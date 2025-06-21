@@ -1,45 +1,96 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
 import { Platform } from 'react-native';
-
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
+    <SafeAreaProvider>
+      <Tabs
+        screenOptions={{
+          headerShown: false, // Usaremos nuestro header personalizado
+          tabBarActiveTintColor: "#4CAF50",
+          tabBarInactiveTintColor: "#6B7280",
+          tabBarStyle: {
+            backgroundColor: "#1C1E30", // Color oscuro coherente con las páginas
+            borderTopWidth: 1,
+            borderTopColor: "#2A2D47",
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: {
+              width: 0,
+              height: -2,
+            },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            height: Platform.OS === "ios" ? 90 : 70,
+            paddingTop: 8,
+            paddingBottom: Platform.OS === "ios" ? 25 : 8,
           },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: "600",
+            marginTop: 4,
+          },
+          tabBarIconStyle: {
+            marginTop: 2,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+      >
+        {/* 4 pestañas visibles */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Inicio",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons
+                name="home-variant"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="nutrition"
+          options={{
+            title: "Nutrición",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons
+                name="nutrition"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="work"
+          options={{
+            title: "Ejercicios",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons
+                name="dumbbell"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="stats"
+          options={{
+            title: "Estadísticas",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons
+                name="chart-bar"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+    </SafeAreaProvider>
   );
 }
