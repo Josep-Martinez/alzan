@@ -7,7 +7,7 @@ import { ProgressBar } from 'react-native-paper';
 
 export default function HomeScreen() {
   /* --- DATOS MOCK PARA DEMOSTRACIÓN --- */
-  const userName = 'JOSEP';                                                  
+  const userName = 'Josep';                                                  
   const kcalConsumed = 1250;                  
   const kcalGoal = 2000;
   const steps = 7832;
