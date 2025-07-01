@@ -43,7 +43,7 @@ export function MealCard({ meal, onConfirm, onEdit }: MealCardProps) {
     <View style={styles.mealCard}>
       <LinearGradient
         colors={meal.isConfirmed 
-          ? ['rgba(0, 212, 170, 0.7)', 'rgba(16, 185, 129, 0.7)'] 
+          ? ['rgba(0, 220, 180, 0.45)', 'rgba(20, 195, 140, 0.45)'] 
           : ['#2D2D5F', '#3D3D7F']
         }
         style={styles.mealGradient}
@@ -305,4 +305,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  
 });

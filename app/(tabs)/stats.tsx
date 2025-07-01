@@ -1,58 +1,211 @@
 // app/(tabs)/stats.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+// Importación de componentes modulares
+import { AddMeasurementModal } from '../../components/stats/AddMeasurementModal';
+import { ChartSection } from '../../components/stats/ChartSection';
+import { ConsistencySection } from '../../components/stats/ConsistencySection';
+import { MetricCard } from '../../components/stats/MetricCard';
+import { RecordsSection } from '../../components/stats/RecordsSection';
+
+/**
+ * Pantalla principal de estadísticas
+ * - Muestra métricas corporales con progreso hacia objetivos
+ * - Gráfica interactiva con múltiples métricas y períodos
+ * - Consistencia semanal con deportes multicolor
+ * - Récords personales preparados para navegación futura
+ * - Modal para añadir mediciones manuales o automáticas
+ */
 export default function StatsScreen() {
+  /* -------- ESTADO DE LA INTERFAZ -------- */
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<'peso' | 'grasa' | 'musculo' | 'cintura' | 'pecho' | 'brazo' | 'muslo'>('peso');
+  const [selectedPeriod, setSelectedPeriod] = useState<'7dias' | '30dias' | '90dias'>('30dias');
+
   /* -------- DATOS ESTÁTICOS - TODO: Conectar con base de datos -------- */
   
-  // Métricas corporales actuales
+  // Métricas corporales actuales (algunas pueden no estar disponibles)
   const currentStats = {
-    weight: 72.5,     // kg - peso actual
-    height: 175,      // cm - altura (para calcular IMC)
-    bodyFat: 15.2,    // % - porcentaje de grasa corporal
-    muscle: 34.8,     // kg - masa muscular
-    water: 58.3,      // % - porcentaje de agua corporal
+    weight: 72.5,     // kg - peso actual (obligatorio)
+    height: 175,      // cm - altura (se configura una vez en perfil)
+    bodyFat: 15.2,    // % - porcentaje de grasa corporal (opcional, se puede calcular)
+    muscle: 34.8,     // kg - masa muscular (opcional, se puede calcular)
+    water: 58.3,      // % - porcentaje de agua corporal (opcional)
+    waist: 82,        // cm - cintura (opcional, ideal mensual)
+    chest: 98,        // cm - pecho (opcional, ideal mensual)
+    arm: 35,          // cm - brazo (opcional, ideal mensual)
+    thigh: 58,        // cm - muslo (opcional, ideal mensual)
   };
 
-  // Cálculo automático del IMC
-  const bmi = currentStats.weight / Math.pow(currentStats.height / 100, 2);
-
-  // Datos históricos mensuales para la gráfica (últimos 30 días aproximadamente)
-  const monthlyWeightData = [
-    { date: '5/4', weight: 89.2 },
-    { date: '5/7', weight: 88.8 },
-    { date: '5/11', weight: 87.9 },
-    { date: '5/14', weight: 87.5 },
-    { date: '5/18', weight: 86.8 },
-    { date: '5/21', weight: 86.2 },
-    { date: '5/25', weight: 85.9 },
-    { date: '5/28', weight: 85.7 },
-    { date: '5/31', weight: 85.3 },
-    { date: '6/4', weight: 85.6 },
-    { date: '6/8', weight: 85.8 },
-    { date: '6/11', weight: 86.1 },
-    { date: '6/14', weight: 88.3 }, // Peso actual mostrado en la gráfica
-  ];
-
-  // Objetivos del usuario
+  // Objetivos del usuario (obligatorios según especificaciones)
   const goals = {
     weightGoal: 75.0,    // kg - peso objetivo
     bodyFatGoal: 12.0,   // % - grasa corporal objetivo
     muscleGoal: 36.0,    // kg - masa muscular objetivo
+    waistGoal: 80,       // cm - cintura objetivo
   };
 
-  // Progreso semanal de entrenamientos (para mostrar consistencia)
-  const weeklyWorkouts = [true, true, false, true, true, false, true]; // L-D
-  const workoutsCompleted = weeklyWorkouts.filter(Boolean).length;
+  // Disponibilidad de métricas (para ocultar las no disponibles)
+  const metricsAvailability = {
+    weight: true,
+    bodyFat: true,
+    muscle: true,
+    water: false,
+    waist: true,
+    chest: false, // Ejemplo: no disponible
+    arm: false,   // Ejemplo: no disponible
+    thigh: false, // Ejemplo: no disponible
+  };
 
-  // Récords personales - TODO: obtener de base de datos de entrenamientos
-  const personalRecords = [
-    { exercise: 'Press Banca', weight: 85, unit: 'kg', date: '2024-01-15' },
-    { exercise: 'Sentadilla', weight: 120, unit: 'kg', date: '2024-01-10' },
-    { exercise: 'Peso Muerto', weight: 140, unit: 'kg', date: '2024-01-08' },
-    { exercise: 'Press Militar', weight: 55, unit: 'kg', date: '2024-01-12' },
+  // Métricas disponibles para la gráfica
+  const availableChartMetrics = [
+    ...(metricsAvailability.weight ? ['peso'] : []),
+    ...(metricsAvailability.bodyFat ? ['grasa'] : []),
+    ...(metricsAvailability.muscle ? ['musculo'] : []),
+    ...(metricsAvailability.waist ? ['cintura'] : []),
+    ...(metricsAvailability.chest ? ['pecho'] : []),
+    ...(metricsAvailability.arm ? ['brazo'] : []),
+    ...(metricsAvailability.thigh ? ['muslo'] : []),
+  ];
+
+  // Datos históricos para diferentes métricas y períodos
+  const chartData = {
+    peso: {
+      '7dias': [
+        { date: '25/6', value: 72.8 },
+        { date: '26/6', value: 72.6 },
+        { date: '27/6', value: 72.7 },
+        { date: '28/6', value: 72.4 },
+        { date: '29/6', value: 72.5 },
+        { date: '30/6', value: 72.3 },
+        { date: '1/7', value: 72.5 },
+      ],
+      '30dias': [
+        { date: '1/6', value: 74.2 },
+        { date: '5/6', value: 73.8 },
+        { date: '10/6', value: 73.5 },
+        { date: '15/6', value: 73.1 },
+        { date: '20/6', value: 72.8 },
+        { date: '25/6', value: 72.6 },
+        { date: '1/7', value: 72.5 },
+      ],
+      '90dias': [
+        { date: '1/4', value: 76.5 },
+        { date: '15/4', value: 75.8 },
+        { date: '1/5', value: 75.2 },
+        { date: '15/5', value: 74.6 },
+        { date: '1/6', value: 74.2 },
+        { date: '15/6', value: 73.1 },
+        { date: '1/7', value: 72.5 },
+      ]
+    },
+    grasa: {
+      '7dias': [
+        { date: '25/6', value: 15.5 },
+        { date: '26/6', value: 15.3 },
+        { date: '27/6', value: 15.4 },
+        { date: '28/6', value: 15.2 },
+        { date: '29/6', value: 15.1 },
+        { date: '30/6', value: 15.0 },
+        { date: '1/7', value: 15.2 },
+      ],
+      '30dias': [
+        { date: '1/6', value: 16.2 },
+        { date: '5/6', value: 15.9 },
+        { date: '10/6', value: 15.7 },
+        { date: '15/6', value: 15.5 },
+        { date: '20/6', value: 15.3 },
+        { date: '25/6', value: 15.1 },
+        { date: '1/7', value: 15.2 },
+      ],
+      '90dias': [
+        { date: '1/4', value: 17.8 },
+        { date: '15/4', value: 17.2 },
+        { date: '1/5', value: 16.8 },
+        { date: '15/5', value: 16.4 },
+        { date: '1/6', value: 16.2 },
+        { date: '15/6', value: 15.5 },
+        { date: '1/7', value: 15.2 },
+      ]
+    },
+    musculo: {
+      '7dias': [
+        { date: '25/6', value: 34.5 },
+        { date: '26/6', value: 34.6 },
+        { date: '27/6', value: 34.7 },
+        { date: '28/6', value: 34.8 },
+        { date: '29/6', value: 34.8 },
+        { date: '30/6', value: 34.9 },
+        { date: '1/7', value: 34.8 },
+      ],
+      '30dias': [
+        { date: '1/6', value: 33.8 },
+        { date: '5/6', value: 34.0 },
+        { date: '10/6', value: 34.2 },
+        { date: '15/6', value: 34.4 },
+        { date: '20/6', value: 34.6 },
+        { date: '25/6', value: 34.7 },
+        { date: '1/7', value: 34.8 },
+      ],
+      '90dias': [
+        { date: '1/4', value: 32.5 },
+        { date: '15/4', value: 33.0 },
+        { date: '1/5', value: 33.4 },
+        { date: '15/5', value: 33.7 },
+        { date: '1/6', value: 33.8 },
+        { date: '15/6', value: 34.4 },
+        { date: '1/7', value: 34.8 },
+      ]
+    },
+    cintura: {
+      '30dias': [
+        { date: '1/6', value: 84 },
+        { date: '15/6', value: 83 },
+        { date: '1/7', value: 82 },
+      ],
+      '90dias': [
+        { date: '1/4', value: 86 },
+        { date: '1/5', value: 85 },
+        { date: '1/6', value: 84 },
+        { date: '15/6', value: 83 },
+        { date: '1/7', value: 82 },
+      ]
+    },
+  };
+
+  // Progreso semanal de entrenamientos con deportes
+  const weeklyWorkouts = [
+    { 
+      hasWorkout: true, 
+      sports: [{ id: 'gimnasio', name: 'Gimnasio', color: '#FF6B6B', icon: 'dumbbell' }] 
+    },
+    { 
+      hasWorkout: true, 
+      sports: [
+        { id: 'running', name: 'Running', color: '#4ECDC4', icon: 'run' },
+        { id: 'yoga', name: 'Yoga', color: '#FECA57', icon: 'meditation' }
+      ] 
+    },
+    { hasWorkout: false, sports: [] },
+    { 
+      hasWorkout: true, 
+      sports: [{ id: 'gimnasio', name: 'Gimnasio', color: '#FF6B6B', icon: 'dumbbell' }] 
+    },
+    { 
+      hasWorkout: true, 
+      sports: [{ id: 'ciclismo', name: 'Ciclismo', color: '#45B7D1', icon: 'bike' }] 
+    },
+    { hasWorkout: false, sports: [] },
+    { 
+      hasWorkout: true, 
+      sports: [
+        { id: 'gimnasio', name: 'Gimnasio', color: '#FF6B6B', icon: 'dumbbell' },
+        { id: 'natacion', name: 'Natación', color: '#96CEB4', icon: 'swim' }
+      ] 
+    },
   ];
 
   // Función helper para clasificar IMC
@@ -67,22 +220,77 @@ export default function StatsScreen() {
   const getProgressToGoal = (current: number, goal: number, isReverse = false) => {
     if (isReverse) {
       // Para grasa corporal (queremos reducir)
-      const progress = Math.max(0, Math.min(100, ((current - goal) / current) * 100));
-      return 100 - progress;
+      const progress = Math.max(0, Math.min(100, ((goal / current) * 100)));
+      return progress;
     } else {
       // Para peso/músculo (queremos aumentar)
       return Math.max(0, Math.min(100, (current / goal) * 100));
     }
   };
 
-  // Función para calcular la diferencia con el objetivo
-  const getWeightDifference = () => {
-    const currentWeight = monthlyWeightData[monthlyWeightData.length - 1].weight;
-    const difference = currentWeight - goals.weightGoal;
-    return difference > 0 ? `+${difference.toFixed(1)}kg` : `${difference.toFixed(1)}kg`;
+  // Calcular IMC
+  const bmi = currentStats.weight / Math.pow(currentStats.height / 100, 2);
+  const bmiInfo = getBMICategory(bmi);
+
+  // Obtener datos de gráfica según selección
+  const getCurrentChartData = () => {
+    return (chartData as any)[selectedMetric]?.[selectedPeriod] || [];
   };
 
-  const bmiInfo = getBMICategory(bmi);
+  const getCurrentChartValue = () => {
+    const data = getCurrentChartData();
+    if (!data.length) return '0';
+    
+    switch (selectedMetric) {
+      case 'peso': return currentStats.weight.toString();
+      case 'grasa': return currentStats.bodyFat?.toString() || '0';
+      case 'musculo': return currentStats.muscle?.toString() || '0';
+      case 'cintura': return currentStats.waist?.toString() || '0';
+      case 'pecho': return currentStats.chest?.toString() || '0';
+      case 'brazo': return currentStats.arm?.toString() || '0';
+      case 'muslo': return currentStats.thigh?.toString() || '0';
+      default: return '0';
+    }
+  };
+
+  const getCurrentChartUnit = () => {
+    switch (selectedMetric) {
+      case 'peso': return 'kg';
+      case 'grasa': 
+      case 'musculo': return '%';
+      case 'cintura':
+      case 'pecho':
+      case 'brazo':
+      case 'muslo': return 'cm';
+      default: return '';
+    }
+  };
+
+  const getCurrentGoal = () => {
+    switch (selectedMetric) {
+      case 'peso': return goals.weightGoal;
+      case 'grasa': return goals.bodyFatGoal;
+      case 'musculo': return goals.muscleGoal;
+      case 'cintura': return goals.waistGoal;
+      default: return undefined;
+    }
+  };
+
+  // Handlers
+  const handleAddMeasurement = (data: any) => {
+    console.log('Nueva medición:', data);
+    // TODO: Guardar en base de datos
+  };
+
+  const handleRecordPress = (record: any) => {
+    console.log('Récord seleccionado:', record);
+    // TODO: Navegar a vista de detalles del récord
+  };
+
+  const handleViewAllRecords = () => {
+    console.log('Ver todos los récords');
+    // TODO: Navegar a vista completa de récords
+  };
 
   return (
     <LinearGradient
@@ -104,7 +312,6 @@ export default function StatsScreen() {
           <View style={styles.mainMetrics}>
             <Text style={styles.sectionTitle}>Métricas Corporales</Text>
             
-            {/* Grid de métricas 2x2 */}
             <View style={styles.metricsGrid}>
               <MetricCard 
                 icon="weight" 
@@ -114,6 +321,7 @@ export default function StatsScreen() {
                 progress={getProgressToGoal(currentStats.weight, goals.weightGoal)}
                 goal={goals.weightGoal}
                 color="#00D4AA"
+                isAvailable={metricsAvailability.weight}
               />
               
               <MetricCard 
@@ -123,215 +331,86 @@ export default function StatsScreen() {
                 unit=""
                 subtitle={bmiInfo.category}
                 color={bmiInfo.color}
+                isAvailable={metricsAvailability.weight} // Depende del peso
               />
               
               <MetricCard 
                 icon="scale-bathroom" 
                 label="Grasa Corporal" 
-                value={currentStats.bodyFat.toString()} 
+                value={currentStats.bodyFat?.toString() || '0'} 
                 unit="%"
-                progress={getProgressToGoal(currentStats.bodyFat, goals.bodyFatGoal, true)}
+                progress={getProgressToGoal(currentStats.bodyFat || 0, goals.bodyFatGoal, true)}
                 goal={goals.bodyFatGoal}
                 color="#FF6B6B"
+                isAvailable={metricsAvailability.bodyFat}
               />
               
               <MetricCard 
                 icon="arm-flex" 
                 label="Masa Muscular" 
-                value={currentStats.muscle.toString()} 
+                value={currentStats.muscle?.toString() || '0'} 
                 unit="kg"
-                progress={getProgressToGoal(currentStats.muscle, goals.muscleGoal)}
+                progress={getProgressToGoal(currentStats.muscle || 0, goals.muscleGoal)}
                 goal={goals.muscleGoal}
                 color="#A78BFA"
+                isAvailable={metricsAvailability.muscle}
+              />
+
+              <MetricCard 
+                icon="water" 
+                label="Agua Corporal" 
+                value={currentStats.water?.toString() || '0'} 
+                unit="%"
+                color="#42A5F5"
+                isAvailable={metricsAvailability.water}
+              />
+
+              <MetricCard 
+                icon="ruler" 
+                label="Cintura" 
+                value={currentStats.waist?.toString() || '0'} 
+                unit="cm"
+                progress={getProgressToGoal(currentStats.waist || 0, goals.waistGoal, true)}
+                goal={goals.waistGoal}
+                color="#FFB84D"
+                isAvailable={metricsAvailability.waist}
               />
             </View>
           </View>
 
-          {/* Gráfica Mensual de Peso */}
-          <View style={styles.chartSection}>
-            <LinearGradient
-              colors={['#2D2D5F', '#3D3D7F']}
-              style={styles.chartGradient}
-            >
-              {/* Header de la gráfica */}
-              <View style={styles.chartHeader}>
-                <Text style={styles.cardTitle}>Historial de Peso</Text>
-                <View style={styles.chartHeaderRight}>
-                  <Text style={styles.currentWeightText}>
-                    {monthlyWeightData[monthlyWeightData.length - 1].weight}kg
-                  </Text>
-                  <Text style={styles.dateText}>
-                    jun 14, 2025
-                  </Text>
-                </View>
-              </View>
+          {/* Gráfica Interactiva */}
+          <ChartSection
+            title="Historial de Progreso"
+            currentValue={getCurrentChartValue()}
+            unit={getCurrentChartUnit()}
+            currentDate="jul 1, 2025"
+            data={getCurrentChartData()}
+            selectedMetric={selectedMetric}
+            selectedPeriod={selectedPeriod}
+            goal={getCurrentGoal()}
+            onMetricChange={setSelectedMetric}
+            onPeriodChange={setSelectedPeriod}
+          />
 
-              {/* Contenedor de la gráfica */}
-              <View style={styles.chartContainer}>
-                {/* Área de la gráfica */}
-                <View style={styles.chartArea}>
-                  {/* Líneas de referencia horizontales */}
-                  <View style={styles.gridLines}>
-                    <View style={styles.gridLine} />
-                    <View style={styles.gridLine} />
-                    <View style={styles.gridLine} />
-                    <View style={styles.gridLine} />
-                  </View>
-
-                  {/* Etiquetas del eje Y */}
-                  <View style={styles.yAxisLabels}>
-                    <Text style={styles.yAxisLabel}>95.0</Text>
-                    <Text style={styles.yAxisLabel}>90.0</Text>
-                    <Text style={styles.yAxisLabel}>87.5</Text>
-                    <Text style={styles.yAxisLabel}>85.0</Text>
-                    <Text style={styles.yAxisLabel}>kg</Text>
-                  </View>
-
-                  {/* Gráfica de línea */}
-                  <View style={styles.lineChart}>
-                    {monthlyWeightData.map((point, index) => {
-                      // Calcular posición vertical basada en el peso
-                      const minWeight = 85.0;
-                      const maxWeight = 95.0;
-                      const normalizedWeight = (maxWeight - point.weight) / (maxWeight - minWeight);
-                      const yPosition = normalizedWeight * 100; // Porcentaje desde arriba
-
-                      return (
-                        <View key={index} style={styles.dataPointContainer}>
-                          {/* Punto de datos */}
-                          <View 
-                            style={[
-                              styles.dataPoint, 
-                              { top: `${yPosition}%` },
-                              index === monthlyWeightData.length - 1 && styles.currentDataPoint
-                            ]} 
-                          />
-                          
-                          {/* Línea conectora (excepto para el último punto) */}
-                          {index < monthlyWeightData.length - 1 && (
-                            <View 
-                              style={[
-                                styles.connector,
-                                { top: `${yPosition}%` }
-                              ]} 
-                            />
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  {/* Área rellena bajo la curva */}
-                  <View style={styles.chartFill} />
-                </View>
-
-                {/* Etiquetas del eje X */}
-                <View style={styles.xAxisLabels}>
-                  {['5/4', '5/11', '5/18', '5/25', '5/31', '6/8', '6/14'].map((date, index) => (
-                    <Text key={index} style={styles.xAxisLabel}>{date}</Text>
-                  ))}
-                </View>
-              </View>
-
-              {/* Progreso hacia objetivo */}
-              <View style={styles.goalProgress}>
-                <Text style={styles.goalProgressText}>
-                  Comparar con su objetivo: 
-                  <Text style={styles.goalDifference}> {getWeightDifference()}</Text>
-                </Text>
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* Consistencia de Entrenamiento */}
-          <View style={styles.consistencySection}>
-            <LinearGradient
-              colors={['#2D2D5F', '#3D3D7F']}
-              style={styles.consistencyGradient}
-            >
-              <View style={styles.consistencyHeader}>
-                <MaterialCommunityIcons name="calendar-check" size={24} color="#FFB84D" />
-                <Text style={styles.cardTitle}>Consistencia Semanal</Text>
-              </View>
-              
-              <Text style={styles.consistencyText}>
-                {workoutsCompleted} de 7 entrenamientos completados
-              </Text>
-              
-              <View style={styles.weekRow}>
-                {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, index) => {
-                  const isCompleted = weeklyWorkouts[index];
-                  const isToday = index === 3; // Jueves como ejemplo
-                  
-                  return (
-                    <View key={day} style={styles.dayContainer}>
-                      <Text style={[
-                        styles.dayLabel,
-                        isToday && styles.dayLabelToday
-                      ]}>
-                        {day}
-                      </Text>
-                      <View style={[
-                        styles.workoutDot,
-                        isCompleted && styles.workoutDotCompleted,
-                        isToday && styles.workoutDotToday
-                      ]}>
-                        {isCompleted && (
-                          <MaterialCommunityIcons 
-                            name="dumbbell" 
-                            size={12} 
-                            color="#FFFFFF" 
-                          />
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </LinearGradient>
-          </View>
+          {/* Consistencia Semanal */}
+          <ConsistencySection
+            weekData={weeklyWorkouts as any}
+            totalExercises={12}
+            totalPlanned={15}
+          />
 
           {/* Récords Personales */}
-          <View style={styles.recordsSection}>
-            <Text style={styles.sectionTitle}>Récords Personales</Text>
-            
-            {personalRecords.map((record, index) => (
-              <RecordCard 
-                key={index}
-                exercise={record.exercise}
-                weight={record.weight}
-                unit={record.unit}
-                date={record.date}
-              />
-            ))}
-          </View>
-
-          {/* Métricas Adicionales */}
-          <View style={styles.additionalMetrics}>
-            <LinearGradient
-              colors={['#2D2D5F', '#3D3D7F']}
-              style={styles.additionalGradient}
-            >
-              <Text style={styles.cardTitle}>Composición Corporal</Text>
-              
-              <View style={styles.compositionGrid}>
-                <View style={styles.compositionItem}>
-                  <MaterialCommunityIcons name="water" size={24} color="#42A5F5" />
-                  <Text style={styles.compositionValue}>{currentStats.water}%</Text>
-                  <Text style={styles.compositionLabel}>Agua</Text>
-                </View>
-                
-                <View style={styles.compositionItem}>
-                  <MaterialCommunityIcons name="ruler" size={24} color="#FFB84D" />
-                  <Text style={styles.compositionValue}>{currentStats.height}cm</Text>
-                  <Text style={styles.compositionLabel}>Altura</Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
+          <RecordsSection
+            records={personalRecords}
+            onRecordPress={handleRecordPress}
+            onViewAllPress={handleViewAllRecords}
+          />
 
           {/* Botón para añadir medición */}
-          <Pressable style={styles.addMeasurementBtn}>
+          <Pressable 
+            style={styles.addMeasurementBtn}
+            onPress={() => setShowAddModal(true)}
+          >
             <LinearGradient
               colors={['#00D4AA', '#00B894']}
               style={styles.addBtnGradient}
@@ -344,110 +423,17 @@ export default function StatsScreen() {
           <View style={{ height: 20 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Modal para añadir mediciones */}
+      <AddMeasurementModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={handleAddMeasurement}
+      />
     </LinearGradient>
   );
 }
 
-/* --- Componentes Helper --- */
-
-// Componente para tarjetas de métricas principales
-function MetricCard({ 
-  icon, 
-  label, 
-  value, 
-  unit, 
-  subtitle, 
-  progress, 
-  goal, 
-  color 
-}: { 
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  label: string; 
-  value: string; 
-  unit: string;
-  subtitle?: string;
-  progress?: number;
-  goal?: number;
-  color: string;
-}) {
-  return (
-    <View style={styles.metricCard}>
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.02)']}
-        style={styles.metricGradient}
-      >
-        <MaterialCommunityIcons name={icon} size={28} color={color} />
-        
-        <View style={styles.metricContent}>
-          <Text style={styles.metricValue}>
-            {value}<Text style={styles.metricUnit}>{unit}</Text>
-          </Text>
-          <Text style={styles.metricLabel}>{label}</Text>
-          
-          {subtitle && (
-            <Text style={[styles.metricSubtitle, { color }]}>{subtitle}</Text>
-          )}
-          
-          {progress !== undefined && goal && (
-            <>
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBg}>
-                  <View 
-                    style={[
-                      styles.progressFill, 
-                      { width: `${Math.min(progress, 100)}%`, backgroundColor: color }
-                    ]} 
-                  />
-                </View>
-              </View>
-              <Text style={styles.goalText}>Meta: {goal}{unit}</Text>
-            </>
-          )}
-        </View>
-      </LinearGradient>
-    </View>
-  );
-}
-
-// Componente para tarjetas de récords personales
-function RecordCard({ 
-  exercise, 
-  weight, 
-  unit, 
-  date 
-}: { 
-  exercise: string; 
-  weight: number; 
-  unit: string; 
-  date: string; 
-}) {
-  return (
-    <View style={styles.recordCard}>
-      <LinearGradient
-        colors={['#2D2D5F', '#3D3D7F']}
-        style={styles.recordGradient}
-      >
-        <View style={styles.recordContent}>
-          <View style={styles.recordInfo}>
-            <Text style={styles.recordExercise}>{exercise}</Text>
-            <Text style={styles.recordDate}>
-              {new Date(date).toLocaleDateString('es-ES')}
-            </Text>
-          </View>
-          
-          <View style={styles.recordWeight}>
-            <Text style={styles.recordValue}>{weight}</Text>
-            <Text style={styles.recordUnit}>{unit}</Text>
-          </View>
-        </View>
-        
-        <MaterialCommunityIcons name="trophy" size={20} color="#FFB84D" />
-      </LinearGradient>
-    </View>
-  );
-}
-
-/* --- Estilos --- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -499,395 +485,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  metricCard: {
-    width: '48%',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  metricGradient: {
-    padding: 16,
-    alignItems: 'center',
-  },
-
-  metricContent: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-
-  metricValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-
-  metricUnit: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#B0B0C4',
-  },
-
-  metricLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-
-  metricSubtitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-
-  progressContainer: {
-    width: '100%',
-    marginBottom: 4,
-  },
-
-  progressBg: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 2,
-  },
-
-  progressFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-
-  goalText: {
-    fontSize: 10,
-    color: '#B0B0C4',
-  },
-
-  /* --- Estilos para la nueva gráfica mensual --- */
-  chartSection: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  chartGradient: {
-    padding: 20,
-  },
-
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-
-  chartHeaderRight: {
-    alignItems: 'flex-end',
-  },
-
-  currentWeightText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  dateText: {
-    fontSize: 14,
-    color: '#B0B0C4',
-    marginTop: 2,
-  },
-
-  chartContainer: {
-    height: 200,
-    marginBottom: 16,
-  },
-
-  chartArea: {
-    flex: 1,
-    position: 'relative',
-  },
-
-  gridLines: {
-    position: 'absolute',
-    top: 0,
-    left: 40,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'space-between',
-  },
-
-  gridLine: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-
-  yAxisLabels: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 35,
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-
-  yAxisLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-    textAlign: 'right',
-  },
-
-  lineChart: {
-    position: 'absolute',
-    top: 0,
-    left: 40,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
-  },
-
-  dataPointContainer: {
-    position: 'relative',
-    width: 8,
-    height: '100%',
-  },
-
-  dataPoint: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4A9EFF',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    left: 0,
-    transform: [{ translateY: -4 }],
-  },
-
-  currentDataPoint: {
-    backgroundColor: '#4A9EFF',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 3,
-    transform: [{ translateY: -5 }],
-  },
-
-  connector: {
-    position: 'absolute',
-    height: 2,
-    backgroundColor: '#4A9EFF',
-    left: 8,
-    width: 20,
-    transform: [{ translateY: -1 }],
-  },
-
-  chartFill: {
-    position: 'absolute',
-    bottom: 0,
-    left: 40,
-    right: 0,
-    height: '70%',
-    backgroundColor: 'rgba(74, 158, 255, 0.2)',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-
-  xAxisLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
-    marginTop: 8,
-  },
-
-  xAxisLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-    textAlign: 'center',
-  },
-
-  goalProgress: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    paddingTop: 16,
-  },
-
-  goalProgressText: {
-    fontSize: 14,
-    color: '#B0B0C4',
-  },
-
-  goalDifference: {
-    color: '#FFB84D',
-    fontWeight: '600',
-  },
-
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 0,
-  },
-
-  /* --- Resto de estilos existentes --- */
-  consistencySection: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  consistencyGradient: {
-    padding: 20,
-  },
-
-  consistencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-
-  consistencyText: {
-    fontSize: 14,
-    color: '#B0B0C4',
-    marginBottom: 16,
-  },
-
-  weekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  dayContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-
-  dayLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-
-  dayLabelToday: {
-    color: '#FFB84D',
-  },
-
-  workoutDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  workoutDotCompleted: {
-    backgroundColor: '#00D4AA',
-  },
-
-  workoutDotToday: {
-    borderWidth: 2,
-    borderColor: '#FFB84D',
-  },
-
-  recordsSection: {
-    marginBottom: 20,
-  },
-
-  recordCard: {
-    marginHorizontal: 20,
-    marginBottom: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  recordGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-
-  recordContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-
-  recordInfo: {
-    flex: 1,
-  },
-
-  recordExercise: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-
-  recordDate: {
-    fontSize: 12,
-    color: '#B0B0C4',
-  },
-
-  recordWeight: {
-    alignItems: 'center',
-  },
-
-  recordValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  recordUnit: {
-    fontSize: 12,
-    color: '#B0B0C4',
-  },
-
-  additionalMetrics: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  additionalGradient: {
-    padding: 20,
-  },
-
-  compositionGrid: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-
-  compositionItem: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-  },
-
-  compositionValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-
-  compositionLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-  },
-
   addMeasurementBtn: {
     marginHorizontal: 20,
     borderRadius: 16,
@@ -908,3 +505,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+  // Récords personales
+  const personalRecords = [
+    { id: '1', exercise: 'Press Banca', weight: 85, unit: 'kg', date: '2024-06-15', improvement: 2.5 },
+    { id: '2', exercise: 'Sentadilla', weight: 120, unit: 'kg', date: '2024-06-10', improvement: 5 },
+    { id: '3', exercise: 'Peso Muerto', weight: 140, unit: 'kg', date: '2024-06-08', improvement: 10 },
+    { id: '4', exercise: 'Press Militar', weight: 55, unit: 'kg', date: '2024-06-12', improvement: 2 },
+  ];

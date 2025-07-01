@@ -601,7 +601,7 @@ export default function NutritionScreen() {
 
                 <View style={styles.macrosGrid}>
                   <View style={styles.macroItem}>
-                    <Text style={[styles.macroValue, { color: '#00D4AA' }]}>{dayNutrition.totalProtein}g</Text>
+                    <Text style={[styles.macroValue, { color: '#FF6B6B' }]}>{dayNutrition.totalProtein}g</Text>
                     <Text style={styles.macroLabel}>Proteínas</Text>
                   </View>
                   <View style={styles.macroItem}>
@@ -609,7 +609,7 @@ export default function NutritionScreen() {
                     <Text style={styles.macroLabel}>Carbohidratos</Text>
                   </View>
                   <View style={styles.macroItem}>
-                    <Text style={[styles.macroValue, { color: '#FF6B6B' }]}>{dayNutrition.totalFats}g</Text>
+                    <Text style={[styles.macroValue, { color: '#8B5CF6' }]}>{dayNutrition.totalFats}g</Text>
                     <Text style={styles.macroLabel}>Grasas</Text>
                   </View>
                 </View>
@@ -647,7 +647,7 @@ export default function NutritionScreen() {
               <View key={meal.id} style={styles.mealSection}>
                 <LinearGradient
                   colors={meal.isCompleted 
-                    ? ['rgba(0, 212, 170, 0.3)', 'rgba(16, 185, 129, 0.3)'] 
+                    ? ['rgba(0, 220, 180, 0.45)', 'rgba(20, 195, 140, 0.45)'] 
                     : ['#2D2D5F', '#3D3D7F']
                   }
                   style={styles.mealGradient}
@@ -1503,9 +1503,9 @@ const styles = StyleSheet.create({
   },
   
   checkCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
