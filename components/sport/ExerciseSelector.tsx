@@ -1,7 +1,7 @@
-// components/sport/ExerciseSelector.tsx - Versión corregida con scroll funcional
+// components/sport/ExerciseSelector.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -10,225 +10,212 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from 'react-native';
 
-// Interfaz simplificada para ejercicio manual
-interface ManualExercise {
+import exercisesData from '../../assets/data/ejercicios_esp.json';
+
+// ---- Tipos ---- //
+export interface ManualExercise {
   id: string;
   name: string;
+  description?: string;
 }
 
 interface ExerciseSelectorProps {
   visible: boolean;
-  onClose: () => void;
   onSelectExercise: (exercise: ManualExercise) => void;
+  onClose: () => void;
 }
 
-export default function ExerciseSelector({ visible, onClose, onSelectExercise }: ExerciseSelectorProps) {
-  const [exerciseName, setExerciseName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+/**
+ * Modal selector de ejercicios con diseño minimalista
+ * - Búsqueda inteligente por nombre
+ * - Filtros por grupo muscular, equipamiento y nivel
+ * - Vista de descripción expandible
+ * - Estética moderna y limpia
+ */
+export default function ExerciseSelector({
+  visible,
+  onSelectExercise,
+  onClose,
+}: ExerciseSelectorProps) {
+  const [search, setSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
+  const [equipmentFilter, setEquipmentFilter] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
 
-  // Categorías predefinidas para organizar
-  const categories = [
-    { id: 'chest', name: 'Pecho', icon: 'arm-flex' },
-    { id: 'back', name: 'Espalda', icon: 'human-handsup' },
-    { id: 'shoulders', name: 'Hombros', icon: 'account-outline' },
-    { id: 'arms', name: 'Brazos', icon: 'arm-flex-outline' },
-    { id: 'legs', name: 'Piernas', icon: 'human-male' },
-    { id: 'abs', name: 'Abdomen', icon: 'ab-testing' },
-    { id: 'cardio', name: 'Cardio', icon: 'heart' },
-    { id: 'other', name: 'Otro', icon: 'dumbbell' }
-  ];
+  // Pre-calcular listas únicas para los filtros
+  const muscles = useMemo(
+    () => Array.from(new Set(exercisesData.map((e) => e['Grupo Muscular']))).sort(),
+    []
+  );
 
-  // Ejercicios sugeridos por categoría (solo nombres)
-  const suggestedExercises: Record<string, string[]> = {
-    chest: ['Press banca', 'Flexiones', 'Press inclinado', 'Aperturas', 'Fondos'],
-    back: ['Dominadas', 'Remo', 'Peso muerto', 'Jalones', 'Remo con barra'],
-    shoulders: ['Press militar', 'Elevaciones laterales', 'Press hombro', 'Pájaros', 'Press Arnold'],
-    arms: ['Curl bíceps', 'Tríceps', 'Curl martillo', 'Press francés', 'Fondos tríceps'],
-    legs: ['Sentadillas', 'Prensa', 'Zancadas', 'Peso muerto rumano', 'Extensiones'],
-    abs: ['Abdominales', 'Plancha', 'Crunches', 'Elevaciones piernas', 'Russian twist'],
-    cardio: ['Cinta', 'Elíptica', 'Bicicleta', 'Remo', 'Burpees'],
-    other: ['Ejercicio personalizado']
-  };
+  const equipments = useMemo(
+    () => Array.from(new Set(exercisesData.map((e) => e['Equipamiento']))).sort(),
+    []
+  );
 
-  /**
-   * Función para añadir ejercicio personalizado
-   * Valida que el nombre no esté vacío y crea el ejercicio
-   */
-  const handleAddCustomExercise = () => {
-    if (!exerciseName.trim()) return;
+  const levels = useMemo(
+    () => Array.from(new Set(exercisesData.map((e) => e['Nivel']))).sort(),
+    []
+  );
 
-    const newExercise: ManualExercise = {
-      id: `manual_${Date.now()}`,
-      name: exerciseName.trim()
-    };
+  // Filtrar ejercicios según criterios
+  const filtered = useMemo(() => {
+    return exercisesData.filter((ex) => {
+      const matchSearch =
+        search.trim().length === 0 ||
+        ex['Ejercicio'].toLowerCase().includes(search.trim().toLowerCase());
+      const matchMuscle = !muscleFilter || ex['Grupo Muscular'] === muscleFilter;
+      const matchEquip = !equipmentFilter || ex['Equipamiento'] === equipmentFilter;
+      const matchLevel = !levelFilter || ex['Nivel'] === levelFilter;
 
-    onSelectExercise(newExercise);
+      return matchSearch && matchMuscle && matchEquip && matchLevel;
+    });
+  }, [search, muscleFilter, equipmentFilter, levelFilter]);
+
+  // Manejar selección
+  const handleSelect = (exercise: any) => {
+    onSelectExercise({
+      id: `db_${exercise['Ejercicio'].replace(/\s+/g, '_').toLowerCase()}`,
+      name: exercise['Ejercicio'],
+      description: exercise['Descripción'] || '',
+    });
     resetAndClose();
   };
 
-  /**
-   * Función para seleccionar ejercicio sugerido
-   * Crea el ejercicio desde la lista predefinida
-   */
-  const handleSelectSuggested = (name: string) => {
-    const exercise: ManualExercise = {
-      id: `suggested_${Date.now()}`,
-      name: name
-    };
-
-    onSelectExercise(exercise);
-    resetAndClose();
-  };
-
-  /**
-   * Función para limpiar estado y cerrar modal
-   */
   const resetAndClose = () => {
-    setExerciseName('');
-    setSelectedCategory('');
+    setSearch('');
+    setMuscleFilter(null);
+    setEquipmentFilter(null);
+    setLevelFilter(null);
+    setExpandedExercise(null);
     onClose();
   };
+
+  const clearAllFilters = () => {
+    setMuscleFilter(null);
+    setEquipmentFilter(null);
+    setLevelFilter(null);
+  };
+
+  const hasActiveFilters = muscleFilter || equipmentFilter || levelFilter;
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="fullScreen" // Cambio clave: fullScreen para mejor scroll
+      presentationStyle="pageSheet"
+      onRequestClose={resetAndClose}
     >
       <LinearGradient
         colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
-          {/* Header fijo */}
+          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Añadir Ejercicio</Text>
+            <Text style={styles.title}>Seleccionar Ejercicio</Text>
             <Pressable onPress={resetAndClose} style={styles.closeButton}>
-              <MaterialCommunityIcons name="close" size={24} color="#B0B0C4" />
+              <MaterialCommunityIcons name="close" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
 
-          {/* Contenido scrolleable */}
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            bounces={true} // Permite bounce en iOS
-            scrollEventThrottle={16} // Mejora performance del scroll
-          >
-            {/* Ejercicio personalizado */}
-            <View style={styles.customSection}>
-              <Text style={styles.sectionTitle}>Ejercicio Personalizado</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  value={exerciseName}
-                  onChangeText={setExerciseName}
-                  placeholder="Nombre del ejercicio..."
-                  placeholderTextColor="#B0B0C4"
-                  style={styles.textInput}
-                  autoFocus={false} // Evitar auto-focus que puede interferir
-                />
-                <Pressable 
-                  onPress={handleAddCustomExercise}
-                  style={[
-                    styles.addButton,
-                    !exerciseName.trim() && styles.addButtonDisabled
-                  ]}
-                  disabled={!exerciseName.trim()}
-                >
-                  <MaterialCommunityIcons 
-                    name="plus" 
-                    size={20} 
-                    color={exerciseName.trim() ? "#FFFFFF" : "#6B7280"} 
-                  />
-                  <Text style={[
-                    styles.addButtonText,
-                    !exerciseName.trim() && styles.addButtonTextDisabled
-                  ]}>
-                    Añadir
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Separador */}
-            <View style={styles.separator}>
-              <View style={styles.separatorLine} />
-              <Text style={styles.separatorText}>O selecciona uno sugerido</Text>
-              <View style={styles.separatorLine} />
-            </View>
-
-            {/* Categorías */}
-            <View style={styles.categoriesSection}>
-              <Text style={styles.sectionTitle}>Categorías</Text>
-              <View style={styles.categoriesGrid}>
-                {categories.map((category) => (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => setSelectedCategory(
-                      selectedCategory === category.id ? '' : category.id
-                    )}
-                    style={[
-                      styles.categoryCard,
-                      selectedCategory === category.id && styles.categoryCardSelected
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={category.icon as any}
-                      size={24}
-                      color={selectedCategory === category.id ? '#FFFFFF' : '#00D4AA'}
-                    />
-                    <Text style={[
-                      styles.categoryName,
-                      selectedCategory === category.id && styles.categoryNameSelected
-                    ]}>
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Ejercicios sugeridos - Solo se muestran si hay categoría seleccionada */}
-            {selectedCategory && (
-              <View style={styles.suggestionsSection}>
-                <Text style={styles.sectionTitle}>
-                  Ejercicios de {categories.find(c => c.id === selectedCategory)?.name}
-                </Text>
-                <View style={styles.suggestionsList}>
-                  {suggestedExercises[selectedCategory]?.map((exercise, index) => (
-                    <Pressable
-                      key={index}
-                      onPress={() => handleSelectSuggested(exercise)}
-                      style={styles.suggestionItem}
-                    >
-                      <LinearGradient
-                        colors={["#2D2D5F", "#3D3D7F"]}
-                        style={styles.suggestionGradient}
-                      >
-                        <MaterialCommunityIcons
-                          name="dumbbell"
-                          size={20}
-                          color="#00D4AA"
-                        />
-                        <Text style={styles.suggestionName}>{exercise}</Text>
-                        <MaterialCommunityIcons
-                          name="chevron-right"
-                          size={16}
-                          color="#B0B0C4"
-                        />
-                      </LinearGradient>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
+          {/* Búsqueda */}
+          <View style={styles.searchContainer}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#B0B0C4" />
+            <TextInput
+              placeholder="Buscar ejercicio..."
+              placeholderTextColor="#6B7280"
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')} style={styles.clearSearch}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#6B7280" />
+              </Pressable>
             )}
+          </View>
 
-            {/* Espacio adicional al final para mejor scroll */}
-            <View style={styles.bottomSpacer} />
+          {/* Filtros con header */}
+          <View style={styles.filtersSection}>
+            <View style={styles.filtersHeader}>
+              <Text style={styles.filtersTitle}>Filtros</Text>
+              {hasActiveFilters && (
+                <Pressable onPress={clearAllFilters} style={styles.clearFilters}>
+                  <Text style={styles.clearFiltersText}>Limpiar</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Grupo Muscular */}
+            <Text style={styles.filterLabel}>Grupo Muscular</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {muscles.map((muscle) => (
+                <FilterChip
+                  key={muscle}
+                  label={muscle}
+                  selected={muscleFilter === muscle}
+                  onPress={() => setMuscleFilter(muscleFilter === muscle ? null : muscle)}
+                />
+              ))}
+            </ScrollView>
+
+            {/* Equipamiento */}
+            <Text style={styles.filterLabel}>Equipamiento</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {equipments.map((equipment) => (
+                <FilterChip
+                  key={equipment}
+                  label={equipment}
+                  selected={equipmentFilter === equipment}
+                  onPress={() => setEquipmentFilter(equipmentFilter === equipment ? null : equipment)}
+                />
+              ))}
+            </ScrollView>
+
+            {/* Nivel */}
+            <Text style={styles.filterLabel}>Nivel</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {levels.map((level) => (
+                <FilterChip
+                  key={level}
+                  label={level}
+                  selected={levelFilter === level}
+                  onPress={() => setLevelFilter(levelFilter === level ? null : level)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Resultados */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsCount}>
+              {filtered.length} ejercicio{filtered.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+
+          {/* Lista de ejercicios */}
+          <ScrollView style={styles.exercisesList} showsVerticalScrollIndicator={false}>
+            {filtered.map((exercise) => (
+              <ExerciseCard
+                key={exercise['Ejercicio']}
+                exercise={exercise}
+                expanded={expandedExercise === exercise['Ejercicio']}
+                onPress={() => handleSelect(exercise)}
+                onToggleExpand={() => 
+                  setExpandedExercise(
+                    expandedExercise === exercise['Ejercicio'] 
+                      ? null 
+                      : exercise['Ejercicio']
+                  )
+                }
+              />
+            ))}
+            <View style={{ height: 20 }} />
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
@@ -236,8 +223,93 @@ export default function ExerciseSelector({ visible, onClose, onSelectExercise }:
   );
 }
 
+// Componente FilterChip mejorado
+function FilterChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+      android_ripple={{ color: 'rgba(255, 255, 255, 0.1)' }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// Componente ExerciseCard con descripción expandible
+function ExerciseCard({
+  exercise,
+  expanded,
+  onPress,
+  onToggleExpand,
+}: {
+  exercise: any;
+  expanded: boolean;
+  onPress: () => void;
+  onToggleExpand: () => void;
+}) {
+  const hasDescription = exercise['Descripción'] && exercise['Descripción'].trim().length > 0;
+
+  return (
+    <View style={styles.exerciseCard}>
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.02)']}
+        style={styles.exerciseGradient}
+      >
+        <Pressable onPress={onPress} style={styles.exerciseMain}>
+          <View style={styles.exerciseHeader}>
+            <Text style={styles.exerciseName}>{exercise['Ejercicio']}</Text>
+            {hasDescription && (
+              <Pressable onPress={onToggleExpand} style={styles.expandButton}>
+                <MaterialCommunityIcons 
+                  name={expanded ? "chevron-up" : "information-outline"} 
+                  size={20} 
+                  color="#00D4AA" 
+                />
+              </Pressable>
+            )}
+          </View>
+          
+          <View style={styles.exerciseTags}>
+            <Text style={styles.exerciseTag}>{exercise['Grupo Muscular']}</Text>
+            <Text style={styles.exerciseTag}>{exercise['Equipamiento']}</Text>
+            <Text style={[styles.exerciseTag, { color: getLevelColor(exercise['Nivel']) }]}>
+              {exercise['Nivel']}
+            </Text>
+          </View>
+
+          {expanded && hasDescription && (
+            <View style={styles.descriptionContainer}>
+              <Text style={styles.descriptionText}>{exercise['Descripción']}</Text>
+            </View>
+          )}
+        </Pressable>
+      </LinearGradient>
+    </View>
+  );
+}
+
+// Helper para colores de nivel
+function getLevelColor(level: string) {
+  switch (level.toLowerCase()) {
+    case 'principiante': return '#4ADE80';
+    case 'intermedio': return '#FFB84D';
+    case 'avanzado': return '#FF6B6B';
+    default: return '#B0B0C4';
+  }
+}
+
 const styles = StyleSheet.create({
-  // Contenedor principal
   container: {
     flex: 1,
   },
@@ -246,7 +318,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Header fijo que no hace scroll
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -255,173 +326,180 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'transparent', // Fondo transparente para mejor integración
   },
 
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#FFFFFF',
   },
 
   closeButton: {
-    padding: 8,
+    padding: 4,
     borderRadius: 8,
+  },
+
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    height: 44,
   },
 
-  // ScrollView y contenido
-  scrollView: {
+  searchInput: {
     flex: 1,
-  },
-
-  scrollContent: {
-    padding: 20,
-    paddingTop: 10, // Menos padding top ya que header es fijo
-  },
-
-  // Sección de ejercicio personalizado
-  customSection: {
-    marginBottom: 24,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
     color: '#FFFFFF',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+
+  clearSearch: {
+    padding: 4,
+  },
+
+  filtersSection: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+
+  filtersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
 
-  inputContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  textInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  filtersTitle: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#00D4AA',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
+  clearFilters: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
 
-  addButtonDisabled: {
-    backgroundColor: '#6B7280',
-  },
-
-  addButtonText: {
-    color: '#FFFFFF',
+  clearFiltersText: {
     fontSize: 14,
+    color: '#00D4AA',
+    fontWeight: '500',
+  },
+
+  filterLabel: {
+    fontSize: 12,
+    color: '#B0B0C4',
+    marginBottom: 8,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+
+  chipRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+
+  chipSelected: {
+    backgroundColor: '#00D4AA',
+    borderColor: '#00D4AA',
+  },
+
+  chipText: {
+    color: '#B0B0C4',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  chipTextSelected: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 
-  addButtonTextDisabled: {
-    color: '#9CA3AF',
+  resultsHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
 
-  // Separador
-  separator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-    gap: 12,
-  },
-
-  separatorLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-
-  separatorText: {
+  resultsCount: {
     fontSize: 14,
     color: '#B0B0C4',
     fontWeight: '500',
   },
 
-  // Sección de categorías
-  categoriesSection: {
-    marginBottom: 24,
-  },
-
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-
-  categoryCard: {
-    width: '22%', // Ajustado para mejor distribución
-    aspectRatio: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    gap: 6,
-  },
-
-  categoryCardSelected: {
-    backgroundColor: '#00D4AA',
-    borderColor: '#00D4AA',
-  },
-
-  categoryName: {
-    fontSize: 11,
-    color: '#B0B0C4',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  categoryNameSelected: {
-    color: '#FFFFFF',
-  },
-
-  // Sección de sugerencias
-  suggestionsSection: {
+  exercisesList: {
     flex: 1,
+    paddingHorizontal: 20,
   },
 
-  suggestionsList: {
-    gap: 8,
-  },
-
-  suggestionItem: {
+  exerciseCard: {
+    marginTop: 12,
     borderRadius: 12,
     overflow: 'hidden',
   },
 
-  suggestionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  exerciseGradient: {
     padding: 16,
-    gap: 12,
   },
 
-  suggestionName: {
+  exerciseMain: {
+    flex: 1,
+  },
+
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  exerciseName: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
 
-  // Espacio al final para mejor scroll
-  bottomSpacer: {
-    height: 40,
+  expandButton: {
+    padding: 4,
+  },
+
+  exerciseTags: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  exerciseTag: {
+    fontSize: 12,
+    color: '#B0B0C4',
+    fontWeight: '500',
+  },
+
+  descriptionContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  descriptionText: {
+    fontSize: 14,
+    color: '#B0B0C4',
+    lineHeight: 20,
   },
 });
