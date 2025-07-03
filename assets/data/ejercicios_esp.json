@@ -1,5 +1,6 @@
 [
   {
+    "ID": 1,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Apertura pectoral con banda",
     "Nivel": "Principiante",
@@ -7,6 +8,7 @@
     "Descripción": "Sostener banda a altura del pecho, separar brazos hacia los lados"
   },
   {
+    "ID": 2,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Aperturas inclinadas",
     "Nivel": "Intermedio",
@@ -14,6 +16,7 @@
     "Descripción": "Mismo movimiento que aperturas planas pero en banco inclinado"
   },
   {
+    "ID": 3,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Aperturas planas con mancuernas",
     "Nivel": "Principiante-Intermedio",
@@ -21,6 +24,7 @@
     "Descripción": "Brazos abiertos, bajar mancuernas en arco hasta sentir estiramiento"
   },
   {
+    "ID": 4,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Chest fly TRX",
     "Nivel": "Intermedio",
@@ -28,6 +32,7 @@
     "Descripción": "Inclinado hacia adelante, abrir brazos en cruz"
   },
   {
+    "ID": 5,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Cruces con poleas",
     "Nivel": "Intermedio",
@@ -35,6 +40,7 @@
     "Descripción": "De pie entre poleas altas, brazos extendidos, juntar manos adelante del pecho"
   },
   {
+    "ID": 6,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Cruces en máquina (pec deck)",
     "Nivel": "Principiante-Intermedio",
@@ -42,6 +48,7 @@
     "Descripción": "Sentado, brazos en almohadillas, juntar brazos adelante contrayendo pectorales"
   },
   {
+    "ID": 7,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Flexiones con banda elástica",
     "Nivel": "Intermedio",
@@ -49,6 +56,7 @@
     "Descripción": "Banda en espalda, añade resistencia a flexiones tradicionales"
   },
   {
+    "ID": 8,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Flexiones con palmada",
     "Nivel": "Intermedio",
@@ -56,6 +64,7 @@
     "Descripción": "Flexión explosiva, al subir empujar con fuerza para despegar manos y dar palmada"
   },
   {
+    "ID": 9,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Flexiones declinadas",
     "Nivel": "Intermedio-Avanzado",
@@ -63,6 +72,7 @@
     "Descripción": "Pies elevados en banco/caja, flexiones enfocando parte superior del pecho"
   },
   {
+    "ID": 10,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Flexiones diamante",
     "Nivel": "Intermedio-Avanzado",
@@ -70,6 +80,7 @@
     "Descripción": "Manos formando diamante, flexiones con énfasis en tríceps y pecho interno"
   },
   {
+    "ID": 11,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Flexiones tradicionales",
     "Nivel": "Principiante",
@@ -77,6 +88,7 @@
     "Descripción": "Posición de plancha,  manos ancho de hombros"
   },
   {
+    "ID": 12,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press declinado con barra",
     "Nivel": "Intermedio",
@@ -84,6 +96,7 @@
     "Descripción": "Banco declinado, bajar barra al pecho inferior y empujar"
   },
   {
+    "ID": 13,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press de banca con mancuernas",
     "Nivel": "Principiante-Intermedio",
@@ -91,6 +104,7 @@
     "Descripción": "Igual que con barra pero permite mayor rango de movimiento y trabajo unilateral"
   },
   {
+    "ID": 14,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press de banca plano con barra",
     "Nivel": "Principiante-Intermedio",
@@ -98,6 +112,7 @@
     "Descripción": "Acostado en banco plano, agarre ligeramente más ancho que hombros, bajar barra al pecho y empujar hacia arriba"
   },
   {
+    "ID": 15,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press de pecho con cables",
     "Nivel": "Intermedio",
@@ -105,6 +120,7 @@
     "Descripción": "Con poleas a altura baja, empujar desde posición de estocada hacia adelante y arriba"
   },
   {
+    "ID": 16,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press en máquina",
     "Nivel": "Principiante",
@@ -112,6 +128,7 @@
     "Descripción": "Sentado en máquina, empujar manijas hacia adelante"
   },
   {
+    "ID": 17,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press inclinado con barra",
     "Nivel": "Intermedio",
@@ -119,6 +136,7 @@
     "Descripción": "En banco inclinado 30-45°, mismo movimiento que press plano"
   },
   {
+    "ID": 18,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Press inclinado con mancuernas",
     "Nivel": "Intermedio",
@@ -126,6 +144,7 @@
     "Descripción": "Banco inclinado, mancuernas desde pecho hacia arriba y afuera"
   },
   {
+    "ID": 19,
     "Grupo Muscular": "Pectorales",
     "Ejercicio": "Pullover con mancuerna",
     "Nivel": "Intermedio",
@@ -133,6 +152,7 @@
     "Descripción": "Acostado perpendicular al banco, bajar mancuerna por detrás de cabeza"
   },
   {
+    "ID": 20,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Dominadas australianas",
     "Nivel": "Principiante",
@@ -140,6 +160,7 @@
     "Descripción": "Inclinado bajo barra baja, tirar pecho hacia barra manteniendo cuerpo recto"
   },
   {
+    "ID": 21,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Dominadas pronas",
     "Nivel": "Intermedio-Avanzado",
@@ -147,6 +168,7 @@
     "Descripción": "Agarre prono más ancho que hombros, tirar cuerpo hasta que el pecho toque la barra"
   },
   {
+    "ID": 22,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Dominadas supinas (chin-ups)",
     "Nivel": "Principiante-Intermedio",
@@ -154,6 +176,7 @@
     "Descripción": "Agarre supino (palmas hacia ti), énfasis en bíceps y dorsales"
   },
   {
+    "ID": 23,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Jalón al pecho con agarre ancho",
     "Nivel": "Principiante-Intermedio",
@@ -161,6 +184,7 @@
     "Descripción": "Sentado, tirar barra hacia pecho superior contrayendo dorsales"
   },
   {
+    "ID": 24,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Jalón con agarre cerrado",
     "Nivel": "Intermedio",
@@ -168,6 +192,7 @@
     "Descripción": "Tirar agarre hacia pecho con codos pegados al cuerpo"
   },
   {
+    "ID": 25,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Jalón tras nuca",
     "Nivel": "Intermedio",
@@ -175,6 +200,7 @@
     "Descripción": "Tirar barra por detrás de la cabeza hasta altura de nuca"
   },
   {
+    "ID": 26,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Muscle-up",
     "Nivel": "Avanzado",
@@ -182,6 +208,7 @@
     "Descripción": "Dominada + fondo en barras en un movimiento continuo"
   },
   {
+    "ID": 27,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Peso muerto",
     "Nivel": "Intermedio-Avanzado",
@@ -189,6 +216,7 @@
     "Descripción": "Desde el suelo, levantar la barra manteniendo espalda recta y empujando caderas hacia adelante"
   },
   {
+    "ID": 28,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Pullover en polea alta",
     "Nivel": "Intermedio",
@@ -196,6 +224,7 @@
     "Descripción": "De pie, brazos extendidos, tirar barra desde arriba hacia muslos"
   },
   {
+    "ID": 29,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Remo con barra inclinado",
     "Nivel": "Intermedio-Avanzado",
@@ -203,6 +232,7 @@
     "Descripción": "Tronco inclinado ~45°, tirar barra hacia abdomen superior, codos cerca del cuerpo"
   },
   {
+    "ID": 30,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Remo con mancuerna a una mano",
     "Nivel": "Principiante-Intermedio",
@@ -210,6 +240,7 @@
     "Descripción": "Apoyando una mano y rodilla en banco, tirar mancuerna hacia cadera, llevando codo hacia atrás"
   },
   {
+    "ID": 31,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Remo en T-bar",
     "Nivel": "Intermedio",
@@ -217,6 +248,7 @@
     "Descripción": "Inclinado sobre barra en T, tirar hacia pecho manteniendo codos cerca del cuerpo"
   },
   {
+    "ID": 32,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Remo en máquina sentado",
     "Nivel": "Principiante",
@@ -224,6 +256,7 @@
     "Descripción": "Sentado, tirar manijas hacia abdomen retrayendo escápulas"
   },
   {
+    "ID": 33,
     "Grupo Muscular": "Dorsales",
     "Ejercicio": "Remo en polea baja",
     "Nivel": "Principiante-Intermedio",
@@ -231,6 +264,7 @@
     "Descripción": "Sentado, tirar cable hacia abdomen manteniendo espalda recta"
   },
   {
+    "ID": 34,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Encogimientos de hombros",
     "Nivel": "Principiante",
@@ -238,6 +272,7 @@
     "Descripción": "Elevar hombros hacia orejas, mantener y bajar controladamente"
   },
   {
+    "ID": 35,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Face pulls",
     "Nivel": "Principiante-Intermedio",
@@ -245,6 +280,7 @@
     "Descripción": "Polea a altura de la cabeza, tirar de la cuerda hacia la cara separando los extremos"
   },
   {
+    "ID": 36,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Good mornings",
     "Nivel": "Intermedio",
@@ -252,6 +288,7 @@
     "Descripción": "Barra en hombros, flexionar cadera manteniendo espalda recta"
   },
   {
+    "ID": 37,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Hiperextensiones",
     "Nivel": "Intermedio",
@@ -259,6 +296,7 @@
     "Descripción": "En banco romano, flexionar cadera bajando el torso, luego subir contrayendo erectores espinales"
   },
   {
+    "ID": 38,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Remo invertido",
     "Nivel": "Intermedio",
@@ -266,6 +304,7 @@
     "Descripción": "Suspendido boca arriba bajo una barra, tirar pecho hacia la barra manteniendo el cuerpo recto"
   },
   {
+    "ID": 39,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Remo con barra agarre supino",
     "Nivel": "Intermedio",
@@ -273,6 +312,7 @@
     "Descripción": "Igual que el remo inclinado, pero con palmas mirando hacia arriba (agarre invertido)"
   },
   {
+    "ID": 40,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Retracción escapular con banda",
     "Nivel": "Principiante",
@@ -280,6 +320,7 @@
     "Descripción": "Brazos extendidos al frente, juntar escápulas atrás estirando la banda"
   },
   {
+    "ID": 41,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Superman",
     "Nivel": "Principiante",
@@ -287,6 +328,7 @@
     "Descripción": "Boca abajo, elevar simultáneamente brazos y piernas contrayendo la espalda baja"
   },
   {
+    "ID": 42,
     "Grupo Muscular": "Espalda",
     "Ejercicio": "Bird dog",
     "Nivel": "Principiante",
@@ -294,6 +336,7 @@
     "Descripción": "En posición cuadrúpeda, extender brazo y pierna opuestos manteniendo la espalda neutra"
   },
   {
+    "ID": 43,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevación lateral con banda",
     "Nivel": "Principiante",
@@ -301,6 +344,7 @@
     "Descripción": "Pisar la banda, elevar el brazo lateralmente hasta la altura del hombro"
   },
   {
+    "ID": 44,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones en Y",
     "Nivel": "Intermedio",
@@ -308,6 +352,7 @@
     "Descripción": "Tronco inclinado hacia adelante, elevar brazos formando una Y con el cuerpo"
   },
   {
+    "ID": 45,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones frontales",
     "Nivel": "Principiante",
@@ -315,6 +360,7 @@
     "Descripción": "Brazos extendidos, elevar el peso al frente hasta la altura de los hombros"
   },
   {
+    "ID": 46,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones laterales",
     "Nivel": "Principiante",
@@ -322,6 +368,7 @@
     "Descripción": "Brazos ligeramente flexionados, elevar mancuernas a los lados hasta la altura de los hombros"
   },
   {
+    "ID": 47,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones laterales con cable",
     "Nivel": "Principiante",
@@ -329,6 +376,7 @@
     "Descripción": "Con polea baja, elevar el brazo lateralmente hasta la altura del hombro"
   },
   {
+    "ID": 48,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones laterales en polea",
     "Nivel": "Intermedio",
@@ -336,6 +384,7 @@
     "Descripción": "Polea baja, elevar el brazo lateralmente hasta la altura del hombro"
   },
   {
+    "ID": 49,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Elevaciones posteriores con mancuernas",
     "Nivel": "Principiante-Intermedio",
@@ -343,6 +392,7 @@
     "Descripción": "Tronco inclinado hacia adelante, abrir brazos hacia los lados contrayendo deltoides posterior"
   },
   {
+    "ID": 50,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Flexiones de pino/handstand push-ups",
     "Nivel": "Avanzado",
@@ -350,6 +400,7 @@
     "Descripción": "En posición invertida con pies apoyados en pared, flexionar brazos hasta tocar la cabeza al suelo, luego extender"
   },
   {
+    "ID": 51,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press Arnold",
     "Nivel": "Intermedio",
@@ -357,6 +408,7 @@
     "Descripción": "Desde posición de curl martillo frente al rostro, rotar y empujar mancuernas hacia arriba hasta estirar brazos"
   },
   {
+    "ID": 52,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press con kettlebell",
     "Nivel": "Intermedio",
@@ -364,6 +416,7 @@
     "Descripción": "Desde posición de rack (kettlebell a la altura del hombro), presionar kettlebell sobre la cabeza"
   },
   {
+    "ID": 53,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press cubano",
     "Nivel": "Avanzado",
@@ -371,6 +424,7 @@
     "Descripción": "Combinación de remo vertical (tirón), rotación externa de hombros y press overhead"
   },
   {
+    "ID": 54,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press en máquina",
     "Nivel": "Principiante",
@@ -378,6 +432,7 @@
     "Descripción": "Sentado en máquina de hombros, empujar las manijas hacia arriba hasta extender brazos"
   },
   {
+    "ID": 55,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press militar de pie",
     "Nivel": "Intermedio-Avanzado",
@@ -385,6 +440,7 @@
     "Descripción": "De pie, barra apoyada en la parte frontal de hombros, empujar barra hacia arriba extendiendo brazos"
   },
   {
+    "ID": 56,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press de hombros con mancuernas",
     "Nivel": "Principiante-Intermedio",
@@ -392,6 +448,7 @@
     "Descripción": "Sentado con respaldo (o de pie), empujar mancuernas desde los hombros hacia arriba hasta estirar brazos"
   },
   {
+    "ID": 57,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Press tras nuca",
     "Nivel": "Intermedio",
@@ -399,6 +456,7 @@
     "Descripción": "Barra sostenida detrás de la cabeza a la altura de orejas, presionar hacia arriba sin bajar demasiado"
   },
   {
+    "ID": 58,
     "Grupo Muscular": "Hombros",
     "Ejercicio": "Remo vertical",
     "Nivel": "Intermedio",
@@ -406,6 +464,7 @@
     "Descripción": "De pie, tirar barra hacia arriba pegada al cuerpo hasta llegar a la altura del mentón, elevando codos"
   },
   {
+    "ID": 59,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl 21s",
     "Nivel": "Avanzado",
@@ -413,6 +472,7 @@
     "Descripción": "7 repeticiones de curl parciales (hasta 90°) + 7 repeticiones de 90° a completo + 7 repeticiones completas"
   },
   {
+    "ID": 60,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl araña",
     "Nivel": "Intermedio",
@@ -420,6 +480,7 @@
     "Descripción": "Apoyar pecho contra un banco inclinado, brazos colgando verticales, flexionar codos llevando barra hacia la cara"
   },
   {
+    "ID": 61,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl concentrado",
     "Nivel": "Intermedio",
@@ -427,6 +488,7 @@
     "Descripción": "Sentado, apoyar el codo en el muslo interno, flexión lenta y controlada de la mancuerna"
   },
   {
+    "ID": 62,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl con banda elástica",
     "Nivel": "Principiante",
@@ -434,6 +496,7 @@
     "Descripción": "Pisar la banda, flexionar codos contra la resistencia de la banda"
   },
   {
+    "ID": 63,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl con barra de pie",
     "Nivel": "Principiante",
@@ -441,6 +504,7 @@
     "Descripción": "De pie, agarre supino, flexionar codos llevando la barra hacia los hombros"
   },
   {
+    "ID": 64,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl con cable y cuerda",
     "Nivel": "Principiante",
@@ -448,6 +512,7 @@
     "Descripción": "De pie frente a polea baja con cuerda, flexionar codos separando los extremos de la cuerda al final"
   },
   {
+    "ID": 65,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl concentrado (alternativo)",
     "Nivel": "Intermedio",
@@ -455,6 +520,7 @@
     "Descripción": "(Variante) De pie, inclinar el torso y apoyar el codo contra el muslo por la parte interna, flexionar mancuerna"
   },
   {
+    "ID": 66,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl en banco Scott (predicador)",
     "Nivel": "Intermedio",
@@ -462,6 +528,7 @@
     "Descripción": "Brazos apoyados sobre el banco Scott (predicador), flexión de codos controlada hasta contraer completamente el bíceps"
   },
   {
+    "ID": 67,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl en máquina",
     "Nivel": "Principiante",
@@ -469,6 +536,7 @@
     "Descripción": "Sentado en máquina de curl, flexionar los brazos contra la resistencia controlando el movimiento"
   },
   {
+    "ID": 68,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl en polea baja",
     "Nivel": "Intermedio",
@@ -476,6 +544,7 @@
     "Descripción": "De pie frente a polea baja, agarre recto o barra Z, flexionar codos manteniendo tensión constante"
   },
   {
+    "ID": 69,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl inclinado con mancuernas",
     "Nivel": "Intermedio-Avanzado",
@@ -483,6 +552,7 @@
     "Descripción": "Sentado en banco inclinado ~45°, brazos colgando, flexionar codos sin mover la parte superior del brazo"
   },
   {
+    "ID": 70,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl inverso",
     "Nivel": "Intermedio",
@@ -490,6 +560,7 @@
     "Descripción": "Agarre prono (palmas hacia abajo), flexionar codos trabajando más braquiorradial y antebrazo"
   },
   {
+    "ID": 71,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl martillo con mancuernas",
     "Nivel": "Principiante-Intermedio",
@@ -497,6 +568,7 @@
     "Descripción": "Agarre neutro (palmas enfrentadas), flexión alterna de codos manteniendo la posición de martillo"
   },
   {
+    "ID": 72,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl overhead en polea alta",
     "Nivel": "Avanzado",
@@ -504,6 +576,7 @@
     "Descripción": "En poleas altas a los lados, brazos en cruz, flexionar codos llevando las manos hacia la cabeza"
   },
   {
+    "ID": 73,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Curl con toalla y kettlebell",
     "Nivel": "Avanzado",
@@ -511,6 +584,7 @@
     "Descripción": "Pasar una toalla por el asa de una kettlebell y sostener los extremos, hacer curl martillo (agarre neutro) tirando de la toalla"
   },
   {
+    "ID": 74,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Drag curls",
     "Nivel": "Avanzado",
@@ -518,6 +592,7 @@
     "Descripción": "Hacer curl “arrastrando” la barra cerca del cuerpo, llevando los codos hacia atrás durante la subida"
   },
   {
+    "ID": 75,
     "Grupo Muscular": "Bíceps",
     "Ejercicio": "Zottman curls",
     "Nivel": "Avanzado",
@@ -525,6 +600,7 @@
     "Descripción": "Curl alternando agarre: subir con supinación (palmas arriba), rotar muñecas en la cima, bajar en prono (palmas abajo)"
   },
   {
+    "ID": 76,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Extensión de tríceps con banda",
     "Nivel": "Principiante",
@@ -532,6 +608,7 @@
     "Descripción": "Banda anclada arriba, extender codos hacia abajo hasta completar el movimiento"
   },
   {
+    "ID": 77,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Extensión de tríceps en banco inclinado",
     "Nivel": "Intermedio",
@@ -539,6 +616,7 @@
     "Descripción": "Acostado en banco inclinado, brazos apuntando al techo, flexionar y extender codos llevando las mancuernas desde detrás de la cabeza hacia arriba"
   },
   {
+    "ID": 78,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Extensión de tríceps en polea alta",
     "Nivel": "Principiante",
@@ -546,6 +624,7 @@
     "Descripción": "Codos pegados al cuerpo, extender completamente los brazos manteniendo la parte superior inmóvil"
   },
   {
+    "ID": 79,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Extensión de tríceps tras nuca",
     "Nivel": "Intermedio",
@@ -553,6 +632,7 @@
     "Descripción": "De pie o sentado, sujetar el peso por detrás de la cabeza con ambas manos, extender los codos verticalmente"
   },
   {
+    "ID": 80,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Extensión en polea con cuerda",
     "Nivel": "Principiante",
@@ -560,6 +640,7 @@
     "Descripción": "Desde polea alta con cuerda, extender brazos hacia abajo y al final separar los extremos de la cuerda"
   },
   {
+    "ID": 81,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Fondos en banco",
     "Nivel": "Principiante-Intermedio",
@@ -567,6 +648,7 @@
     "Descripción": "Manos apoyadas en el borde de un banco detrás del cuerpo, piernas extendidas, flexionar codos hacia atrás bajando el cuerpo y extender para subir"
   },
   {
+    "ID": 82,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Fondos en máquina",
     "Nivel": "Principiante",
@@ -574,6 +656,7 @@
     "Descripción": "Ejercicio de fondos en paralelas asistido en máquina (contrapeso ayuda a subir)"
   },
   {
+    "ID": 83,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Fondos en paralelas (dips)",
     "Nivel": "Intermedio-Avanzado",
@@ -581,6 +664,7 @@
     "Descripción": "Cuerpo vertical, agarrar barras paralelas, descender flexionando codos hacia atrás y empujar hasta extender brazos"
   },
   {
+    "ID": 84,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Flexiones diamante",
     "Nivel": "Intermedio-Avanzado",
@@ -588,6 +672,7 @@
     "Descripción": "Manos formando un diamante bajo el pecho, realizar flexiones enfatizando tríceps"
   },
   {
+    "ID": 85,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Korean dips",
     "Nivel": "Avanzado",
@@ -595,6 +680,7 @@
     "Descripción": "Fondos en paralelas con el cuerpo inclinado hacia atrás y piernas hacia adelante (requiere gran flexibilidad de hombros)"
   },
   {
+    "ID": 86,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Press JM",
     "Nivel": "Avanzado",
@@ -602,6 +688,7 @@
     "Descripción": "Variación de press de banca cerrado: bajar la barra hacia el cuello desplazando codos ligeramente hacia la cabeza, luego extender"
   },
   {
+    "ID": 87,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Press de banca agarre cerrado",
     "Nivel": "Intermedio",
@@ -609,6 +696,7 @@
     "Descripción": "Acostado, agarre más estrecho que hombros, bajar barra al pecho manteniendo codos pegados al cuerpo, extender brazos"
   },
   {
+    "ID": 88,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Press francés (skullcrusher)",
     "Nivel": "Intermedio",
@@ -616,6 +704,7 @@
     "Descripción": "Tumbado en banco, brazos perpendiculares al cuerpo, flexionar solo los codos llevando la barra hacia la frente, luego extender"
   },
   {
+    "ID": 89,
     "Grupo Muscular": "Tríceps",
     "Ejercicio": "Tate press",
     "Nivel": "Intermedio",
@@ -623,6 +712,7 @@
     "Descripción": "Tumbado en banco, sostener mancuernas con palmas hacia adentro sobre el pecho, flexionar codos llevando mancuernas hacia los hombros y extender"
   },
   {
+    "ID": 90,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Colgarse de barra (dead hang)",
     "Nivel": "Intermedio",
@@ -630,6 +720,7 @@
     "Descripción": "Colgar del agarre de una barra el máximo tiempo posible (variantes: usando menos dedos, con peso adicional, etc.)"
   },
   {
+    "ID": 91,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Curl de muñeca con barra (flexores)",
     "Nivel": "Principiante",
@@ -637,6 +728,7 @@
     "Descripción": "Antebrazos apoyados en banco con palmas hacia arriba, dejar que la barra ruede hacia los dedos y luego flexionar muñecas elevando la barra"
   },
   {
+    "ID": 92,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Curl de muñeca inverso (extensores)",
     "Nivel": "Principiante",
@@ -644,6 +736,7 @@
     "Descripción": "Antebrazos apoyados con palmas hacia abajo, extender muñecas elevando el dorso de las manos"
   },
   {
+    "ID": 93,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Curl inverso con barra",
     "Nivel": "Principiante",
@@ -651,6 +744,7 @@
     "Descripción": "(Similar a curl de bíceps inverso) Agarre prono, flexionar codos trabajando braquiorradial"
   },
   {
+    "ID": 94,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Curl martillo con cuerda",
     "Nivel": "Intermedio",
@@ -658,6 +752,7 @@
     "Descripción": "Realizar curl martillo usando una cuerda en polea baja, lo que aumenta la activación de antebrazo"
   },
   {
+    "ID": 95,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Farmer's walk (caminata del granjero)",
     "Nivel": "Intermedio",
@@ -665,6 +760,7 @@
     "Descripción": "Caminar sujetando pesas muy pesadas en cada mano, recorriendo la máxima distancia posible"
   },
   {
+    "ID": 96,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Flexión de dedos con barra",
     "Nivel": "Avanzado",
@@ -672,6 +768,7 @@
     "Descripción": "Con la barra en las manos, dejarla rodar hasta la punta de los dedos y luego cerrarlos para levantarla de nuevo (entrenar agarre)"
   },
   {
+    "ID": 97,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Plate pinch (pellizco de discos)",
     "Nivel": "Intermedio-Avanzado",
@@ -679,6 +776,7 @@
     "Descripción": "Tomar dos o más discos juntos pellizcándolos entre los dedos y el pulgar, y sostenerlos el mayor tiempo posible"
   },
   {
+    "ID": 98,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Towel pull-ups",
     "Nivel": "Avanzado",
@@ -686,6 +784,7 @@
     "Descripción": "Colgar dos toallas de una barra y agarrarlas para hacer dominadas, lo que incrementa la dificultad en el agarre"
   },
   {
+    "ID": 99,
     "Grupo Muscular": "Antebrazos",
     "Ejercicio": "Wrist roller (enrollador de muñeca)",
     "Nivel": "Intermedio-Avanzado",
@@ -693,6 +792,7 @@
     "Descripción": "Enrollar una cuerda con peso colgante usando solo el movimiento de las muñecas (flexión y extensión)"
   },
   {
+    "ID": 100,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Box squats",
     "Nivel": "Intermedio",
@@ -700,6 +800,7 @@
     "Descripción": "Sentadilla hasta sentarse ligeramente en una caja y volver a subir, controlando la posición baja"
   },
   {
+    "ID": 101,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Prensa de piernas",
     "Nivel": "Principiante",
@@ -707,6 +808,7 @@
     "Descripción": "Sentado en máquina de prensa, empujar la plataforma con los pies sin bloquear las rodillas al extender"
   },
   {
+    "ID": 102,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla (squat) con pausa",
     "Nivel": "Avanzado",
@@ -714,6 +816,7 @@
     "Descripción": "Sentadilla convencional pero deteniéndose 2-3 segundos en la posición baja antes de subir"
   },
   {
+    "ID": 103,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla búlgara",
     "Nivel": "Intermedio",
@@ -721,6 +824,7 @@
     "Descripción": "Pie trasero apoyado en un banco, descender flexionando la rodilla delantera manteniendo el torso erguido"
   },
   {
+    "ID": 104,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla frontal",
     "Nivel": "Intermedio-Avanzado",
@@ -728,6 +832,7 @@
     "Descripción": "Barra apoyada en la parte frontal de los hombros (agarre cruzado o de fuerza), mantener codos altos, descender en sentadilla manteniendo torso vertical"
   },
   {
+    "ID": 105,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla goblet",
     "Nivel": "Principiante",
@@ -735,6 +840,7 @@
     "Descripción": "Sostener un kettlebell o mancuerna frente al pecho con ambas manos, realizar sentadilla profunda"
   },
   {
+    "ID": 106,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla hack",
     "Nivel": "Intermedio",
@@ -742,6 +848,7 @@
     "Descripción": "En máquina hack squat, pies al ancho de hombros, descender flexionando rodillas controladamente y empujar de nuevo hacia arriba"
   },
   {
+    "ID": 107,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla sissy",
     "Nivel": "Avanzado",
@@ -749,6 +856,7 @@
     "Descripción": "De pie apoyándose en un soporte, plantar pies y elevar talones, luego flexionar rodillas llevando el cuerpo hacia atrás (cuádriceps en máxima tensión)"
   },
   {
+    "ID": 108,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadilla trasera (Back squat)",
     "Nivel": "Principiante-Avanzado",
@@ -756,6 +864,7 @@
     "Descripción": "Barra apoyada en la espalda alta (trapecios), descender en sentadilla hasta romper la paralela, subir de forma explosiva"
   },
   {
+    "ID": 109,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Sentadillas (bodyweight squats)",
     "Nivel": "Principiante",
@@ -763,6 +872,7 @@
     "Descripción": "De pie, descender en sentadilla (muslos al menos paralelos al piso) y volver a subir extendiendo rodillas y caderas"
   },
   {
+    "ID": 110,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Step up",
     "Nivel": "Principiante-Intermedio",
@@ -770,6 +880,7 @@
     "Descripción": "Subir con un pie a un banco o cajón, empujando a través del talón para elevar el cuerpo, luego bajar controladamente (alternar piernas)"
   },
   {
+    "ID": 111,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Wall sit",
     "Nivel": "Principiante",
@@ -777,6 +888,7 @@
     "Descripción": "Apoyar la espalda contra la pared en posición de sentadilla (rodillas ~90°) y mantener la posición estática"
   },
   {
+    "ID": 112,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Zancadas (lunges)",
     "Nivel": "Principiante",
@@ -784,6 +896,7 @@
     "Descripción": "Paso amplio hacia adelante, descender hasta que la rodilla trasera casi toque el suelo, empujar con la pierna delantera para volver a la posición inicial"
   },
   {
+    "ID": 113,
     "Grupo Muscular": "Cuádriceps",
     "Ejercicio": "Zancadas caminando",
     "Nivel": "Intermedio",
@@ -791,6 +904,7 @@
     "Descripción": "Zancadas alternadas avanzando hacia adelante con cada paso"
   },
   {
+    "ID": 114,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Curl femoral con banda",
     "Nivel": "Principiante",
@@ -798,6 +912,7 @@
     "Descripción": "Tumbado boca abajo, banda en los tobillos, flexionar rodillas contra la resistencia de la banda"
   },
   {
+    "ID": 115,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Curl femoral de pie",
     "Nivel": "Principiante",
@@ -805,6 +920,7 @@
     "Descripción": "De pie en máquina de curl de pierna, flexionar la rodilla llevando el talón hacia el glúteo (trabajar una pierna a la vez)"
   },
   {
+    "ID": 116,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Curl femoral sentado",
     "Nivel": "Principiante",
@@ -812,6 +928,7 @@
     "Descripción": "Sentado en máquina de curl, iniciar con piernas estiradas y flexionar rodillas llevando los tobillos hacia debajo del asiento"
   },
   {
+    "ID": 117,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Curl femoral tumbado",
     "Nivel": "Principiante",
@@ -819,6 +936,7 @@
     "Descripción": "Tumbado boca abajo en máquina de curl, flexionar rodillas llevando talones hacia los glúteos"
   },
   {
+    "ID": 118,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Curl nórdico",
     "Nivel": "Avanzado",
@@ -826,6 +944,7 @@
     "Descripción": "Arrodillado con tobillos sujetos (por un compañero o aparato), descender el torso controladamente hacia el suelo usando la fuerza de los isquiotibiales"
   },
   {
+    "ID": 119,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Glute ham raise",
     "Nivel": "Avanzado",
@@ -833,6 +952,7 @@
     "Descripción": "En máquina GHR, comenzar con el cuerpo extendido, flexionar rodillas y cadera para subir el torso usando isquiotibiales y glúteos"
   },
   {
+    "ID": 120,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Good mornings",
     "Nivel": "Intermedio",
@@ -840,6 +960,7 @@
     "Descripción": "Barra en hombros, flexionar cadera con piernas semi-rígidas (ligeramente flexionadas), sentir el estiramiento en isquiotibiales y volver arriba"
   },
   {
+    "ID": 121,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto con kettlebell",
     "Nivel": "Principiante",
@@ -847,6 +968,7 @@
     "Descripción": "Con espalda recta, realizar una bisagra de cadera llevando el kettlebell hacia el suelo, luego extender cadera y rodillas para volver arriba"
   },
   {
+    "ID": 122,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto pierna rígida",
     "Nivel": "Intermedio",
@@ -854,6 +976,7 @@
     "Descripción": "Pies al ancho de caderas, rodillas apenas flexionadas, bajar la barra recorriendo los muslos hasta notar estiramiento en isquiotibiales, subir contrayendo glúteos"
   },
   {
+    "ID": 123,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto rumano",
     "Nivel": "Intermedio",
@@ -861,6 +984,7 @@
     "Descripción": "Similar al peso muerto regular pero con rodillas ligeramente flexionadas, concentrándose en empujar caderas atrás para estirar isquiotibiales"
   },
   {
+    "ID": 124,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto sumo",
     "Nivel": "Intermedio-Avanzado",
@@ -868,6 +992,7 @@
     "Descripción": "Postura de pies muy amplia y puntas hacia afuera, agarrar barra con manos entre las rodillas, levantar manteniendo espalda recta"
   },
   {
+    "ID": 125,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto unilateral",
     "Nivel": "Intermedio",
@@ -875,6 +1000,7 @@
     "Descripción": "Equilibrado en una pierna, inclinar el cuerpo hacia adelante levantando la otra pierna atrás, bajar el peso hacia el suelo y subir contrayendo isquiotibiales"
   },
   {
+    "ID": 126,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Puente de glúteos con barra",
     "Nivel": "Intermedio",
@@ -882,6 +1008,7 @@
     "Descripción": "Apoyando la espalda alta en un banco y pies en el suelo, colocar una barra sobre la pelvis, extender caderas hacia arriba contrayendo isquiotibiales y glúteos"
   },
   {
+    "ID": 127,
     "Grupo Muscular": "Isquiotibiales",
     "Ejercicio": "Peso muerto convencional (Deadlift)",
     "Nivel": "Intermedio-Avanzado",
@@ -889,6 +1016,7 @@
     "Descripción": "Postura pies a ancho de caderas, agarrar barra en el suelo, levantar extendiendo rodillas y caderas simultáneamente, manteniendo espalda neutra"
   },
   {
+    "ID": 128,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Abducción de cadera de pie",
     "Nivel": "Principiante",
@@ -896,6 +1024,7 @@
     "Descripción": "De pie, banda alrededor de los tobillos, elevar una pierna lateralmente lo máximo posible (trabaja glúteos medianos)"
   },
   {
+    "ID": 129,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Caminata lateral con banda",
     "Nivel": "Principiante",
@@ -903,6 +1032,7 @@
     "Descripción": "Banda alrededor de muslos o tobillos, pasos laterales cortos manteniendo tensión constante en la banda"
   },
   {
+    "ID": 130,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Curtsy lunges",
     "Nivel": "Intermedio",
@@ -910,6 +1040,7 @@
     "Descripción": "Zancadas cruzadas: dar un paso hacia atrás y al lado (como haciendo reverencia) flexionando rodilla delantera, regresar al inicio"
   },
   {
+    "ID": 131,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Frog pumps",
     "Nivel": "Principiante",
@@ -917,6 +1048,7 @@
     "Descripción": "Boca arriba, plantas de los pies juntas y cercanas al cuerpo, realizar puentes de glúteos rápidos contrayendo al tope"
   },
   {
+    "ID": 132,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Hamstring curl TRX",
     "Nivel": "Intermedio",
@@ -924,6 +1056,7 @@
     "Descripción": "Acostado boca arriba con talones en estribos TRX, elevar cadera y flexionar rodillas llevando talones hacia glúteos"
   },
   {
+    "ID": 133,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Hiperextensiones (enfocado glúteos)",
     "Nivel": "Intermedio",
@@ -931,6 +1064,7 @@
     "Descripción": "En banco romano, descender y subir contrayendo glúteos (puede sostener peso sobre el pecho para más resistencia)"
   },
   {
+    "ID": 134,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Hip thrust",
     "Nivel": "Intermedio",
@@ -938,6 +1072,7 @@
     "Descripción": "Espalda alta apoyada en banco, barra sobre la pelvis, empujar con talones elevando la cadera hasta alinear muslos y torso (contraer glúteos arriba)"
   },
   {
+    "ID": 135,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Patadas de glúteo",
     "Nivel": "Principiante",
@@ -945,6 +1080,7 @@
     "Descripción": "En posición cuadrúpeda, elevar una pierna hacia atrás y arriba manteniendo la rodilla a 90°, concentrando la contracción en el glúteo"
   },
   {
+    "ID": 136,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Patadas en máquina",
     "Nivel": "Principiante",
@@ -952,6 +1088,7 @@
     "Descripción": "En máquina de glúteos, empujar la plataforma hacia atrás y arriba con la pierna, contrayendo el glúteo"
   },
   {
+    "ID": 137,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Sentadilla búlgara",
     "Nivel": "Intermedio",
@@ -959,6 +1096,7 @@
     "Descripción": "Pie trasero elevado en un banco, descender flexionando la rodilla delantera (énfasis en glúteo de pierna delantera)"
   },
   {
+    "ID": 138,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Sentadilla sumo",
     "Nivel": "Intermedio",
@@ -966,6 +1104,7 @@
     "Descripción": "Con pies muy separados y puntas hacia afuera (posición sumo), sostener peso al frente, realizar sentadilla profunda contrayendo glúteos al subir"
   },
   {
+    "ID": 139,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Single leg deadlift con KB",
     "Nivel": "Intermedio",
@@ -973,6 +1112,7 @@
     "Descripción": "Peso muerto a una pierna sosteniendo kettlebell (énfasis en equilibrio y trabajo de glúteo e isquiotibiales de la pierna de apoyo)"
   },
   {
+    "ID": 140,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Step up con rodilla alta",
     "Nivel": "Intermedio",
@@ -980,6 +1120,7 @@
     "Descripción": "Subir a un banco con un pie y al llegar arriba elevar la rodilla contraria lo más alto posible, alternar piernas"
   },
   {
+    "ID": 141,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Puente de glúteos (glute bridge)",
     "Nivel": "Principiante",
@@ -987,6 +1128,7 @@
     "Descripción": "Boca arriba con rodillas flexionadas y pies en el suelo, elevar caderas apretando glúteos formando línea recta de rodillas a hombros"
   },
   {
+    "ID": 142,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Fire hydrants",
     "Nivel": "Principiante",
@@ -994,6 +1136,7 @@
     "Descripción": "En cuadrupedia, elevar una pierna flexionada hacia un lado (como un perro levantando la pata) manteniendo 90° de rodilla"
   },
   {
+    "ID": 143,
     "Grupo Muscular": "Glúteos",
     "Ejercicio": "Clamshells",
     "Nivel": "Principiante",
@@ -1001,6 +1144,7 @@
     "Descripción": "Acostado de lado con rodillas flexionadas y pies juntos, abrir la rodilla superior contra la resistencia de la banda (trabaja abductores de cadera)"
   },
   {
+    "ID": 144,
     "Grupo Muscular": "Abductor",
     "Ejercicio": "Abducción de cadera en máquina",
     "Nivel": "Principiante",
@@ -1008,6 +1152,7 @@
     "Descripción": "Sentado en máquina de abducción de cadera, separar muslos abriendo las piernas contra la resistencia"
   },
   {
+    "ID": 145,
     "Grupo Muscular": "Abductor",
     "Ejercicio": "Abducción de cadera de pie (con banda)",
     "Nivel": "Principiante",
@@ -1015,6 +1160,7 @@
     "Descripción": "(Ver Glúteos: Abducción de cadera de pie) De pie con banda, elevar lateralmente una pierna"
   },
   {
+    "ID": 146,
     "Grupo Muscular": "Abductor",
     "Ejercicio": "Caminata lateral con banda",
     "Nivel": "Principiante",
@@ -1022,6 +1168,7 @@
     "Descripción": "(Ver Glúteos: Caminata lateral) Pasos laterales con banda en muslos, manteniendo tensión para trabajar glúteos medianos"
   },
   {
+    "ID": 147,
     "Grupo Muscular": "Abductor",
     "Ejercicio": "Clamshells (con banda)",
     "Nivel": "Principiante",
@@ -1029,6 +1176,7 @@
     "Descripción": "(Ver Glúteos: Clamshells) Apertura de cadera lateral acostado de lado, con banda para mayor resistencia"
   },
   {
+    "ID": 148,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Crunch abdominal básico",
     "Nivel": "Principiante",
@@ -1036,6 +1184,7 @@
     "Descripción": "Tumbado, rodillas flexionadas, elevar el tronco contrayendo abdominales (subir unos 30-40°)"
   },
   {
+    "ID": 149,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Crunch con banda",
     "Nivel": "Intermedio",
@@ -1043,6 +1192,7 @@
     "Descripción": "Banda anclada arriba, acostado tirando de la banda al hacer el crunch para añadir resistencia"
   },
   {
+    "ID": 150,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Crunch en polea alta",
     "Nivel": "Intermedio",
@@ -1050,6 +1200,7 @@
     "Descripción": "De rodillas bajo una polea alta con cuerda, flexionar el tronco llevando la cabeza hacia el suelo (contrayendo abdominales)"
   },
   {
+    "ID": 151,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Crunch inverso",
     "Nivel": "Principiante",
@@ -1057,6 +1208,7 @@
     "Descripción": "Tumbado, manos apoyadas, elevar caderas despegando glúteos del suelo llevando rodillas hacia el pecho"
   },
   {
+    "ID": 152,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Crunch oblicuo (bicicleta)",
     "Nivel": "Principiante-Intermedio",
@@ -1064,6 +1216,7 @@
     "Descripción": "Tumbado, llevar alternativamente el codo derecho a rodilla izquierda y viceversa, en movimiento de pedaleo"
   },
   {
+    "ID": 153,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Elevaciones de piernas",
     "Nivel": "Principiante-Intermedio",
@@ -1071,6 +1224,7 @@
     "Descripción": "Tumbado, elevar piernas extendidas hasta 90° y descender controladamente sin arquear la espalda"
   },
   {
+    "ID": 154,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Elevaciones de piernas en suspensión",
     "Nivel": "Avanzado",
@@ -1078,6 +1232,7 @@
     "Descripción": "Colgado de una barra, elevar rodillas hacia el pecho (o piernas extendidas hasta horizontal o más) sin balancearse"
   },
   {
+    "ID": 155,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Flutter kicks",
     "Nivel": "Intermedio",
@@ -1085,6 +1240,7 @@
     "Descripción": "Tumbado, piernas extendidas ligeramente elevadas, alternar rápidos movimientos cortos de subir/bajar de cada pierna (como pataleo)"
   },
   {
+    "ID": 156,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Giros rusos (Russian twists)",
     "Nivel": "Intermedio",
@@ -1092,6 +1248,7 @@
     "Descripción": "Sentado con el torso a ~45° y pies elevados, sostener balón y rotar el torso de lado a lado tocando el balón al suelo en cada lado"
   },
   {
+    "ID": 157,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Hollow body hold",
     "Nivel": "Intermedio",
@@ -1099,6 +1256,7 @@
     "Descripción": "Tumbado boca arriba, elevar ligeramente hombros y piernas (estiradas) y mantener posición ahuecando el abdomen"
   },
   {
+    "ID": 158,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "L-sit",
     "Nivel": "Avanzado",
@@ -1106,6 +1264,7 @@
     "Descripción": "Apoyado en paralelas o suelo con brazos extendidos, levantar las piernas juntas y estiradas hasta formar una 'L' con el cuerpo, mantener posición"
   },
   {
+    "ID": 159,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Leñador (woodchopper) con cable",
     "Nivel": "Intermedio-Avanzado",
@@ -1113,6 +1272,7 @@
     "Descripción": "De pie lateral a una polea alta, tirar de la cuerda o barra diagonalmente hacia abajo cruzando el cuerpo hasta la altura de la rodilla opuesta (como un hachazo)"
   },
   {
+    "ID": 160,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Mountain climbers",
     "Nivel": "Intermedio",
@@ -1120,6 +1280,7 @@
     "Descripción": "En posición de plancha alta, llevar rodillas alternadamente al pecho de forma rápida, sin levantar las caderas (tipo escalador)"
   },
   {
+    "ID": 161,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Plancha frontal (plank)",
     "Nivel": "Principiante-Intermedio",
@@ -1127,6 +1288,7 @@
     "Descripción": "Apoyado en antebrazos y pies, mantener el cuerpo en línea recta de cabeza a tobillos contrayendo el core"
   },
   {
+    "ID": 162,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Plancha lateral",
     "Nivel": "Intermedio",
@@ -1134,6 +1296,7 @@
     "Descripción": "Apoyado de lado en antebrazo y pies, elevar la cadera formando línea recta, mantener contrayendo oblicuos"
   },
   {
+    "ID": 163,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Plancha con elevación de pierna",
     "Nivel": "Intermedio",
@@ -1141,6 +1304,7 @@
     "Descripción": "En plancha frontal, elevar una pierna recta unos centímetros y mantener, alternar con la otra pierna (manteniendo cadera nivelada)"
   },
   {
+    "ID": 164,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Press Pallof",
     "Nivel": "Intermedio",
@@ -1148,6 +1312,7 @@
     "Descripción": "De pie lateral a una polea con agarre a altura de pecho, brazos extendidos al frente, resistir la rotación que provoca el cable (mantener core firme)"
   },
   {
+    "ID": 165,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Rueda abdominal (ab wheel)",
     "Nivel": "Avanzado",
@@ -1155,6 +1320,7 @@
     "Descripción": "De rodillas, agarrar la rueda abdominal y rodarla hacia adelante extendiendo el cuerpo lo más recto posible, luego regresar contrayendo abdomen"
   },
   {
+    "ID": 166,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Scissors (tijeras)",
     "Nivel": "Intermedio",
@@ -1162,6 +1328,7 @@
     "Descripción": "Tumbado, piernas extendidas ligeramente elevadas, cruzarlas alternadamente (movimiento de tijera horizontal)"
   },
   {
+    "ID": 167,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Sit-ups",
     "Nivel": "Principiante",
@@ -1169,6 +1336,7 @@
     "Descripción": "Tumbado con rodillas flexionadas, elevar el torso completamente hasta quedar sentado, luego bajar controlado"
   },
   {
+    "ID": 168,
     "Grupo Muscular": "Abdominales",
     "Ejercicio": "Toes to bar",
     "Nivel": "Avanzado",
@@ -1176,6 +1344,7 @@
     "Descripción": "Colgado de una barra, elevar las piernas juntas hasta tocar la barra con los pies (flexionando abdomen y caderas)"
   },
   {
+    "ID": 169,
     "Grupo Muscular": "Cuello",
     "Ejercicio": "Extensión de cuello con arnés",
     "Nivel": "Intermedio",
@@ -1183,6 +1352,7 @@
     "Descripción": "De pie, con arnés para cabeza sujeto a peso (o polea baja), realizar extensiones del cuello hacia atrás"
   },
   {
+    "ID": 170,
     "Grupo Muscular": "Cuello",
     "Ejercicio": "Flexión de cuello con peso",
     "Nivel": "Intermedio",
@@ -1190,6 +1360,7 @@
     "Descripción": "Tumbado boca arriba en una banca con la cabeza fuera del borde, colocar un disco en la frente y flexionar el cuello elevando la cabeza"
   },
   {
+    "ID": 171,
     "Grupo Muscular": "Core",
     "Ejercicio": "Bear crawl",
     "Nivel": "Intermedio",
@@ -1197,6 +1368,7 @@
     "Descripción": "En posición cuadrúpeda (manos y pies), avanzar alternando mano y pie opuestos, manteniendo rodillas cerca del suelo y core estable"
   },
   {
+    "ID": 172,
     "Grupo Muscular": "Core",
     "Ejercicio": "Crab walk",
     "Nivel": "Principiante",
@@ -1204,6 +1376,7 @@
     "Descripción": "Sentado con manos y pies en el suelo (posición de cangrejo), caminar hacia atrás y adelante manteniendo caderas elevadas"
   },
   {
+    "ID": 173,
     "Grupo Muscular": "Core",
     "Ejercicio": "Farmer's carry unilateral",
     "Nivel": "Intermedio",
@@ -1211,6 +1384,7 @@
     "Descripción": "Caminar llevando un peso pesado en una sola mano a un lado del cuerpo, manteniendo el torso recto (evitar inclinarse)"
   },
   {
+    "ID": 174,
     "Grupo Muscular": "Core",
     "Ejercicio": "Flexión pike TRX",
     "Nivel": "Avanzado",
@@ -1218,6 +1392,7 @@
     "Descripción": "En posición de plancha con pies en estribos TRX, elevar caderas formando una V invertida (pike), luego volver a plancha"
   },
   {
+    "ID": 175,
     "Grupo Muscular": "Core",
     "Ejercicio": "Loaded carries",
     "Nivel": "Intermedio",
@@ -1225,6 +1400,7 @@
     "Descripción": "Transportar o cargar pesos de diferentes formas (por ejemplo: maleta, sobre el hombro, overhead) para fortalecer core y estabilidad"
   },
   {
+    "ID": 176,
     "Grupo Muscular": "Core",
     "Ejercicio": "Plancha con elevación de rodillas TRX",
     "Nivel": "Intermedio",
@@ -1232,6 +1408,7 @@
     "Descripción": "En posición de plancha con pies en TRX, llevar rodillas alternadamente hacia el pecho, manteniendo core firme"
   },
   {
+    "ID": 177,
     "Grupo Muscular": "Core",
     "Ejercicio": "Plancha lateral TRX",
     "Nivel": "Avanzado",
@@ -1239,6 +1416,7 @@
     "Descripción": "Plancha lateral con pies en los estribos TRX, mantener posición trabajando oblicuos"
   },
   {
+    "ID": 178,
     "Grupo Muscular": "Core",
     "Ejercicio": "Rotación con banda",
     "Nivel": "Intermedio",
@@ -1246,6 +1424,7 @@
     "Descripción": "Banda anclada a la altura del pecho, con brazos extendidos realizar rotación de torso contra la resistencia de la banda"
   },
   {
+    "ID": 179,
     "Grupo Muscular": "Core",
     "Ejercicio": "Wall walk",
     "Nivel": "Intermedio",
@@ -1253,6 +1432,7 @@
     "Descripción": "Desde posición de flexión, “caminar” con los pies por la pared hacia arriba hasta quedar casi en handstand, luego caminar de regreso abajo – excelente para hombros y core"
   },
   {
+    "ID": 180,
     "Grupo Muscular": "Equilibrio",
     "Ejercicio": "Equilibrio a una pierna",
     "Nivel": "Principiante",
@@ -1260,6 +1440,7 @@
     "Descripción": "De pie sobre un pie, levantar la otra pierna y mantener el equilibrio el mayor tiempo posible (ejercicio básico de balance)"
   },
   {
+    "ID": 181,
     "Grupo Muscular": "Equilibrio",
     "Ejercicio": "Sentadilla en bosu",
     "Nivel": "Intermedio",
@@ -1267,6 +1448,7 @@
     "Descripción": "De pie sobre un bosu, realizar una sentadilla controlada manteniendo la estabilidad (mejora equilibrio y fuerza de piernas)"
   },
   {
+    "ID": 182,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Ball slams",
     "Nivel": "Intermedio",
@@ -1274,6 +1456,7 @@
     "Descripción": "Desde posición de pie, levantar un balón medicinal por encima de la cabeza y lanzarlo con fuerza contra el suelo, recogiéndolo al rebote"
   },
   {
+    "ID": 183,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Battle ropes",
     "Nivel": "Intermedio",
@@ -1281,6 +1464,7 @@
     "Descripción": "Con un extremo de cuerda de batalla en cada mano, mover los brazos de forma explosiva para generar olas en las cuerdas (entrenamiento de potencia y resistencia)"
   },
   {
+    "ID": 184,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Box jumps",
     "Nivel": "Principiante-Intermedio",
@@ -1288,6 +1472,7 @@
     "Descripción": "Salto explosivo sobre un cajón pliométrico, aterrizando con ambos pies y extendiendo cadera y rodillas al subir"
   },
   {
+    "ID": 185,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Burpee con balón",
     "Nivel": "Avanzado",
@@ -1295,6 +1480,7 @@
     "Descripción": "Realizar un burpee sosteniendo un balón medicinal: flexión, recoger balón al saltar pies al frente, y realizar un salto vertical con el balón"
   },
   {
+    "ID": 186,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Burpees",
     "Nivel": "Principiante-Intermedio",
@@ -1302,6 +1488,7 @@
     "Descripción": "Desde de pie, agacharse a posición de flexión, hacer una flexión de pecho, impulsar pies al frente y saltar vertical con brazos arriba"
   },
   {
+    "ID": 187,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Clean and jerk",
     "Nivel": "Avanzado",
@@ -1309,6 +1496,7 @@
     "Descripción": "Levantamiento olímpico: desde el suelo llevar la barra hasta los hombros (clean) y luego impulsar sobre la cabeza (jerk) con extensión completa"
   },
   {
+    "ID": 188,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Clapping push-ups (flexiones pliométricas)",
     "Nivel": "Intermedio",
@@ -1316,6 +1504,7 @@
     "Descripción": "Flexiones explosivas donde las manos se separan del suelo en la subida lo suficiente para dar una palmada antes de aterrizar"
   },
   {
+    "ID": 189,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Double unders",
     "Nivel": "Intermedio",
@@ -1323,6 +1512,7 @@
     "Descripción": "Salto de comba pasando la cuerda dos veces bajo los pies en un solo salto (requiere coordinación y velocidad)"
   },
   {
+    "ID": 190,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Dumbbell snatch",
     "Nivel": "Intermedio",
@@ -1330,6 +1520,7 @@
     "Descripción": "Desde sentadilla parcial, impulsar una mancuerna desde el suelo hasta posición extendida sobre la cabeza en un solo movimiento explosivo"
   },
   {
+    "ID": 191,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Flexiones con palmada",
     "Nivel": "Intermedio",
@@ -1337,6 +1528,7 @@
     "Descripción": "Flexión explosiva, al subir empujar con fuerza para despegar las manos y dar una palmada"
   },
   {
+    "ID": 192,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Man maker (con mancuernas)",
     "Nivel": "Avanzado",
@@ -1344,6 +1536,7 @@
     "Descripción": "Secuencia compleja: desde posición de plancha con mancuernas hacer una flexión, luego remo con cada brazo, recoger pies al frente en sentadilla y realizar clean & press con las mancuernas"
   },
   {
+    "ID": 193,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Man maker con KB",
     "Nivel": "Avanzado",
@@ -1351,6 +1544,7 @@
     "Descripción": "Variación del Man Maker usando 2 kettlebells en vez de mancuernas (mismo patrón: flexión + remo + clean + press)"
   },
   {
+    "ID": 194,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Salto en profundidad",
     "Nivel": "Avanzado",
@@ -1358,6 +1552,7 @@
     "Descripción": "Desde encima de un cajón, dejarse caer al suelo y al aterrizar impulsar inmediatamente un salto vertical máximo (entrenamiento de potencia/reactivo)"
   },
   {
+    "ID": 195,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Saltos laterales (skater jumps)",
     "Nivel": "Principiante",
@@ -1365,6 +1560,7 @@
     "Descripción": "Saltos explosivos de lado a lado, impulsándose con una pierna y aterrizando sobre la pierna opuesta (mejora potencia lateral y equilibrio)"
   },
   {
+    "ID": 196,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Sled push/pull",
     "Nivel": "Intermedio",
@@ -1372,6 +1568,7 @@
     "Descripción": "Empujar un trineo cargado (o tirar de él con arnés/cuerda) lo más rápido posible – entrena potencia de piernas y acondicionamiento"
   },
   {
+    "ID": 197,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Thruster",
     "Nivel": "Intermedio",
@@ -1379,6 +1576,7 @@
     "Descripción": "Combinación de sentadilla frontal y press de hombros: al levantarse de la sentadilla empujar la barra por encima de la cabeza en un solo movimiento fluido"
   },
   {
+    "ID": 198,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Thruster con banda",
     "Nivel": "Avanzado",
@@ -1386,6 +1584,7 @@
     "Descripción": "Sentadilla con banda seguida de press vertical: realizar una sentadilla pisando una banda elástica y, al subir, extender brazos por encima de la cabeza contra la resistencia de la banda"
   },
   {
+    "ID": 199,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Wall ball (lanzamiento vertical)",
     "Nivel": "Principiante-Intermedio",
@@ -1393,6 +1592,7 @@
     "Descripción": "Desde posición de sentadilla profunda, impulsarse hacia arriba lanzando un balón medicinal contra la pared a cierta altura, atrapar al rebote y repetir"
   },
   {
+    "ID": 200,
     "Grupo Muscular": "Pliométricos",
     "Ejercicio": "Zancadas con salto",
     "Nivel": "Intermedio",

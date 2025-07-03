@@ -1,13 +1,15 @@
-// app/(tabs)/work.tsx - Versión final sin avisos con entrenamientos completados visibles
+// app/(tabs)/work.tsx - Sistema mejorado de entrenamientos con gestión múltiple
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from 'react-native';
 import GymSession from '../../components/sport/GymSession';
@@ -17,8 +19,8 @@ import {
   RunningSessionComponent,
   SwimmingSessionComponent
 } from '../../components/sport/OtherSportsSessions';
+import PostWorkoutIntensity from '../../components/sport/PostWorkoutIntensity';
 import RestTimerBar from '../../components/sport/RestTimerBar';
-import SportSelector from '../../components/sport/SportSelector';
 import {
   CyclingSession,
   GenericSportSession,
@@ -31,10 +33,18 @@ import {
   WeeklyPlan,
   Workout
 } from '../../components/sport/sports';
+import SportSelector from '../../components/sport/SportSelector';
 
+/**
+ * Configuración de días de la semana
+ * L=Lunes, M=Martes, X=Miércoles, J=Jueves, V=Viernes, S=Sábado, D=Domingo
+ */
 const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const todayIdx = (new Date().getDay() + 6) % 7; // Lunes = 0
 
+/**
+ * Configuración de iconos para cada deporte
+ */
 const SPORT_ICONS: Record<SportType, string> = {
   gym: 'dumbbell',
   running: 'run',
@@ -45,6 +55,9 @@ const SPORT_ICONS: Record<SportType, string> = {
   basketball: 'basketball'
 };
 
+/**
+ * Configuración de colores gradiente para cada deporte
+ */
 const SPORT_COLORS: Record<SportType, string[]> = {
   gym: ['#FF6B6B', '#FF5252'],
   running: ['#4ECDC4', '#26C6DA'],
@@ -55,25 +68,36 @@ const SPORT_COLORS: Record<SportType, string[]> = {
   basketball: ['#FD79A8', '#E91E63']
 };
 
+/**
+ * Componente principal de la pantalla de entrenamientos
+ * Gestiona múltiples entrenamientos por día con sistema de minimización
+ */
 export default function MainTrainingScreen() {
-  /**
-   * Estados principales de la aplicación
-   */
+  // ===== ESTADOS PRINCIPALES =====
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan>(
     Object.fromEntries(days.map((d) => [d, []]))
   );
   const [selectedDay, setSelectedDay] = useState(days[todayIdx]);
   const [showSportSelector, setShowSportSelector] = useState(false);
+  const [showWorkoutNamer, setShowWorkoutNamer] = useState(false);
+  const [pendingSport, setPendingSport] = useState<SportType | null>(null);
+  const [pendingWorkoutName, setPendingWorkoutName] = useState('');
+  
+  // ===== ESTADOS DE ENTRENAMIENTO ACTIVO =====
   const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
+  const [minimizedWorkouts, setMinimizedWorkouts] = useState<Set<string>>(new Set());
+  
+  // ===== ESTADOS DE TIMER Y POST-ENTRENAMIENTO =====
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [restDuration, setRestDuration] = useState(60);
+  const [showIntensityModal, setShowIntensityModal] = useState(false);
+  const [completingWorkoutId, setCompletingWorkoutId] = useState<string | null>(null);
 
   const todaysWorkouts = weeklyPlan[selectedDay] || [];
   const activeWorkout = todaysWorkouts.find(w => w.id === activeWorkoutId);
 
   /**
-   * Función para generar fechas de la semana actual
-   * Calcula las fechas reales para cada día de lunes a domingo
+   * Genera las fechas de la semana actual para el selector de días
    */
   const getWeekDates = () => {
     const today = new Date();
@@ -96,7 +120,7 @@ export default function MainTrainingScreen() {
   const weekDates = getWeekDates();
 
   /**
-   * Función para obtener información formateada del día seleccionado
+   * Obtiene información formateada del día seleccionado
    */
   const getSelectedDayInfo = () => {
     const selectedDayInfo = weekDates.find(d => d.dayCode === selectedDay);
@@ -111,7 +135,22 @@ export default function MainTrainingScreen() {
   };
 
   /**
-   * Función para crear sesión por defecto según el deporte
+   * Genera nombre automático para entrenamientos basado en el patrón:
+   * "Entrenamiento de [DEPORTE], el [FECHA Y HORA]"
+   */
+  const generateDefaultWorkoutName = (sport: SportType): string => {
+    const now = new Date();
+    const dayInfo = getSelectedDayInfo();
+    const time = now.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    return `Entrenamiento de ${SPORT_TRANSLATIONS[sport]}, el ${dayInfo} ${time}`;
+  };
+
+  /**
+   * Crea sesión por defecto según el tipo de deporte
    */
   const createDefaultSession = (sport: SportType): SportSession => {
     switch (sport) {
@@ -156,15 +195,31 @@ export default function MainTrainingScreen() {
   };
 
   /**
-   * Función para añadir nuevo entrenamiento
+   * Inicia el proceso de añadir nuevo entrenamiento
+   * Abre modal para editar nombre
    */
-  const addNewWorkout = (sport: SportType) => {
+  const startAddWorkout = (sport: SportType) => {
+    setPendingSport(sport);
+    setPendingWorkoutName(generateDefaultWorkoutName(sport));
+    setShowWorkoutNamer(true);
+    setShowSportSelector(false);
+  };
+
+  /**
+   * Confirma la creación del entrenamiento con nombre personalizado
+   */
+  const confirmAddWorkout = () => {
+    if (!pendingSport) return;
+
     const newWorkout: Workout = {
-      id: `workout_${Date.now()}`,
+      id: `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ID único
       date: new Date().toISOString().split('T')[0],
-      sport,
-      session: createDefaultSession(sport),
-      completed: false
+      sport: pendingSport,
+      name: pendingWorkoutName.trim() || generateDefaultWorkoutName(pendingSport),
+      session: createDefaultSession(pendingSport),
+      completed: false,
+      createdAt: new Date().toISOString(), // Para BD futura
+      updatedAt: new Date().toISOString()  // Para BD futura
     };
 
     setWeeklyPlan(prev => ({
@@ -172,12 +227,22 @@ export default function MainTrainingScreen() {
       [selectedDay]: [...prev[selectedDay], newWorkout]
     }));
 
+    // Activar el nuevo entrenamiento y expandirlo
     setActiveWorkoutId(newWorkout.id);
-    setShowSportSelector(false);
+    setMinimizedWorkouts(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(newWorkout.id); // Asegurar que esté expandido
+      return newSet;
+    });
+
+    // Limpiar estados temporales
+    setShowWorkoutNamer(false);
+    setPendingSport(null);
+    setPendingWorkoutName('');
   };
 
   /**
-   * Función para actualizar sesión del entrenamiento activo
+   * Actualiza la sesión del entrenamiento activo
    */
   const updateWorkoutSession = (session: SportSession) => {
     if (!activeWorkoutId) return;
@@ -186,14 +251,18 @@ export default function MainTrainingScreen() {
       ...prev,
       [selectedDay]: prev[selectedDay].map(workout =>
         workout.id === activeWorkoutId
-          ? { ...workout, session }
+          ? { 
+              ...workout, 
+              session,
+              updatedAt: new Date().toISOString() // Para BD futura
+            }
           : workout
       )
     }));
   };
 
   /**
-   * Función para eliminar entrenamiento
+   * Elimina un entrenamiento con confirmación visual
    */
   const removeWorkout = (workoutId: string) => {
     setWeeklyPlan(prev => ({
@@ -201,75 +270,116 @@ export default function MainTrainingScreen() {
       [selectedDay]: prev[selectedDay].filter(w => w.id !== workoutId)
     }));
 
+    // Si era el entrenamiento activo, seleccionar otro
     if (activeWorkoutId === workoutId) {
       const remainingWorkouts = todaysWorkouts.filter(w => w.id !== workoutId);
       setActiveWorkoutId(remainingWorkouts.length > 0 ? remainingWorkouts[0].id : null);
     }
+
+    // Limpiar de entrenamientos minimizados
+    setMinimizedWorkouts(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(workoutId);
+      return newSet;
+    });
   };
 
   /**
-   * Función para completar entrenamiento - SIN AVISOS
-   * Solo cambia el estado a completado
+   * Inicia el proceso de completar entrenamiento
+   * Abre modal de intensidad post-entrenamiento
    */
-  const completeWorkout = () => {
-    if (!activeWorkoutId) return;
+  const startCompleteWorkout = (workoutId?: string) => {
+    const targetWorkoutId = workoutId || activeWorkoutId;
+    if (!targetWorkoutId) return;
+
+    setCompletingWorkoutId(targetWorkoutId);
+    setShowIntensityModal(true);
+  };
+
+  /**
+   * Completa el entrenamiento con datos de intensidad
+   */
+  const completeWorkoutWithIntensity = (intensityData: {
+    rpe: number;
+    feeling: string;
+    notes?: string;
+  }) => {
+    if (!completingWorkoutId) return;
+
+    const completedAt = new Date().toISOString();
 
     setWeeklyPlan(prev => ({
       ...prev,
       [selectedDay]: prev[selectedDay].map(workout =>
-        workout.id === activeWorkoutId
-          ? { ...workout, completed: true, duration: Date.now() }
+        workout.id === completingWorkoutId
+          ? { 
+              ...workout, 
+              completed: true,
+              completedAt,
+              updatedAt: completedAt,
+              postWorkoutData: {
+                ...intensityData,
+                timestamp: completedAt
+              } // Para análisis futuro
+            }
           : workout
       )
     }));
 
     // Buscar siguiente entrenamiento incompleto
     const remainingIncompleteWorkouts = todaysWorkouts.filter(w => 
-      w.id !== activeWorkoutId && !w.completed
+      w.id !== completingWorkoutId && !w.completed
     );
     
     if (remainingIncompleteWorkouts.length > 0) {
       setActiveWorkoutId(remainingIncompleteWorkouts[0].id);
     } else {
       setActiveWorkoutId(null);
-      // SIN ALERTAS - Solo cambio de estado visual
     }
+
+    // Cerrar modales
+    setShowIntensityModal(false);
+    setCompletingWorkoutId(null);
   };
 
   /**
-   * Función para renderizar la sesión deportiva activa
-   * Incluye tanto entrenamientos en progreso como completados
+   * Alterna el estado minimizado de un entrenamiento
    */
-  const renderSportSession = () => {
-    if (!activeWorkout) return null;
+  const toggleWorkoutMinimized = (workoutId: string) => {
+    setMinimizedWorkouts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(workoutId)) {
+        newSet.delete(workoutId);
+      } else {
+        newSet.add(workoutId);
+      }
+      return newSet;
+    });
+  };
 
-    const session = activeWorkout.session;
-    
-    // Si el entrenamiento está completado, mostrar solo lectura
-    const isCompleted = activeWorkout.completed;
-    
-    // Props comunes para componentes completados
-    const completedProps = isCompleted ? {
-      onCompleteWorkout: undefined, // Deshabilitar botón de completar
-      disabled: true // Indicador de que está en modo lectura
-    } : {
-      onCompleteWorkout: completeWorkout
-    };
+  /**
+   * Renderiza la sesión deportiva según el tipo
+   */
+  const renderSportSession = (workout: Workout, isMinimized: boolean) => {
+    if (isMinimized) return null;
 
-    switch (activeWorkout.sport) {
+    const session = workout.session;
+    const isCompleted = workout.completed;
+
+    switch (workout.sport) {
       case 'gym':
         return (
           <GymSession
             exercises={(session as any).data || []}
             onUpdateExercises={
               isCompleted 
-                ? () => {} // No permitir cambios si está completado
+                ? () => {}
                 : (exercises: GymExercise[]) => 
                     updateWorkoutSession({ sport: 'gym', data: exercises })
             }
             onStartRestTimer={isCompleted ? () => {} : startRestTimer}
-            onCompleteWorkout={isCompleted ? undefined : completeWorkout}
-            isCompleted={isCompleted} // Nueva prop para indicar estado
+            onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
+            isCompleted={isCompleted}
           />
         );
       
@@ -279,11 +389,12 @@ export default function MainTrainingScreen() {
             session={(session as any).data || { type: 'long_run' }}
             onUpdateSession={
               isCompleted
-                ? () => {} // No permitir cambios si está completado
+                ? () => {}
                 : (data: RunningSession) => 
                     updateWorkoutSession({ sport: 'running', data })
             }
-            onCompleteWorkout={isCompleted ? undefined : completeWorkout}
+            onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
+            isCompleted={isCompleted}
           />
         );
       
@@ -293,11 +404,12 @@ export default function MainTrainingScreen() {
             session={(session as any).data || { type: 'endurance' }}
             onUpdateSession={
               isCompleted
-                ? () => {} // No permitir cambios si está completado
+                ? () => {}
                 : (data: CyclingSession) => 
                     updateWorkoutSession({ sport: 'cycling', data })
             }
-            onCompleteWorkout={isCompleted ? undefined : completeWorkout}
+            onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
+            isCompleted={isCompleted}
           />
         );
       
@@ -307,11 +419,12 @@ export default function MainTrainingScreen() {
             session={(session as any).data || { type: 'endurance', poolLength: 25 }}
             onUpdateSession={
               isCompleted
-                ? () => {} // No permitir cambios si está completado
+                ? () => {}
                 : (data: SwimmingSession) => 
                     updateWorkoutSession({ sport: 'swimming', data })
             }
-            onCompleteWorkout={isCompleted ? undefined : completeWorkout}
+            onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
+            isCompleted={isCompleted}
           />
         );
       
@@ -319,33 +432,37 @@ export default function MainTrainingScreen() {
         return (
           <GenericSportSessionComponent
             session={(session as any).data || { type: 'training' }}
-            sport={activeWorkout.sport}
+            sport={workout.sport}
             onUpdateSession={
               isCompleted
-                ? () => {} // No permitir cambios si está completado
+                ? () => {}
                 : (data: GenericSportSession) => 
-                    updateWorkoutSession({ sport: activeWorkout.sport, data })
+                    updateWorkoutSession({ sport: workout.sport, data })
             }
-            onCompleteWorkout={isCompleted ? undefined : completeWorkout}
+            onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
+            isCompleted={isCompleted}
           />
         );
     }
   };
 
   /**
-   * Funciones para el timer de descanso
+   * Inicia el timer de descanso
    */
   const startRestTimer = (duration: number) => {
     setRestDuration(duration);
     setShowRestTimer(true);
   };
 
+  /**
+   * Detiene el timer de descanso
+   */
   const stopRestTimer = () => {
     setShowRestTimer(false);
   };
 
   /**
-   * Función para obtener nombre completo del día
+   * Obtiene el nombre completo del día
    */
   const getDayName = (dayCode: string) => {
     const dayNames = {
@@ -360,7 +477,7 @@ export default function MainTrainingScreen() {
     return dayNames[dayCode as keyof typeof dayNames];
   };
 
-  // Calcular estadísticas del día
+  // ===== CÁLCULOS DE ESTADÍSTICAS =====
   const completedWorkouts = todaysWorkouts.filter(w => w.completed).length;
   const totalWorkouts = todaysWorkouts.length;
   const dayProgress = totalWorkouts > 0 ? (completedWorkouts / totalWorkouts) * 100 : 0;
@@ -375,13 +492,13 @@ export default function MainTrainingScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Header */}
+          {/* ===== HEADER ===== */}
           <View style={styles.header}>
             <Text style={styles.title}>Entrenamientos 💪</Text>
             <Text style={styles.subtitle}>Planifica tu semana deportiva</Text>
           </View>
 
-          {/* Day Selector con fechas mejorado */}
+          {/* ===== SELECTOR DE DÍAS ===== */}
           <View style={styles.daySelector}>
             <LinearGradient
               colors={["#2D2D5F", "#3D3D7F"]}
@@ -474,7 +591,7 @@ export default function MainTrainingScreen() {
             </LinearGradient>
           </View>
 
-          {/* Rest Timer Bar */}
+          {/* ===== BARRA DE TIMER DE DESCANSO ===== */}
           {showRestTimer && (
             <RestTimerBar
               duration={restDuration}
@@ -483,7 +600,7 @@ export default function MainTrainingScreen() {
             />
           )}
 
-          {/* Current Day Info with Progress */}
+          {/* ===== INFORMACIÓN DEL DÍA ACTUAL ===== */}
           <View style={styles.currentDayInfo}>
             <LinearGradient
               colors={["#2D2D5F", "#3D3D7F"]}
@@ -512,7 +629,6 @@ export default function MainTrainingScreen() {
                 )}
               </View>
 
-              {/* Barra de progreso del día */}
               {totalWorkouts > 0 && (
                 <View style={styles.dayProgressContainer}>
                   <View style={styles.dayProgressBackground}>
@@ -528,83 +644,7 @@ export default function MainTrainingScreen() {
             </LinearGradient>
           </View>
 
-          {/* Workouts List */}
-          {todaysWorkouts.length > 0 && (
-            <View style={styles.workoutsList}>
-              <LinearGradient
-                colors={["#2D2D5F", "#3D3D7F"]}
-                style={styles.workoutsListGradient}
-              >
-                <Text style={styles.workoutsListTitle}>Entrenamientos del Día</Text>
-                {todaysWorkouts.map((workout) => (
-                  <Pressable
-                    key={workout.id}
-                    onPress={() => setActiveWorkoutId(workout.id)}
-                    style={styles.workoutItem}
-                  >
-                    <LinearGradient
-                      colors={
-                        activeWorkoutId === workout.id
-                          ? SPORT_COLORS[workout.sport] as [string, string]
-                          : workout.completed
-                          ? ['rgba(0, 212, 170, 0.3)', 'rgba(0, 184, 148, 0.2)']
-                          : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
-                      }
-                      style={[
-                        styles.workoutItemGradient,
-                        activeWorkoutId === workout.id && styles.workoutItemActive,
-                        workout.completed && styles.workoutItemCompleted
-                      ]}
-                    >
-                      <View style={styles.workoutItemContent}>
-                        <View style={styles.workoutItemInfo}>
-                          <View style={styles.workoutItemHeader}>
-                            <MaterialCommunityIcons
-                              name={SPORT_ICONS[workout.sport] as any}
-                              size={24}
-                              color={
-                                activeWorkoutId === workout.id ? '#FFFFFF' : 
-                                workout.completed ? '#00D4AA' : '#B0B0C4'
-                              }
-                            />
-                            <Text style={[
-                              styles.workoutItemName,
-                              activeWorkoutId === workout.id && styles.workoutItemNameActive,
-                              workout.completed && styles.workoutItemNameCompleted
-                            ]}>
-                              {SPORT_TRANSLATIONS[workout.sport]}
-                            </Text>
-                            {workout.completed && (
-                              <View style={styles.completedBadge}>
-                                <MaterialCommunityIcons
-                                  name="check-circle"
-                                  size={16}
-                                  color="#00D4AA"
-                                />
-                                <Text style={styles.completedBadgeText}>COMPLETADO</Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                        <Pressable
-                          onPress={() => removeWorkout(workout.id)}
-                          style={styles.removeWorkoutBtn}
-                        >
-                          <MaterialCommunityIcons
-                            name="close"
-                            size={20}
-                            color="#FF6B6B"
-                          />
-                        </Pressable>
-                      </View>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
-              </LinearGradient>
-            </View>
-          )}
-
-          {/* Add Workout Button */}
+          {/* ===== BOTÓN AÑADIR ENTRENAMIENTO ===== */}
           <Pressable 
             onPress={() => setShowSportSelector(true)} 
             style={styles.addWorkoutBtn}
@@ -618,39 +658,114 @@ export default function MainTrainingScreen() {
             </LinearGradient>
           </Pressable>
 
-          {/* Sport Session - Tanto en progreso como completados */}
-          {activeWorkout && (
-            <View style={styles.sessionContainer}>
-              <LinearGradient
-                colors={
-                  activeWorkout.completed 
-                    ? ["rgba(0, 212, 170, 0.2)", "rgba(0, 184, 148, 0.1)"]
-                    : ["#2D2D5F", "#3D3D7F"]
-                }
-                style={styles.sessionHeader}
-              >
-                <MaterialCommunityIcons
-                  name={SPORT_ICONS[activeWorkout.sport] as any}
-                  size={24}
-                  color={
-                    activeWorkout.completed 
-                      ? "#00D4AA" 
-                      : SPORT_COLORS[activeWorkout.sport][0]
-                  }
-                />
-                <Text style={[
-                  styles.sessionTitle,
-                  activeWorkout.completed && styles.sessionTitleCompleted
-                ]}>
-                  {SPORT_TRANSLATIONS[activeWorkout.sport]}
-                  {activeWorkout.completed && " - Completado ✅"}
-                </Text>
-              </LinearGradient>
-              {renderSportSession()}
-            </View>
-          )}
+          {/* ===== LISTA DE ENTRENAMIENTOS ===== */}
+          {todaysWorkouts.map((workout) => {
+            const isActive = activeWorkoutId === workout.id;
+            const isMinimized = minimizedWorkouts.has(workout.id);
+            
+            return (
+              <View key={workout.id} style={styles.workoutCard}>
+                {/* Header del entrenamiento */}
+                <Pressable
+                  onPress={() => setActiveWorkoutId(isActive ? null : workout.id)}
+                  style={styles.workoutHeader}
+                >
+                  <LinearGradient
+                    colors={
+                      isActive
+                        ? SPORT_COLORS[workout.sport] as [string, string]
+                        : workout.completed
+                        ? ['rgba(0, 212, 170, 0.3)', 'rgba(0, 184, 148, 0.2)']
+                        : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
+                    }
+                    style={[
+                      styles.workoutHeaderGradient,
+                      isActive && styles.workoutHeaderActive,
+                      workout.completed && styles.workoutHeaderCompleted
+                    ]}
+                  >
+                    <View style={styles.workoutHeaderContent}>
+                      <View style={styles.workoutHeaderLeft}>
+                        <MaterialCommunityIcons
+                          name={SPORT_ICONS[workout.sport] as any}
+                          size={24}
+                          color={
+                            isActive ? '#FFFFFF' : 
+                            workout.completed ? '#00D4AA' : 
+                            SPORT_COLORS[workout.sport][0]
+                          }
+                        />
+                        <View style={styles.workoutHeaderText}>
+                          <Text style={[
+                            styles.workoutName,
+                            isActive && styles.workoutNameActive,
+                            workout.completed && styles.workoutNameCompleted
+                          ]}>
+                            {workout.name || `Entrenamiento de ${SPORT_TRANSLATIONS[workout.sport]}`}
+                          </Text>
+                          
+                          {workout.completed && (
+                            <View style={styles.completedBadge}>
+                              <MaterialCommunityIcons
+                                name="check-circle"
+                                size={12}
+                                color="#00D4AA"
+                              />
+                              <Text style={styles.completedBadgeText}>COMPLETADO</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
 
-          {/* Empty State */}
+                      <View style={styles.workoutHeaderActions}>
+                        {/* Botón minimizar */}
+                        {isActive && (
+                          <Pressable
+                            onPress={() => toggleWorkoutMinimized(workout.id)}
+                            style={styles.minimizeBtn}
+                          >
+                            <MaterialCommunityIcons
+                              name={isMinimized ? "window-maximize" : "window-minimize"}
+                              size={20}
+                              color="#B0B0C4"
+                            />
+                          </Pressable>
+                        )}
+
+                        {/* Botón eliminar */}
+                        <Pressable
+                          onPress={() => removeWorkout(workout.id)}
+                          style={styles.removeWorkoutBtn}
+                        >
+                          <MaterialCommunityIcons
+                            name="close"
+                            size={20}
+                            color="#FF6B6B"
+                          />
+                        </Pressable>
+
+                        {/* Indicador expandido/colapsado */}
+                        <MaterialCommunityIcons
+                          name={isActive && !isMinimized ? "chevron-up" : "chevron-down"}
+                          size={24}
+                          color="#B0B0C4"
+                        />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </Pressable>
+
+                {/* Contenido del entrenamiento */}
+                {isActive && (
+                  <View style={styles.workoutContent}>
+                    {renderSportSession(workout, isMinimized)}
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {/* ===== ESTADO VACÍO ===== */}
           {todaysWorkouts.length === 0 && (
             <View style={styles.emptyState}>
               <LinearGradient
@@ -672,11 +787,93 @@ export default function MainTrainingScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Sport Selector Modal */}
+      {/* ===== MODALES ===== */}
+      
+      {/* Modal selector de deporte */}
       {showSportSelector && (
         <SportSelector
-          onSportSelect={addNewWorkout}
+          onSportSelect={startAddWorkout}
           onClose={() => setShowSportSelector(false)}
+        />
+      )}
+
+      {/* Modal para nombrar entrenamiento */}
+      <Modal
+        visible={showWorkoutNamer}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowWorkoutNamer(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <LinearGradient
+            colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
+            style={styles.workoutNamerModal}
+          >
+            <View style={styles.workoutNamerHeader}>
+              <MaterialCommunityIcons
+                name="pencil"
+                size={24}
+                color="#00D4AA"
+              />
+              <Text style={styles.workoutNamerTitle}>Nombre del Entrenamiento</Text>
+            </View>
+
+            <TextInput
+              value={pendingWorkoutName}
+              onChangeText={setPendingWorkoutName}
+              style={styles.workoutNamerInput}
+              placeholder="Nombre del entrenamiento..."
+              placeholderTextColor="#B0B0C4"
+              multiline
+              maxLength={100}
+              autoFocus
+            />
+
+            <Text style={styles.workoutNamerHint}>
+              💡 Puedes usar el nombre automático o personalizarlo
+            </Text>
+
+            <View style={styles.workoutNamerActions}>
+              <Pressable
+                onPress={() => {
+                  setShowWorkoutNamer(false);
+                  setPendingSport(null);
+                  setPendingWorkoutName('');
+                }}
+                style={styles.workoutNamerCancelBtn}
+              >
+                <Text style={styles.workoutNamerCancelText}>Cancelar</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={confirmAddWorkout}
+                style={styles.workoutNamerConfirmBtn}
+              >
+                <LinearGradient
+                  colors={["#00D4AA", "#00B894"]}
+                  style={styles.workoutNamerConfirmGradient}
+                >
+                  <Text style={styles.workoutNamerConfirmText}>Crear Entrenamiento</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
+
+      {/* Modal de intensidad post-entrenamiento */}
+      {showIntensityModal && completingWorkoutId && (
+        <PostWorkoutIntensity
+          visible={showIntensityModal}
+          onClose={() => {
+            setShowIntensityModal(false);
+            setCompletingWorkoutId(null);
+          }}
+          onSubmit={completeWorkoutWithIntensity}
+          workoutName={
+            todaysWorkouts.find(w => w.id === completingWorkoutId)?.name || 
+            'Entrenamiento'
+          }
         />
       )}
     </LinearGradient>
@@ -716,17 +913,17 @@ const styles = StyleSheet.create({
     color: '#B0B0C4',
   },
 
-  // Day Selector con bordes redondeados completos
+  // ===== SELECTOR DE DÍAS =====
   daySelector: {
     marginHorizontal: 20,
     marginBottom: 16,
-    borderRadius: 20, // Aumentado para mejor redondeado
+    borderRadius: 20,
     overflow: 'hidden',
   },
 
   daySelectorGradient: {
     padding: 20,
-    borderRadius: 20, // Asegurar redondeado interno
+    borderRadius: 20,
   },
 
   daySelectorHeader: {
@@ -759,7 +956,7 @@ const styles = StyleSheet.create({
   dayContainer: {
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 16, // Bordes más redondeados
+    borderRadius: 16,
     alignItems: 'center',
     minWidth: 44,
     minHeight: 68,
@@ -824,7 +1021,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Current Day Info con bordes mejorados
+  // ===== INFORMACIÓN DEL DÍA =====
   currentDayInfo: {
     marginHorizontal: 20,
     marginBottom: 16,
@@ -884,103 +1081,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  // Workouts List con bordes mejorados
-  workoutsList: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-
-  workoutsListGradient: {
-    padding: 20,
-    borderRadius: 20,
-  },
-
-  workoutsListTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-
-  workoutItem: {
-    marginBottom: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  workoutItemGradient: {
-    padding: 16,
-    borderRadius: 16,
-  },
-
-  workoutItemActive: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-
-  workoutItemCompleted: {
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.5)',
-  },
-
-  workoutItemContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  workoutItemInfo: {
-    flex: 1,
-  },
-
-  workoutItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  workoutItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    flex: 1,
-  },
-
-  workoutItemNameActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-
-  workoutItemNameCompleted: {
-    color: '#00D4AA',
-    fontWeight: '700',
-  },
-
-  // Badge para entrenamientos completados
-  completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-
-  completedBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#00D4AA',
-    letterSpacing: 0.5,
-  },
-
-  removeWorkoutBtn: {
-    padding: 4,
-  },
-
-  // Add Workout Button con bordes mejorados
+  // ===== BOTÓN AÑADIR ENTRENAMIENTO =====
   addWorkoutBtn: {
     marginHorizontal: 20,
     marginBottom: 16,
@@ -1003,33 +1104,105 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Session Container con bordes mejorados
-  sessionContainer: {
-    marginBottom: 16,
-  },
-
-  sessionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // ===== TARJETAS DE ENTRENAMIENTO =====
+  workoutCard: {
     marginHorizontal: 20,
     marginBottom: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 20, // Bordes más redondeados
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  workoutHeader: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  workoutHeaderGradient: {
+    borderRadius: 20,
+  },
+
+  workoutHeaderActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  workoutHeaderCompleted: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 170, 0.5)',
+  },
+
+  workoutHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+
+  workoutHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
     gap: 12,
   },
 
-  sessionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+  workoutHeaderText: {
+    flex: 1,
+  },
+
+  workoutName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 4,
+  },
+
+  workoutNameActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
 
-  sessionTitleCompleted: {
+  workoutNameCompleted: {
     color: '#00D4AA',
+    fontWeight: '700',
   },
 
-  // Empty State con bordes mejorados
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+
+  completedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#00D4AA',
+    letterSpacing: 0.5,
+  },
+
+  workoutHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  minimizeBtn: {
+    padding: 4,
+  },
+
+  removeWorkoutBtn: {
+    padding: 4,
+  },
+
+  workoutContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+
+  // ===== ESTADO VACÍO =====
   emptyState: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -1055,5 +1228,93 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#B0B0C4',
     textAlign: 'center',
+  },
+
+  // ===== MODAL NOMBRAR ENTRENAMIENTO =====
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+
+  workoutNamerModal: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+  },
+
+  workoutNamerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+
+  workoutNamerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  workoutNamerInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 8,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+
+  workoutNamerHint: {
+    fontSize: 12,
+    color: '#FFB84D',
+    marginBottom: 20,
+    fontStyle: 'italic',
+  },
+
+  workoutNamerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  workoutNamerCancelBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+
+  workoutNamerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  workoutNamerConfirmBtn: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  workoutNamerConfirmGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+
+  workoutNamerConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

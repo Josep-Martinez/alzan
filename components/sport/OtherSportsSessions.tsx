@@ -1,13 +1,14 @@
-// components/sport/OtherSportsSessions.tsx - Con modo solo lectura para entrenamientos completados
+// components/sport/OtherSportsSessions.tsx - Deportes específicos con constructor avanzado integrado
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View
 } from 'react-native';
+import AdvancedWorkoutBuilder from './AdvancedWorkoutBuilder';
 import {
   CyclingSession,
   GenericSportSession,
@@ -16,54 +17,119 @@ import {
   SwimmingSession
 } from './sports';
 
+/**
+ * Interfaz para plan de entrenamiento estructurado
+ */
+interface WorkoutPlan {
+  id: string;
+  name: string;
+  sport: 'running' | 'cycling' | 'swimming';
+  steps: any[];
+  estimatedDuration: number;
+  estimatedDistance: number;
+  createdAt: string;
+}
+
+// ===== RUNNING COMPONENT =====
 interface RunningSessionProps {
   session: RunningSession;
   onUpdateSession: (session: RunningSession) => void;
   onCompleteWorkout?: () => void;
-  isCompleted?: boolean; // Nueva prop para modo solo lectura
+  isCompleted?: boolean;
 }
 
+/**
+ * Componente para sesiones de running con constructor avanzado
+ * Integra plantillas predefinidas y construcción personalizada
+ */
 export function RunningSessionComponent({ 
   session, 
   onUpdateSession, 
   onCompleteWorkout,
   isCompleted = false 
 }: RunningSessionProps) {
-  
+  const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false);
+  const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
+
   /**
-   * Función para actualizar datos de intervalos
-   * Solo funciona si no está completado
+   * Plantillas rápidas para running
    */
-  const updateIntervalData = (field: keyof NonNullable<RunningSession['intervalData']>, value: number) => {
-    if (isCompleted) return; // No permitir cambios si está completado
-    
-    const currentIntervalData = session.intervalData || {
-      workDistance: 0,
-      restDistance: 0,
-      repetitions: 0
-    };
-    
+  const quickTemplates = [
+    {
+      id: 'easy_run',
+      name: 'Rodaje Suave',
+      description: '30-60 min a ritmo conversacional',
+      icon: 'run',
+      color: '#4CAF50',
+      estimatedTime: '45 min'
+    },
+    {
+      id: 'intervals',
+      name: 'Intervalos',
+      description: 'Series de velocidad con descanso',
+      icon: 'speedometer',
+      color: '#FF5722',
+      estimatedTime: '40 min'
+    },
+    {
+      id: 'tempo',
+      name: 'Tempo Run',
+      description: '20 min a ritmo de umbral',
+      icon: 'timer',
+      color: '#FF9800',
+      estimatedTime: '35 min'
+    },
+    {
+      id: 'long_run',
+      name: 'Tirada Larga',
+      description: 'Carrera continua de resistencia',
+      icon: 'map-marker-distance',
+      color: '#00BCD4',
+      estimatedTime: '90 min'
+    }
+  ];
+
+  /**
+   * Maneja la selección de plantilla rápida
+   */
+  const handleQuickTemplate = (templateId: string) => {
+    const template = quickTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    // Actualizar sesión básica
     onUpdateSession({
       ...session,
-      intervalData: {
-        ...currentIntervalData,
-        [field]: value
-      }
+      type: templateId as any,
+      plannedDuration: templateId === 'long_run' ? 90 * 60 : 
+                      templateId === 'intervals' ? 40 * 60 :
+                      templateId === 'tempo' ? 35 * 60 : 45 * 60
     });
   };
 
   /**
-   * Función para completar entrenamiento - Sin alertas, solo callback
-   * Solo funciona si no está completado
+   * Maneja el plan de entrenamiento creado
    */
-  const handleCompleteWorkout = () => {
-    if (!session.plannedDistance && !session.plannedDuration) return;
-    if (isCompleted) return; // No permitir si ya está completado
-    onCompleteWorkout?.();
+  const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
+    setCurrentWorkoutPlan(workoutPlan);
+    
+    // Actualizar sesión con datos del plan
+    onUpdateSession({
+      ...session,
+      type: 'intervals', // Determinar tipo basado en los pasos
+      plannedDuration: workoutPlan.estimatedDuration,
+      plannedDistance: workoutPlan.estimatedDistance,
+      workoutPlan: workoutPlan // Guardar plan completo para ejecución
+    });
+    
+    setShowWorkoutBuilder(false);
   };
 
-  // Verificar si el entrenamiento está listo para completar
-  const isReadyToComplete = session.plannedDistance || session.plannedDuration;
+  /**
+   * Verifica si el entrenamiento está listo para completar
+   */
+  const isReadyToComplete = () => {
+    return session.plannedDuration || session.plannedDistance || currentWorkoutPlan;
+  };
 
   return (
     <View style={styles.sessionContainer}>
@@ -75,27 +141,16 @@ export function RunningSessionComponent({
         }
         style={styles.sessionGradient}
       >
-        {/* Header con candado para entrenamientos completados */}
+        {/* ===== HEADER ===== */}
         <View style={styles.sessionHeader}>
           <MaterialCommunityIcons name="run" size={24} color="#4ECDC4" />
-          <Text style={[
-            styles.sessionTitle,
-            isCompleted && styles.sessionTitleCompleted
-          ]}>
+          <Text style={[styles.sessionTitle, isCompleted && styles.sessionTitleCompleted]}>
             Sesión de Running {isCompleted && "- Completada"}
           </Text>
-          {/* Icono de candado para entrenamientos completados */}
-          {isCompleted && (
-            <MaterialCommunityIcons
-              name="lock"
-              size={16}
-              color="#00D4AA"
-              style={styles.lockIcon}
-            />
-          )}
+          {isCompleted && <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />}
         </View>
 
-        {/* Mensaje mejorado para entrenamientos completados */}
+        {/* ===== MENSAJE DE COMPLETADO ===== */}
         {isCompleted && (
           <View style={styles.completedMessage}>
             <MaterialCommunityIcons name="trophy" size={16} color="#00D4AA" />
@@ -105,211 +160,188 @@ export function RunningSessionComponent({
           </View>
         )}
 
-        {/* Type Selector */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Tipo de Entrenamiento</Text>
-          <View style={styles.typeSelector}>
-            {[
-              { value: 'long_run', label: 'Tirada Larga', icon: 'run-fast' },
-              { value: 'intervals', label: 'Series/Intervalos', icon: 'speedometer' },
-              { value: 'tempo', label: 'Tempo', icon: 'heart' },
-              { value: 'recovery', label: 'Recuperación', icon: 'walk' },
-              { value: 'race', label: 'Competición', icon: 'trophy' }
-            ].map((type) => (
-              <Pressable
-                key={type.value}
-                onPress={() => !isCompleted && onUpdateSession({ ...session, type: type.value as any })}
-                style={[
-                  styles.typeChip,
-                  session.type === type.value && styles.typeChipSelected,
-                  isCompleted && styles.chipDisabled
-                ]}
-                disabled={isCompleted}
-              >
-                <MaterialCommunityIcons
-                  name={type.icon as any}
-                  size={16}
-                  color={session.type === type.value ? '#FFFFFF' : '#4ECDC4'}
-                />
-                <Text style={[
-                  styles.typeChipText,
-                  session.type === type.value && styles.typeChipTextSelected
-                ]}>
-                  {type.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Distance and Duration */}
-        <View style={styles.inputRow}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>Distancia Planificada</Text>
-            <View style={styles.inputWithUnit}>
-              <TextInput
-                value={session.plannedDistance?.toString() || ''}
-                onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                  ...session, 
-                  plannedDistance: val ? parseFloat(val) : undefined 
-                })}
-                keyboardType="numeric"
-                style={[
-                  styles.textInput,
-                  isCompleted && styles.inputDisabled
-                ]}
-                placeholder="10"
-                placeholderTextColor="#B0B0C4"
-                editable={!isCompleted}
-              />
-              <Text style={styles.unitLabel}>km</Text>
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>Duración Estimada</Text>
-            <View style={styles.inputWithUnit}>
-              <TextInput
-                value={session.plannedDuration?.toString() || ''}
-                onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                  ...session, 
-                  plannedDuration: val ? parseFloat(val) : undefined 
-                })}
-                keyboardType="numeric"
-                style={[
-                  styles.textInput,
-                  isCompleted && styles.inputDisabled
-                ]}
-                placeholder="60"
-                placeholderTextColor="#B0B0C4"
-                editable={!isCompleted}
-              />
-              <Text style={styles.unitLabel}>min</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Interval Data for Series */}
-        {session.type === 'intervals' && (
-          <View style={styles.intervalContainer}>
-            <View style={styles.intervalHeader}>
-              <MaterialCommunityIcons
-                name="speedometer"
-                size={20}
-                color="#4ECDC4"
-              />
-              <Text style={styles.intervalTitle}>Configuración de Series</Text>
-            </View>
-            
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.subFieldLabel}>Distancia de Trabajo</Text>
-                <View style={styles.inputWithUnit}>
-                  <TextInput
-                    value={session.intervalData?.workDistance?.toString() || ''}
-                    onChangeText={(val) => updateIntervalData('workDistance', val ? parseFloat(val) : 0)}
-                    keyboardType="numeric"
-                    style={[
-                      styles.textInput,
-                      isCompleted && styles.inputDisabled
-                    ]}
-                    placeholder="400"
-                    placeholderTextColor="#B0B0C4"
-                    editable={!isCompleted}
-                  />
-                  <Text style={styles.unitLabel}>m</Text>
-                </View>
+        {/* ===== PLAN DE ENTRENAMIENTO ACTIVO ===== */}
+        {currentWorkoutPlan && (
+          <View style={styles.activeWorkoutPlan}>
+            <LinearGradient
+              colors={["#4ECDC4", "#26C6DA"]}
+              style={styles.activeWorkoutPlanGradient}
+            >
+              <View style={styles.workoutPlanHeader}>
+                <MaterialCommunityIcons name="playlist-check" size={20} color="#FFFFFF" />
+                <Text style={styles.workoutPlanName}>{currentWorkoutPlan.name}</Text>
               </View>
               
-              <View style={styles.inputGroup}>
-                <Text style={styles.subFieldLabel}>Descanso</Text>
-                <View style={styles.inputWithUnit}>
-                  <TextInput
-                    value={session.intervalData?.restDistance?.toString() || ''}
-                    onChangeText={(val) => updateIntervalData('restDistance', val ? parseFloat(val) : 0)}
-                    keyboardType="numeric"
-                    style={[
-                      styles.textInput,
-                      isCompleted && styles.inputDisabled
-                    ]}
-                    placeholder="200"
-                    placeholderTextColor="#B0B0C4"
-                    editable={!isCompleted}
-                  />
-                  <Text style={styles.unitLabel}>m</Text>
+              <View style={styles.workoutPlanStats}>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="clock" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {Math.round(currentWorkoutPlan.estimatedDuration / 60)} min
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="map-marker-distance" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.estimatedDistance >= 1000 
+                      ? `${(currentWorkoutPlan.estimatedDistance / 1000).toFixed(1)} km`
+                      : `${currentWorkoutPlan.estimatedDistance} m`
+                    }
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="format-list-numbered" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.steps.length} pasos
+                  </Text>
                 </View>
               </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.subFieldLabel}>Repeticiones</Text>
-                <TextInput
-                  value={session.intervalData?.repetitions?.toString() || ''}
-                  onChangeText={(val) => updateIntervalData('repetitions', val ? parseInt(val) : 0)}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  placeholder="8"
-                  placeholderTextColor="#B0B0C4"
-                  editable={!isCompleted}
-                />
-              </View>
-            </View>
 
-            {/* Interval Summary */}
-            {session.intervalData && session.intervalData.workDistance > 0 && session.intervalData.repetitions > 0 && (
-              <View style={styles.intervalSummary}>
-                <Text style={styles.summaryText}>
-                  Total: {((session.intervalData.workDistance + session.intervalData.restDistance) * session.intervalData.repetitions / 1000).toFixed(1)}km
-                  ({session.intervalData.repetitions} × {session.intervalData.workDistance}m + {session.intervalData.restDistance}m)
-                </Text>
-              </View>
-            )}
+              {!isCompleted && (
+                <Pressable
+                  onPress={() => setCurrentWorkoutPlan(null)}
+                  style={styles.removeWorkoutPlanBtn}
+                >
+                  <MaterialCommunityIcons name="close" size={16} color="#FFFFFF" />
+                  <Text style={styles.removeWorkoutPlanText}>Quitar Plan</Text>
+                </Pressable>
+              )}
+            </LinearGradient>
           </View>
         )}
 
-        {/* Tips based on type */}
-        <View style={styles.tipsContainer}>
-          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <Text style={styles.tipsText}>
-            {session.type === 'long_run' && 'Mantén un ritmo conversacional durante toda la carrera'}
-            {session.type === 'intervals' && 'Calienta bien antes de hacer las series intensas'}
-            {session.type === 'tempo' && 'Corre a un ritmo "cómodamente duro" durante la sesión'}
-            {session.type === 'recovery' && 'Mantén un ritmo muy suave, priorizando la recuperación'}
-            {session.type === 'race' && 'Descansa bien los días previos y calienta adecuadamente'}
-          </Text>
-        </View>
+        {/* ===== PLANTILLAS RÁPIDAS ===== */}
+        {!isCompleted && !currentWorkoutPlan && (
+          <View style={styles.quickTemplatesSection}>
+            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
+            <View style={styles.quickTemplatesGrid}>
+              {quickTemplates.map((template) => (
+                <Pressable
+                  key={template.id}
+                  onPress={() => handleQuickTemplate(template.id)}
+                  style={styles.quickTemplateBtn}
+                >
+                  <LinearGradient
+                    colors={[template.color + '20', template.color + '10']}
+                    style={styles.quickTemplateGradient}
+                  >
+                    <MaterialCommunityIcons
+                      name={template.icon as any}
+                      size={20}
+                      color={template.color}
+                    />
+                    <Text style={styles.quickTemplateName}>{template.name}</Text>
+                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
+                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
+                  </LinearGradient>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
-        {/* Complete Workout Button - Solo si no está completado */}
+        {/* ===== CONSTRUCTOR AVANZADO ===== */}
         {!isCompleted && (
           <Pressable 
-            onPress={handleCompleteWorkout}
+            onPress={() => setShowWorkoutBuilder(true)} 
+            style={styles.advancedBuilderBtn}
+          >
+            <LinearGradient 
+              colors={["#4ECDC4", "#26C6DA"]} 
+              style={styles.advancedBuilderGradient}
+            >
+              <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
+              <Text style={styles.advancedBuilderText}>
+                Constructor Avanzado de Running
+              </Text>
+              <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* ===== INFORMACIÓN ACTUAL ===== */}
+        {(session.plannedDuration || session.plannedDistance) && !currentWorkoutPlan && (
+          <View style={styles.currentSessionInfo}>
+            <LinearGradient
+              colors={["rgba(78, 205, 196, 0.15)", "rgba(78, 205, 196, 0.08)"]}
+              style={styles.currentSessionGradient}
+            >
+              <Text style={styles.currentSessionTitle}>Sesión Configurada</Text>
+              <View style={styles.currentSessionDetails}>
+                {session.plannedDuration && (
+                  <Text style={styles.currentSessionDetail}>
+                    ⏱️ Duración: {Math.round(session.plannedDuration / 60)} minutos
+                  </Text>
+                )}
+                {session.plannedDistance && (
+                  <Text style={styles.currentSessionDetail}>
+                    📏 Distancia: {session.plannedDistance >= 1000 
+                      ? `${(session.plannedDistance / 1000).toFixed(1)} km`
+                      : `${session.plannedDistance} m`
+                    }
+                  </Text>
+                )}
+                <Text style={styles.currentSessionDetail}>
+                  🏃‍♂️ Tipo: {session.type === 'long_run' ? 'Tirada Larga' :
+                           session.type === 'intervals' ? 'Intervalos' :
+                           session.type === 'tempo' ? 'Tempo Run' :
+                           session.type === 'recovery' ? 'Recuperación' : 'Carrera'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* ===== CONSEJOS ===== */}
+        <View style={styles.tipsContainer}>
+          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
+          <View style={styles.tipsContent}>
+            <Text style={styles.tipsTitle}>Consejos para Running:</Text>
+            <Text style={styles.tipsText}>🏃‍♂️ Calienta 10-15 minutos antes de empezar</Text>
+            <Text style={styles.tipsText}>💧 Mantén hidratación cada 15-20 minutos</Text>
+            <Text style={styles.tipsText}>👟 Usa calzado apropiado y revisa la técnica</Text>
+            <Text style={styles.tipsText}>📱 Tu reloj/app registrará las métricas automáticamente</Text>
+          </View>
+        </View>
+
+        {/* ===== BOTÓN COMPLETAR ===== */}
+        {!isCompleted && (
+          <Pressable 
+            onPress={() => onCompleteWorkout?.()} 
             style={[
               styles.completeWorkoutBtn,
-              !isReadyToComplete && styles.completeWorkoutBtnDisabled
+              !isReadyToComplete() && styles.completeWorkoutBtnDisabled
             ]}
+            disabled={!isReadyToComplete()}
           >
             <LinearGradient
-              colors={isReadyToComplete ? ["#4ECDC4", "#26C6DA"] : ["#6B7280", "#4B5563"]}
+              colors={isReadyToComplete() ? ["#4ECDC4", "#26C6DA"] : ["#6B7280", "#4B5563"]}
               style={styles.completeWorkoutGradient}
             >
               <MaterialCommunityIcons 
-                name={isReadyToComplete ? "check-circle" : "alert-circle"} 
+                name={isReadyToComplete() ? "check-circle" : "alert-circle"} 
                 size={20} 
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete ? "Completar Running" : "Añade distancia o duración"}
+                {isReadyToComplete() ? "Completar Running" : "Configura tu entrenamiento"}
               </Text>
             </LinearGradient>
           </Pressable>
         )}
+
+        {/* ===== MODAL CONSTRUCTOR AVANZADO ===== */}
+        <AdvancedWorkoutBuilder
+          sport="running"
+          visible={showWorkoutBuilder}
+          onClose={() => setShowWorkoutBuilder(false)}
+          onSave={handleWorkoutPlan}
+        />
       </LinearGradient>
     </View>
   );
 }
 
+// ===== CYCLING COMPONENT =====
 interface CyclingSessionProps {
   session: CyclingSession;
   onUpdateSession: (session: CyclingSession) => void;
@@ -317,23 +349,81 @@ interface CyclingSessionProps {
   isCompleted?: boolean;
 }
 
+/**
+ * Componente para sesiones de ciclismo con constructor avanzado
+ */
 export function CyclingSessionComponent({ 
   session, 
   onUpdateSession, 
   onCompleteWorkout,
   isCompleted = false 
 }: CyclingSessionProps) {
-  
-  /**
-   * Función para completar entrenamiento - Sin alertas, solo callback
-   */
-  const handleCompleteWorkout = () => {
-    if (!session.plannedDistance && !session.plannedDuration) return;
-    if (isCompleted) return;
-    onCompleteWorkout?.();
+  const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false);
+  const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
+
+  const quickTemplates = [
+    {
+      id: 'endurance',
+      name: 'Resistencia',
+      description: '60-120 min a ritmo aeróbico',
+      icon: 'bike',
+      color: '#00BCD4',
+      estimatedTime: '90 min'
+    },
+    {
+      id: 'intervals',
+      name: 'Intervalos',
+      description: 'Series de potencia con recuperación',
+      icon: 'speedometer',
+      color: '#FF5722',
+      estimatedTime: '60 min'
+    },
+    {
+      id: 'recovery',
+      name: 'Recuperación',
+      description: 'Pedaleo suave y regenerativo',
+      icon: 'heart-pulse',
+      color: '#4CAF50',
+      estimatedTime: '45 min'
+    },
+    {
+      id: 'indoor',
+      name: 'Indoor',
+      description: 'Entrenamiento en rodillo/estática',
+      icon: 'home',
+      color: '#9C27B0',
+      estimatedTime: '60 min'
+    }
+  ];
+
+  const handleQuickTemplate = (templateId: string) => {
+    const template = quickTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    onUpdateSession({
+      ...session,
+      type: templateId as any,
+      plannedDuration: templateId === 'endurance' ? 90 * 60 : 
+                      templateId === 'intervals' ? 60 * 60 :
+                      templateId === 'recovery' ? 45 * 60 : 60 * 60
+    });
   };
 
-  const isReadyToComplete = session.plannedDistance || session.plannedDuration;
+  const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
+    setCurrentWorkoutPlan(workoutPlan);
+    onUpdateSession({
+      ...session,
+      type: 'intervals',
+      plannedDuration: workoutPlan.estimatedDuration,
+      plannedDistance: workoutPlan.estimatedDistance,
+      workoutPlan: workoutPlan
+    });
+    setShowWorkoutBuilder(false);
+  };
+
+  const isReadyToComplete = () => {
+    return session.plannedDuration || session.plannedDistance || currentWorkoutPlan;
+  };
 
   return (
     <View style={styles.sessionContainer}>
@@ -345,27 +435,14 @@ export function CyclingSessionComponent({
         }
         style={styles.sessionGradient}
       >
-        {/* Header con candado para entrenamientos completados */}
         <View style={styles.sessionHeader}>
           <MaterialCommunityIcons name="bike" size={24} color="#45B7D1" />
-          <Text style={[
-            styles.sessionTitle,
-            isCompleted && styles.sessionTitleCompleted
-          ]}>
+          <Text style={[styles.sessionTitle, isCompleted && styles.sessionTitleCompleted]}>
             Sesión de Ciclismo {isCompleted && "- Completada"}
           </Text>
-          {/* Icono de candado para entrenamientos completados */}
-          {isCompleted && (
-            <MaterialCommunityIcons
-              name="lock"
-              size={16}
-              color="#00D4AA"
-              style={styles.lockIcon}
-            />
-          )}
+          {isCompleted && <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />}
         </View>
 
-        {/* Mensaje mejorado para entrenamientos completados */}
         {isCompleted && (
           <View style={styles.completedMessage}>
             <MaterialCommunityIcons name="trophy" size={16} color="#00D4AA" />
@@ -375,153 +452,149 @@ export function CyclingSessionComponent({
           </View>
         )}
 
-        {/* Type Selector */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Tipo de Entrenamiento</Text>
-          <View style={styles.typeSelector}>
-            {[
-              { value: 'endurance', label: 'Resistencia', icon: 'bike' },
-              { value: 'intervals', label: 'Intervalos', icon: 'speedometer' },
-              { value: 'recovery', label: 'Recuperación', icon: 'bike-fast' },
-              { value: 'indoor', label: 'Bici Estática', icon: 'home' }
-            ].map((type) => (
-              <Pressable
-                key={type.value}
-                onPress={() => !isCompleted && onUpdateSession({ ...session, type: type.value as any })}
-                style={[
-                  styles.typeChip,
-                  session.type === type.value && styles.typeChipSelected,
-                  isCompleted && styles.chipDisabled
-                ]}
-                disabled={isCompleted}
-              >
-                <MaterialCommunityIcons
-                  name={type.icon as any}
-                  size={16}
-                  color={session.type === type.value ? '#FFFFFF' : '#45B7D1'}
-                />
-                <Text style={[
-                  styles.typeChipText,
-                  session.type === type.value && styles.typeChipTextSelected
-                ]}>
-                  {type.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+        {currentWorkoutPlan && (
+          <View style={styles.activeWorkoutPlan}>
+            <LinearGradient
+              colors={["#45B7D1", "#2196F3"]}
+              style={styles.activeWorkoutPlanGradient}
+            >
+              <View style={styles.workoutPlanHeader}>
+                <MaterialCommunityIcons name="playlist-check" size={20} color="#FFFFFF" />
+                <Text style={styles.workoutPlanName}>{currentWorkoutPlan.name}</Text>
+              </View>
+              
+              <View style={styles.workoutPlanStats}>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="clock" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {Math.round(currentWorkoutPlan.estimatedDuration / 60)} min
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="map-marker-distance" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.estimatedDistance >= 1000 
+                      ? `${(currentWorkoutPlan.estimatedDistance / 1000).toFixed(1)} km`
+                      : `${currentWorkoutPlan.estimatedDistance} m`
+                    }
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="format-list-numbered" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.steps.length} pasos
+                  </Text>
+                </View>
+              </View>
 
-        {/* Distance and Duration */}
-        <View style={styles.inputRow}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>
-              {session.type === 'indoor' ? 'Duración' : 'Distancia Planificada'}
-            </Text>
-            {session.type === 'indoor' ? (
-              <View style={styles.inputWithUnit}>
-                <TextInput
-                  value={session.plannedDuration?.toString() || ''}
-                  onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                    ...session, 
-                    plannedDuration: val ? parseFloat(val) : undefined 
-                  })}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  placeholder="45"
-                  placeholderTextColor="#B0B0C4"
-                  editable={!isCompleted}
-                />
-                <Text style={styles.unitLabel}>min</Text>
-              </View>
-            ) : (
-              <View style={styles.inputWithUnit}>
-                <TextInput
-                  value={session.plannedDistance?.toString() || ''}
-                  onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                    ...session, 
-                    plannedDistance: val ? parseFloat(val) : undefined 
-                  })}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  placeholder="30"
-                  placeholderTextColor="#B0B0C4"
-                  editable={!isCompleted}
-                />
-                <Text style={styles.unitLabel}>km</Text>
-              </View>
-            )}
+              {!isCompleted && (
+                <Pressable
+                  onPress={() => setCurrentWorkoutPlan(null)}
+                  style={styles.removeWorkoutPlanBtn}
+                >
+                  <MaterialCommunityIcons name="close" size={16} color="#FFFFFF" />
+                  <Text style={styles.removeWorkoutPlanText}>Quitar Plan</Text>
+                </Pressable>
+              )}
+            </LinearGradient>
           </View>
-          
-          {session.type !== 'indoor' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.fieldLabel}>Duración Estimada</Text>
-              <View style={styles.inputWithUnit}>
-                <TextInput
-                  value={session.plannedDuration?.toString() || ''}
-                  onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                    ...session, 
-                    plannedDuration: val ? parseFloat(val) : undefined 
-                  })}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  placeholder="90"
-                  placeholderTextColor="#B0B0C4"
-                  editable={!isCompleted}
-                />
-                <Text style={styles.unitLabel}>min</Text>
-              </View>
+        )}
+
+        {!isCompleted && !currentWorkoutPlan && (
+          <View style={styles.quickTemplatesSection}>
+            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
+            <View style={styles.quickTemplatesGrid}>
+              {quickTemplates.map((template) => (
+                <Pressable
+                  key={template.id}
+                  onPress={() => handleQuickTemplate(template.id)}
+                  style={styles.quickTemplateBtn}
+                >
+                  <LinearGradient
+                    colors={[template.color + '20', template.color + '10']}
+                    style={styles.quickTemplateGradient}
+                  >
+                    <MaterialCommunityIcons
+                      name={template.icon as any}
+                      size={20}
+                      color={template.color}
+                    />
+                    <Text style={styles.quickTemplateName}>{template.name}</Text>
+                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
+                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
+                  </LinearGradient>
+                </Pressable>
+              ))}
             </View>
-          )}
-        </View>
+          </View>
+        )}
 
-        {/* Tips */}
+        {!isCompleted && (
+          <Pressable 
+            onPress={() => setShowWorkoutBuilder(true)} 
+            style={styles.advancedBuilderBtn}
+          >
+            <LinearGradient 
+              colors={["#45B7D1", "#2196F3"]} 
+              style={styles.advancedBuilderGradient}
+            >
+              <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
+              <Text style={styles.advancedBuilderText}>
+                Constructor Avanzado de Ciclismo
+              </Text>
+              <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        )}
+
         <View style={styles.tipsContainer}>
           <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <Text style={styles.tipsText}>
-            {session.type === 'endurance' && 'Mantén una cadencia estable de 80-100 RPM'}
-            {session.type === 'intervals' && 'Alterna entre alta intensidad y recuperación activa'}
-            {session.type === 'recovery' && 'Pedalea suave para favorecer la recuperación'}
-            {session.type === 'indoor' && 'Asegúrate de tener buena ventilación e hidratación'}
-          </Text>
+          <View style={styles.tipsContent}>
+            <Text style={styles.tipsTitle}>Consejos para Ciclismo:</Text>
+            <Text style={styles.tipsText}>🚴‍♂️ Ajusta bien la altura del sillín y manillar</Text>
+            <Text style={styles.tipsText}>⚡ Controla la potencia y cadencia durante el entrenamiento</Text>
+            <Text style={styles.tipsText}>🦺 Usa casco y ropa visible si sales a la carretera</Text>
+            <Text style={styles.tipsText}>📱 Tu ciclocomputador registrará métricas de potencia y velocidad</Text>
+          </View>
         </View>
 
         {!isCompleted && (
           <Pressable 
-            onPress={handleCompleteWorkout}
+            onPress={() => onCompleteWorkout?.()} 
             style={[
               styles.completeWorkoutBtn,
-              !isReadyToComplete && styles.completeWorkoutBtnDisabled
+              !isReadyToComplete() && styles.completeWorkoutBtnDisabled
             ]}
+            disabled={!isReadyToComplete()}
           >
             <LinearGradient
-              colors={isReadyToComplete ? ["#45B7D1", "#2196F3"] : ["#6B7280", "#4B5563"]}
+              colors={isReadyToComplete() ? ["#45B7D1", "#2196F3"] : ["#6B7280", "#4B5563"]}
               style={styles.completeWorkoutGradient}
             >
               <MaterialCommunityIcons 
-                name={isReadyToComplete ? "check-circle" : "alert-circle"} 
+                name={isReadyToComplete() ? "check-circle" : "alert-circle"} 
                 size={20} 
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete ? "Completar Ciclismo" : "Añade distancia o duración"}
+                {isReadyToComplete() ? "Completar Ciclismo" : "Configura tu entrenamiento"}
               </Text>
             </LinearGradient>
           </Pressable>
         )}
+
+        <AdvancedWorkoutBuilder
+          sport="cycling"
+          visible={showWorkoutBuilder}
+          onClose={() => setShowWorkoutBuilder(false)}
+          onSave={handleWorkoutPlan}
+        />
       </LinearGradient>
     </View>
   );
 }
 
+// ===== SWIMMING COMPONENT =====
 interface SwimmingSessionProps {
   session: SwimmingSession;
   onUpdateSession: (session: SwimmingSession) => void;
@@ -529,20 +602,80 @@ interface SwimmingSessionProps {
   isCompleted?: boolean;
 }
 
+/**
+ * Componente para sesiones de natación con constructor avanzado
+ */
 export function SwimmingSessionComponent({ 
   session, 
   onUpdateSession, 
   onCompleteWorkout,
   isCompleted = false 
 }: SwimmingSessionProps) {
-  
-  const handleCompleteWorkout = () => {
-    if (!session.plannedDistance) return;
-    if (isCompleted) return;
-    onCompleteWorkout?.();
+  const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false);
+  const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
+
+  const quickTemplates = [
+    {
+      id: 'endurance',
+      name: 'Resistencia',
+      description: '1500-3000m continuos',
+      icon: 'swim',
+      color: '#00BCD4',
+      estimatedTime: '60 min'
+    },
+    {
+      id: 'technique',
+      name: 'Técnica',
+      description: 'Ejercicios de técnica y drills',
+      icon: 'school',
+      color: '#4CAF50',
+      estimatedTime: '45 min'
+    },
+    {
+      id: 'speed',
+      name: 'Velocidad',
+      description: 'Series cortas de alta intensidad',
+      icon: 'speedometer',
+      color: '#FF5722',
+      estimatedTime: '50 min'
+    },
+    {
+      id: 'open_water',
+      name: 'Aguas Abiertas',
+      description: 'Entrenamiento para mar/lago',
+      icon: 'waves',
+      color: '#2196F3',
+      estimatedTime: '75 min'
+    }
+  ];
+
+  const handleQuickTemplate = (templateId: string) => {
+    const template = quickTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    onUpdateSession({
+      ...session,
+      type: templateId as any,
+      plannedDistance: templateId === 'endurance' ? 2000 : 
+                      templateId === 'technique' ? 1200 :
+                      templateId === 'speed' ? 1000 : 1500
+    });
   };
 
-  const isReadyToComplete = !!session.plannedDistance;
+  const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
+    setCurrentWorkoutPlan(workoutPlan);
+    onUpdateSession({
+      ...session,
+      type: 'technique',
+      plannedDistance: workoutPlan.estimatedDistance,
+      workoutPlan: workoutPlan
+    });
+    setShowWorkoutBuilder(false);
+  };
+
+  const isReadyToComplete = () => {
+    return session.plannedDistance || currentWorkoutPlan;
+  };
 
   return (
     <View style={styles.sessionContainer}>
@@ -554,27 +687,14 @@ export function SwimmingSessionComponent({
         }
         style={styles.sessionGradient}
       >
-        {/* Header con candado para entrenamientos completados */}
         <View style={styles.sessionHeader}>
           <MaterialCommunityIcons name="swim" size={24} color="#96CEB4" />
-          <Text style={[
-            styles.sessionTitle,
-            isCompleted && styles.sessionTitleCompleted
-          ]}>
+          <Text style={[styles.sessionTitle, isCompleted && styles.sessionTitleCompleted]}>
             Sesión de Natación {isCompleted && "- Completada"}
           </Text>
-          {/* Icono de candado para entrenamientos completados */}
-          {isCompleted && (
-            <MaterialCommunityIcons
-              name="lock"
-              size={16}
-              color="#00D4AA"
-              style={styles.lockIcon}
-            />
-          )}
+          {isCompleted && <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />}
         </View>
 
-        {/* Mensaje mejorado para entrenamientos completados */}
         {isCompleted && (
           <View style={styles.completedMessage}>
             <MaterialCommunityIcons name="trophy" size={16} color="#00D4AA" />
@@ -584,139 +704,149 @@ export function SwimmingSessionComponent({
           </View>
         )}
 
-        {/* Type Selector */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Tipo de Entrenamiento</Text>
-          <View style={styles.typeSelector}>
-            {[
-              { value: 'endurance', label: 'Resistencia', icon: 'swim' },
-              { value: 'technique', label: 'Técnica', icon: 'school' },
-              { value: 'speed', label: 'Velocidad', icon: 'speedometer' },
-              { value: 'open_water', label: 'Aguas Abiertas', icon: 'waves' }
-            ].map((type) => (
-              <Pressable
-                key={type.value}
-                onPress={() => !isCompleted && onUpdateSession({ ...session, type: type.value as any })}
-                style={[
-                  styles.typeChip,
-                  session.type === type.value && styles.typeChipSelected,
-                  isCompleted && styles.chipDisabled
-                ]}
-                disabled={isCompleted}
-              >
-                <MaterialCommunityIcons
-                  name={type.icon as any}
-                  size={16}
-                  color={session.type === type.value ? '#FFFFFF' : '#96CEB4'}
-                />
-                <Text style={[
-                  styles.typeChipText,
-                  session.type === type.value && styles.typeChipTextSelected
-                ]}>
-                  {type.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Distance and Pool Length */}
-        <View style={styles.inputRow}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>Distancia Planificada</Text>
-            <View style={styles.inputWithUnit}>
-              <TextInput
-                value={session.plannedDistance?.toString() || ''}
-                onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                  ...session, 
-                  plannedDistance: val ? parseFloat(val) : undefined 
-                })}
-                keyboardType="numeric"
-                style={[
-                  styles.textInput,
-                  isCompleted && styles.inputDisabled
-                ]}
-                placeholder="2000"
-                placeholderTextColor="#B0B0C4"
-                editable={!isCompleted}
-              />
-              <Text style={styles.unitLabel}>m</Text>
-            </View>
-          </View>
-          
-          {session.type !== 'open_water' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.fieldLabel}>Longitud Piscina</Text>
-              <View style={styles.inputWithUnit}>
-                <TextInput
-                  value={session.poolLength?.toString() || ''}
-                  onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                    ...session, 
-                    poolLength: val ? parseFloat(val) : undefined 
-                  })}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  placeholder="25"
-                  placeholderTextColor="#B0B0C4"
-                  editable={!isCompleted}
-                />
-                <Text style={styles.unitLabel}>m</Text>
+        {currentWorkoutPlan && (
+          <View style={styles.activeWorkoutPlan}>
+            <LinearGradient
+              colors={["#96CEB4", "#4CAF50"]}
+              style={styles.activeWorkoutPlanGradient}
+            >
+              <View style={styles.workoutPlanHeader}>
+                <MaterialCommunityIcons name="playlist-check" size={20} color="#FFFFFF" />
+                <Text style={styles.workoutPlanName}>{currentWorkoutPlan.name}</Text>
               </View>
-            </View>
-          )}
-        </View>
+              
+              <View style={styles.workoutPlanStats}>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="clock" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {Math.round(currentWorkoutPlan.estimatedDuration / 60)} min
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="map-marker-distance" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.estimatedDistance >= 1000 
+                      ? `${(currentWorkoutPlan.estimatedDistance / 1000).toFixed(1)} km`
+                      : `${currentWorkoutPlan.estimatedDistance} m`
+                    }
+                  </Text>
+                </View>
+                <View style={styles.workoutPlanStat}>
+                  <MaterialCommunityIcons name="format-list-numbered" size={14} color="#FFFFFF" />
+                  <Text style={styles.workoutPlanStatText}>
+                    {currentWorkoutPlan.steps.length} pasos
+                  </Text>
+                </View>
+              </View>
 
-        {/* Pool calculation */}
-        {session.type !== 'open_water' && session.plannedDistance && session.poolLength && (
-          <View style={styles.poolCalculation}>
-            <Text style={styles.calculationText}>
-              = {Math.ceil(session.plannedDistance / session.poolLength)} largos de {session.poolLength}m
-            </Text>
+              {!isCompleted && (
+                <Pressable
+                  onPress={() => setCurrentWorkoutPlan(null)}
+                  style={styles.removeWorkoutPlanBtn}
+                >
+                  <MaterialCommunityIcons name="close" size={16} color="#FFFFFF" />
+                  <Text style={styles.removeWorkoutPlanText}>Quitar Plan</Text>
+                </Pressable>
+              )}
+            </LinearGradient>
           </View>
         )}
 
-        {/* Tips */}
+        {!isCompleted && !currentWorkoutPlan && (
+          <View style={styles.quickTemplatesSection}>
+            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
+            <View style={styles.quickTemplatesGrid}>
+              {quickTemplates.map((template) => (
+                <Pressable
+                  key={template.id}
+                  onPress={() => handleQuickTemplate(template.id)}
+                  style={styles.quickTemplateBtn}
+                >
+                  <LinearGradient
+                    colors={[template.color + '20', template.color + '10']}
+                    style={styles.quickTemplateGradient}
+                  >
+                    <MaterialCommunityIcons
+                      name={template.icon as any}
+                      size={20}
+                      color={template.color}
+                    />
+                    <Text style={styles.quickTemplateName}>{template.name}</Text>
+                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
+                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
+                  </LinearGradient>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!isCompleted && (
+          <Pressable 
+            onPress={() => setShowWorkoutBuilder(true)} 
+            style={styles.advancedBuilderBtn}
+          >
+            <LinearGradient 
+              colors={["#96CEB4", "#4CAF50"]} 
+              style={styles.advancedBuilderGradient}
+            >
+              <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
+              <Text style={styles.advancedBuilderText}>
+                Constructor Avanzado de Natación
+              </Text>
+              <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        )}
+
         <View style={styles.tipsContainer}>
           <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <Text style={styles.tipsText}>
-            {session.type === 'endurance' && 'Mantén un ritmo constante y controlado durante toda la sesión'}
-            {session.type === 'technique' && 'Concéntrate en la técnica más que en la velocidad'}
-            {session.type === 'speed' && 'Incluye series cortas a máxima velocidad con descansos completos'}
-            {session.type === 'open_water' && 'Practica la orientación y adapta la técnica a las condiciones'}
-          </Text>
+          <View style={styles.tipsContent}>
+            <Text style={styles.tipsTitle}>Consejos para Natación:</Text>
+            <Text style={styles.tipsText}>🏊‍♂️ Calienta fuera del agua antes de entrar</Text>
+            <Text style={styles.tipsText}>👓 Usa gafas apropiadas y ajusta bien las correas</Text>
+            <Text style={styles.tipsText}>🫁 Enfócate en la respiración bilateral y técnica</Text>
+            <Text style={styles.tipsText}>⏱️ Tu reloj waterproof registrará brazadas y distancia</Text>
+          </View>
         </View>
 
         {!isCompleted && (
           <Pressable 
-            onPress={handleCompleteWorkout}
+            onPress={() => onCompleteWorkout?.()} 
             style={[
               styles.completeWorkoutBtn,
-              !isReadyToComplete && styles.completeWorkoutBtnDisabled
+              !isReadyToComplete() && styles.completeWorkoutBtnDisabled
             ]}
+            disabled={!isReadyToComplete()}
           >
             <LinearGradient
-              colors={isReadyToComplete ? ["#96CEB4", "#4CAF50"] : ["#6B7280", "#4B5563"]}
+              colors={isReadyToComplete() ? ["#96CEB4", "#4CAF50"] : ["#6B7280", "#4B5563"]}
               style={styles.completeWorkoutGradient}
             >
               <MaterialCommunityIcons 
-                name={isReadyToComplete ? "check-circle" : "alert-circle"} 
+                name={isReadyToComplete() ? "check-circle" : "alert-circle"} 
                 size={20} 
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete ? "Completar Natación" : "Añade distancia planificada"}
+                {isReadyToComplete() ? "Completar Natación" : "Configura tu entrenamiento"}
               </Text>
             </LinearGradient>
           </Pressable>
         )}
+
+        <AdvancedWorkoutBuilder
+          sport="swimming"
+          visible={showWorkoutBuilder}
+          onClose={() => setShowWorkoutBuilder(false)}
+          onSave={handleWorkoutPlan}
+        />
       </LinearGradient>
     </View>
   );
 }
 
+// ===== GENERIC SPORTS COMPONENT =====
 interface GenericSportSessionProps {
   session: GenericSportSession;
   sport: SportType;
@@ -725,220 +855,26 @@ interface GenericSportSessionProps {
   isCompleted?: boolean;
 }
 
-export function GenericSportSessionComponent({ 
-  session, 
-  sport, 
-  onUpdateSession, 
-  onCompleteWorkout,
-  isCompleted = false 
-}: GenericSportSessionProps) {
-  
-  const getSportConfig = () => {
-    switch (sport) {
-      case 'yoga':
-        return { 
-          icon: 'meditation', 
-          color: '#FECA57', 
-          name: 'Yoga',
-          colors: ['#FECA57', '#FF9800'],
-          types: [
-            { value: 'training', label: 'Práctica General' },
-            { value: 'match', label: 'Clase Dirigida' },
-            { value: 'practice', label: 'Meditación' }
-          ]
-        };
-      case 'football':
-        return { 
-          icon: 'soccer', 
-          color: '#6C5CE7', 
-          name: 'Fútbol',
-          colors: ['#6C5CE7', '#673AB7'],
-          types: [
-            { value: 'training', label: 'Entrenamiento' },
-            { value: 'match', label: 'Partido' },
-            { value: 'practice', label: 'Práctica Técnica' }
-          ]
-        };
-      case 'basketball':
-        return { 
-          icon: 'basketball', 
-          color: '#FD79A8', 
-          name: 'Baloncesto',
-          colors: ['#FD79A8', '#E91E63'],
-          types: [
-            { value: 'training', label: 'Entrenamiento' },
-            { value: 'match', label: 'Partido' },
-            { value: 'practice', label: 'Práctica de Tiros' }
-          ]
-        };
-      default:
-        return { 
-          icon: 'dumbbell', 
-          color: '#B0B0C4', 
-          name: 'Deporte',
-          colors: ['#B0B0C4', '#6B7280'],
-          types: [
-            { value: 'training', label: 'Entrenamiento' },
-            { value: 'match', label: 'Competición' },
-            { value: 'practice', label: 'Práctica' }
-          ]
-        };
-    }
-  };
-
-  const config = getSportConfig();
-
-  const handleCompleteWorkout = () => {
-    if (!session.duration) return;
-    if (isCompleted) return;
-    onCompleteWorkout?.();
-  };
-
-  const isReadyToComplete = !!session.duration;
-
-  return (
-    <View style={styles.sessionContainer}>
-      <LinearGradient
-        colors={
-          isCompleted 
-            ? [
-                `${config.colors[0]}33`, // 20% opacity
-                `${config.colors[1]}1A`  // 10% opacity
-              ]
-            : ["#2D2D5F", "#3D3D7F"]
-        }
-        style={styles.sessionGradient}
-      >
-        {/* Header con candado para entrenamientos completados */}
-        <View style={styles.sessionHeader}>
-          <MaterialCommunityIcons name={config.icon as any} size={24} color={config.color} />
-          <Text style={[
-            styles.sessionTitle,
-            isCompleted && styles.sessionTitleCompleted
-          ]}>
-            Sesión de {config.name} {isCompleted && "- Completada"}
-          </Text>
-          {/* Icono de candado para entrenamientos completados */}
-          {isCompleted && (
-            <MaterialCommunityIcons
-              name="lock"
-              size={16}
-              color="#00D4AA"
-              style={styles.lockIcon}
-            />
-          )}
-        </View>
-
-        {/* Mensaje mejorado para entrenamientos completados */}
-        {isCompleted && (
-          <View style={styles.completedMessage}>
-            <MaterialCommunityIcons name="trophy" size={16} color="#00D4AA" />
-            <Text style={styles.completedMessageText}>
-              Este entrenamiento ya fue completado. Los datos se muestran en modo solo lectura.
-            </Text>
-          </View>
-        )}
-
-        {/* Type Selector */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Tipo de Actividad</Text>
-          <View style={styles.typeSelector}>
-            {config.types.map((type) => (
-              <Pressable
-                key={type.value}
-                onPress={() => !isCompleted && onUpdateSession({ ...session, type: type.value as any })}
-                style={[
-                  styles.typeChip,
-                  session.type === type.value && styles.typeChipSelected,
-                  isCompleted && styles.chipDisabled
-                ]}
-                disabled={isCompleted}
-              >
-                <Text style={[
-                  styles.typeChipText,
-                  session.type === type.value && styles.typeChipTextSelected
-                ]}>
-                  {type.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Duration */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Duración</Text>
-          <View style={styles.inputWithUnit}>
-            <TextInput
-              value={session.duration?.toString() || ''}
-              onChangeText={(val) => !isCompleted && onUpdateSession({ 
-                ...session, 
-                duration: val ? parseFloat(val) : undefined 
-              })}
-              keyboardType="numeric"
-              style={[
-                styles.textInput,
-                isCompleted && styles.inputDisabled
-              ]}
-              placeholder={sport === 'yoga' ? '60' : '90'}
-              placeholderTextColor="#B0B0C4"
-              editable={!isCompleted}
-            />
-            <Text style={styles.unitLabel}>min</Text>
-          </View>
-        </View>
-
-        {/* Tips */}
-        <View style={styles.tipsContainer}>
-          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <Text style={styles.tipsText}>
-            {sport === 'yoga' && 'Concéntrate en la respiración y escucha a tu cuerpo'}
-            {sport === 'football' && 'No olvides calentar bien antes de jugar'}
-            {sport === 'basketball' && 'Mantén la hidratación durante los descansos'}
-          </Text>
-        </View>
-
-        {!isCompleted && (
-          <Pressable 
-            onPress={handleCompleteWorkout}
-            style={[
-              styles.completeWorkoutBtn,
-              !isReadyToComplete && styles.completeWorkoutBtnDisabled
-            ]}
-          >
-            <LinearGradient
-              colors={isReadyToComplete ? config.colors as [string, string] : ["#6B7280", "#4B5563"]}
-              style={styles.completeWorkoutGradient}
-            >
-              <MaterialCommunityIcons 
-                name={isReadyToComplete ? "check-circle" : "alert-circle"} 
-                size={20} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete ? `Completar ${config.name}` : "Añade duración del entrenamiento"}
-              </Text>
-            </LinearGradient>
-          </Pressable>
-        )}
-      </LinearGradient>
-    </View>
-  );
-}
+/**
+ * Exportar el componente genérico desde el archivo separado
+ * Ya está implementado en GenericSportSessionComponent.tsx
+ */
+export { default as GenericSportSessionComponent } from './GenericSportSessionComponent';
 
 const styles = StyleSheet.create({
   sessionContainer: {
     marginHorizontal: 20,
     marginBottom: 16,
-    borderRadius: 20, // Bordes más redondeados
+    borderRadius: 20,
     overflow: 'hidden',
   },
 
   sessionGradient: {
     padding: 20,
-    borderRadius: 20, // Asegurar redondeado interno
+    borderRadius: 20,
   },
 
+  // ===== HEADER =====
   sessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -957,11 +893,6 @@ const styles = StyleSheet.create({
     color: '#00D4AA',
   },
 
-  lockIcon: {
-    marginLeft: 8,
-  },
-
-  // Mensaje para entrenamientos completados mejorado
   completedMessage: {
     marginBottom: 16,
     padding: 12,
@@ -981,160 +912,178 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  fieldContainer: {
+  // ===== PLAN ACTIVO =====
+  activeWorkoutPlan: {
     marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
 
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 8,
-  },
-
-  subFieldLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 4,
-  },
-
-  typeSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  typeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16, // Más redondeado
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  typeChipSelected: {
-    backgroundColor: '#00D4AA',
-    borderColor: '#00D4AA',
-  },
-
-  // Estilo para chips deshabilitados
-  chipDisabled: {
-    opacity: 0.6,
-  },
-
-  typeChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-  },
-
-  typeChipTextSelected: {
-    color: '#FFFFFF',
-  },
-
-  inputRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-
-  inputGroup: {
-    flex: 1,
-  },
-
-  inputWithUnit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12, // Más redondeado
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-
-  textInput: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-
-  // Estilo para inputs deshabilitados
-  inputDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    color: '#6B7280',
-  },
-
-  unitLabel: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-
-  intervalContainer: {
-    backgroundColor: 'rgba(78, 205, 196, 0.1)',
-    borderRadius: 16, // Más redondeado
+  activeWorkoutPlanGradient: {
     padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(78, 205, 196, 0.3)',
+    borderRadius: 16,
   },
 
-  intervalHeader: {
+  workoutPlanHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     gap: 8,
   },
 
-  intervalTitle: {
+  workoutPlanName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#4ECDC4',
+    color: '#FFFFFF',
+    flex: 1,
   },
 
-  intervalSummary: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: 'rgba(78, 205, 196, 0.15)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(78, 205, 196, 0.3)',
+  workoutPlanStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
   },
 
-  summaryText: {
-    fontSize: 14,
+  workoutPlanStat: {
+    alignItems: 'center',
+    gap: 4,
+  },
+
+  workoutPlanStatText: {
+    fontSize: 11,
+    color: '#FFFFFF',
     fontWeight: '600',
-    color: '#4ECDC4',
-    textAlign: 'center',
   },
 
-  poolCalculation: {
+  removeWorkoutPlanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    gap: 4,
+  },
+
+  removeWorkoutPlanText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // ===== PLANTILLAS RÁPIDAS =====
+  quickTemplatesSection: {
     marginBottom: 16,
-    padding: 12,
-    backgroundColor: 'rgba(150, 206, 180, 0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(150, 206, 180, 0.3)',
   },
 
-  calculationText: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+
+  quickTemplatesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  quickTemplateBtn: {
+    width: '48%',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  quickTemplateGradient: {
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+
+  quickTemplateName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#96CEB4',
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginTop: 8,
     textAlign: 'center',
   },
 
+  quickTemplateDescription: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+
+  quickTemplateTime: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+
+  // ===== CONSTRUCTOR AVANZADO =====
+  advancedBuilderBtn: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+
+  advancedBuilderGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+  },
+
+  advancedBuilderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center',
+  },
+
+  // ===== SESIÓN ACTUAL =====
+  currentSessionInfo: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+
+  currentSessionGradient: {
+    padding: 16,
+    borderRadius: 16,
+  },
+
+  currentSessionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4ECDC4',
+    marginBottom: 8,
+  },
+
+  currentSessionDetails: {
+    gap: 4,
+  },
+
+  currentSessionDetail: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+
+  // ===== CONSEJOS =====
   tipsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1145,17 +1094,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  tipsText: {
+  tipsContent: {
     flex: 1,
-    fontSize: 12,
-    color: '#FFB84D',
-    lineHeight: 16,
-    fontStyle: 'italic',
   },
 
-  // Complete Workout Button mejorado
+  tipsTitle: {
+    fontSize: 12,
+    color: '#FFB84D',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+
+  tipsText: {
+    fontSize: 11,
+    color: '#FFB84D',
+    lineHeight: 14,
+    marginBottom: 2,
+  },
+
+  // ===== BOTÓN COMPLETAR =====
   completeWorkoutBtn: {
-    borderRadius: 16, // Más redondeado
+    borderRadius: 16,
     overflow: 'hidden',
     marginTop: 8,
   },
