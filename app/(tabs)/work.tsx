@@ -38,12 +38,14 @@ import SportSelector from '../../components/sport/SportSelector';
 /**
  * Configuración de días de la semana
  * L=Lunes, M=Martes, X=Miércoles, J=Jueves, V=Viernes, S=Sábado, D=Domingo
+ * NOTA BD: Esta configuración debe guardarse como preferencia del usuario
  */
 const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const todayIdx = (new Date().getDay() + 6) % 7; // Lunes = 0
 
 /**
  * Configuración de iconos para cada deporte
+ * NOTA BD: Referencia estática para UI, no requiere almacenamiento
  */
 const SPORT_ICONS: Record<SportType, string> = {
   gym: 'dumbbell',
@@ -57,6 +59,7 @@ const SPORT_ICONS: Record<SportType, string> = {
 
 /**
  * Configuración de colores gradiente para cada deporte
+ * NOTA BD: Referencia estática para UI, no requiere almacenamiento
  */
 const SPORT_COLORS: Record<SportType, string[]> = {
   gym: ['#FF6B6B', '#FF5252'],
@@ -71,9 +74,16 @@ const SPORT_COLORS: Record<SportType, string[]> = {
 /**
  * Componente principal de la pantalla de entrenamientos
  * Gestiona múltiples entrenamientos por día con sistema de minimización
+ * 
+ * NOTA BD: Este componente maneja:
+ * - WeeklyPlan: Plan semanal del usuario (tabla: weekly_plans)
+ * - Workout[]: Array de entrenamientos (tabla: workouts)
+ * - Estados de UI que no requieren persistencia
  */
 export default function MainTrainingScreen() {
   // ===== ESTADOS PRINCIPALES =====
+  // NOTA BD: weeklyPlan debe sincronizarse con tabla 'weekly_plans'
+  // Estructura: { user_id, week_start_date, day_code, workouts[] }
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan>(
     Object.fromEntries(days.map((d) => [d, []]))
   );
@@ -92,12 +102,18 @@ export default function MainTrainingScreen() {
   const [restDuration, setRestDuration] = useState(60);
   const [showIntensityModal, setShowIntensityModal] = useState(false);
   const [completingWorkoutId, setCompletingWorkoutId] = useState<string | null>(null);
+  const [editingIntensityWorkoutId, setEditingIntensityWorkoutId] = useState<string | null>(null);
+
+  // ===== ESTADOS DE CONFIRMACIÓN =====
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [workoutToDelete, setWorkoutToDelete] = useState<string | null>(null);
 
   const todaysWorkouts = weeklyPlan[selectedDay] || [];
   const activeWorkout = todaysWorkouts.find(w => w.id === activeWorkoutId);
 
   /**
    * Genera las fechas de la semana actual para el selector de días
+   * NOTA BD: Las fechas se calculan dinámicamente, no requieren almacenamiento
    */
   const getWeekDates = () => {
     const today = new Date();
@@ -151,12 +167,15 @@ export default function MainTrainingScreen() {
 
   /**
    * Crea sesión por defecto según el tipo de deporte
+   * NOTA BD: Estas estructuras deben guardarse en tabla 'workout_sessions'
    */
   const createDefaultSession = (sport: SportType): SportSession => {
     switch (sport) {
       case 'gym':
+        // NOTA BD: GymExercise[] se guarda en tabla 'gym_exercises' relacionada con workout_id
         return { sport: 'gym', data: [] };
       case 'running':
+        // NOTA BD: RunningSession se guarda en tabla 'running_sessions'
         return { 
           sport: 'running', 
           data: { 
@@ -166,6 +185,7 @@ export default function MainTrainingScreen() {
           } 
         };
       case 'cycling':
+        // NOTA BD: CyclingSession se guarda en tabla 'cycling_sessions'
         return { 
           sport: 'cycling', 
           data: { 
@@ -175,6 +195,7 @@ export default function MainTrainingScreen() {
           } 
         };
       case 'swimming':
+        // NOTA BD: SwimmingSession se guarda en tabla 'swimming_sessions'
         return { 
           sport: 'swimming', 
           data: { 
@@ -184,6 +205,7 @@ export default function MainTrainingScreen() {
           } 
         };
       default:
+        // NOTA BD: GenericSportSession se guarda en tabla 'generic_sport_sessions'
         return { 
           sport, 
           data: { 
@@ -207,19 +229,23 @@ export default function MainTrainingScreen() {
 
   /**
    * Confirma la creación del entrenamiento con nombre personalizado
+   * NOTA BD: Aquí se debe insertar en tabla 'workouts' con todos los campos
    */
   const confirmAddWorkout = () => {
     if (!pendingSport) return;
 
+    // NOTA BD: Este objeto Workout debe insertarse en tabla 'workouts'
+    // Campos principales: id, user_id, date, sport, name, session, completed, 
+    // createdAt, updatedAt, notes, duration, postWorkoutData, deviceData
     const newWorkout: Workout = {
-      id: `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ID único
-      date: new Date().toISOString().split('T')[0],
-      sport: pendingSport,
-      name: pendingWorkoutName.trim() || generateDefaultWorkoutName(pendingSport),
-      session: createDefaultSession(pendingSport),
-      completed: false,
-      createdAt: new Date().toISOString(), // Para BD futura
-      updatedAt: new Date().toISOString()  // Para BD futura
+      id: `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // NOTA BD: UUID en producción
+      date: new Date().toISOString().split('T')[0], // NOTA BD: Campo 'date' en formato YYYY-MM-DD
+      sport: pendingSport, // NOTA BD: Campo 'sport' enum
+      name: pendingWorkoutName.trim() || generateDefaultWorkoutName(pendingSport), // NOTA BD: Campo 'name'
+      session: createDefaultSession(pendingSport), // NOTA BD: Se serializa como JSON en campo 'session'
+      completed: false, // NOTA BD: Campo 'completed' boolean
+      createdAt: new Date().toISOString(), // NOTA BD: Campo 'created_at' timestamp
+      updatedAt: new Date().toISOString()  // NOTA BD: Campo 'updated_at' timestamp
     };
 
     setWeeklyPlan(prev => ({
@@ -231,7 +257,7 @@ export default function MainTrainingScreen() {
     setActiveWorkoutId(newWorkout.id);
     setMinimizedWorkouts(prev => {
       const newSet = new Set(prev);
-      newSet.delete(newWorkout.id); // Asegurar que esté expandido
+      newSet.delete(newWorkout.id);
       return newSet;
     });
 
@@ -243,6 +269,7 @@ export default function MainTrainingScreen() {
 
   /**
    * Actualiza la sesión del entrenamiento activo
+   * NOTA BD: Aquí se debe hacer UPDATE en tabla 'workouts' y tablas relacionadas de sesión
    */
   const updateWorkoutSession = (session: SportSession) => {
     if (!activeWorkoutId) return;
@@ -254,7 +281,7 @@ export default function MainTrainingScreen() {
           ? { 
               ...workout, 
               session,
-              updatedAt: new Date().toISOString() // Para BD futura
+              updatedAt: new Date().toISOString() // NOTA BD: Actualizar timestamp
             }
           : workout
       )
@@ -262,26 +289,46 @@ export default function MainTrainingScreen() {
   };
 
   /**
-   * Elimina un entrenamiento con confirmación visual
+   * Inicia confirmación de eliminación de entrenamiento
    */
-  const removeWorkout = (workoutId: string) => {
+  const startRemoveWorkout = (workoutId: string) => {
+    setWorkoutToDelete(workoutId);
+    setShowDeleteConfirmation(true);
+  };
+
+  /**
+   * Confirma y elimina el entrenamiento
+   * NOTA BD: Aquí se debe hacer DELETE en tabla 'workouts' y tablas relacionadas
+   */
+  const confirmRemoveWorkout = () => {
+    if (!workoutToDelete) return;
+
     setWeeklyPlan(prev => ({
       ...prev,
-      [selectedDay]: prev[selectedDay].filter(w => w.id !== workoutId)
+      [selectedDay]: prev[selectedDay].filter(w => w.id !== workoutToDelete)
     }));
 
-    // Si era el entrenamiento activo, seleccionar otro
-    if (activeWorkoutId === workoutId) {
-      const remainingWorkouts = todaysWorkouts.filter(w => w.id !== workoutId);
+    if (activeWorkoutId === workoutToDelete) {
+      const remainingWorkouts = todaysWorkouts.filter(w => w.id !== workoutToDelete);
       setActiveWorkoutId(remainingWorkouts.length > 0 ? remainingWorkouts[0].id : null);
     }
 
-    // Limpiar de entrenamientos minimizados
     setMinimizedWorkouts(prev => {
       const newSet = new Set(prev);
-      newSet.delete(workoutId);
+      newSet.delete(workoutToDelete);
       return newSet;
     });
+
+    setShowDeleteConfirmation(false);
+    setWorkoutToDelete(null);
+  };
+
+  /**
+   * Cancela la eliminación del entrenamiento
+   */
+  const cancelRemoveWorkout = () => {
+    setShowDeleteConfirmation(false);
+    setWorkoutToDelete(null);
   };
 
   /**
@@ -298,12 +345,13 @@ export default function MainTrainingScreen() {
 
   /**
    * Completa el entrenamiento con datos de intensidad
+   * NOTA BD: Actualizar workout con completed=true, completedAt, postWorkoutData
    */
   const completeWorkoutWithIntensity = (intensityData: {
     rpe: number;
     feeling: string;
     notes?: string;
-  }) => {
+  } | null) => {
     if (!completingWorkoutId) return;
 
     const completedAt = new Date().toISOString();
@@ -314,13 +362,14 @@ export default function MainTrainingScreen() {
         workout.id === completingWorkoutId
           ? { 
               ...workout, 
-              completed: true,
-              completedAt,
-              updatedAt: completedAt,
-              postWorkoutData: {
+              completed: true, // NOTA BD: Campo 'completed'
+              completedAt, // NOTA BD: Campo 'completed_at'
+              updatedAt: completedAt, // NOTA BD: Campo 'updated_at'
+              // NOTA BD: Campo 'post_workout_data' como JSON, puede ser null si se omite
+              postWorkoutData: intensityData ? {
                 ...intensityData,
                 timestamp: completedAt
-              } // Para análisis futuro
+              } : undefined
             }
           : workout
       )
@@ -337,9 +386,43 @@ export default function MainTrainingScreen() {
       setActiveWorkoutId(null);
     }
 
-    // Cerrar modales
     setShowIntensityModal(false);
     setCompletingWorkoutId(null);
+  };
+
+  /**
+   * Inicia edición de intensidad de entrenamiento completado
+   */
+  const startEditIntensity = (workoutId: string) => {
+    setEditingIntensityWorkoutId(workoutId);
+    setShowIntensityModal(true);
+  };
+
+  /**
+   * Actualiza datos de intensidad de entrenamiento completado
+   * NOTA BD: UPDATE en campo 'post_workout_data' de tabla 'workouts'
+   */
+  const updateWorkoutIntensity = (intensityData: { rpe: number; feeling: string; notes?: string } | null) => {
+    if (!editingIntensityWorkoutId) return;
+
+    setWeeklyPlan(prev => ({
+      ...prev,
+      [selectedDay]: prev[selectedDay].map(workout =>
+        workout.id === editingIntensityWorkoutId
+          ? { 
+              ...workout,
+              postWorkoutData: intensityData ? {
+                ...intensityData,
+                timestamp: workout.postWorkoutData?.timestamp || new Date().toISOString()
+              } : undefined,
+              updatedAt: new Date().toISOString()
+            }
+          : workout
+      )
+    }));
+
+    setShowIntensityModal(false);
+    setEditingIntensityWorkoutId(null);
   };
 
   /**
@@ -448,6 +531,7 @@ export default function MainTrainingScreen() {
 
   /**
    * Inicia el timer de descanso
+   * NOTA BD: No requiere persistencia, es temporal
    */
   const startRestTimer = (duration: number) => {
     setRestDuration(duration);
@@ -475,6 +559,15 @@ export default function MainTrainingScreen() {
       'D': 'Domingo'
     };
     return dayNames[dayCode as keyof typeof dayNames];
+  };
+
+  /**
+   * Obtiene el nombre del entrenamiento a eliminar para la confirmación
+   */
+  const getWorkoutToDeleteName = () => {
+    if (!workoutToDelete) return '';
+    const workout = todaysWorkouts.find(w => w.id === workoutToDelete);
+    return workout?.name || `Entrenamiento de ${SPORT_TRANSLATIONS[workout?.sport || 'gym']}`;
   };
 
   // ===== CÁLCULOS DE ESTADÍSTICAS =====
@@ -672,10 +765,10 @@ export default function MainTrainingScreen() {
                 >
                   <LinearGradient
                     colors={
-                      isActive
+                      workout.completed
+                        ? ['#4ECDC4', '#26C6DA'] as [string, string] // Color del running completado
+                        : isActive
                         ? SPORT_COLORS[workout.sport] as [string, string]
-                        : workout.completed
-                        ? ['rgba(0, 212, 170, 0.3)', 'rgba(0, 184, 148, 0.2)']
                         : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
                     }
                     style={[
@@ -690,8 +783,8 @@ export default function MainTrainingScreen() {
                           name={SPORT_ICONS[workout.sport] as any}
                           size={24}
                           color={
+                            workout.completed ? '#FFFFFF' : // Siempre blanco cuando está completado
                             isActive ? '#FFFFFF' : 
-                            workout.completed ? '#00D4AA' : 
                             SPORT_COLORS[workout.sport][0]
                           }
                         />
@@ -705,13 +798,39 @@ export default function MainTrainingScreen() {
                           </Text>
                           
                           {workout.completed && (
-                            <View style={styles.completedBadge}>
-                              <MaterialCommunityIcons
-                                name="check-circle"
-                                size={12}
-                                color="#00D4AA"
-                              />
-                              <Text style={styles.completedBadgeText}>COMPLETADO</Text>
+                            <View style={styles.completedInfo}>
+                              <View style={styles.completedBadge}>
+                                <MaterialCommunityIcons
+                                  name="check-circle"
+                                  size={12}
+                                  color="#FFFFFF"
+                                />
+                                <Text style={styles.completedBadgeText}>COMPLETADO</Text>
+                              </View>
+                              
+                              {/* Mostrar datos de intensidad si existen */}
+                              {workout.postWorkoutData && (
+                                <Pressable
+                                  onPress={() => startEditIntensity(workout.id)}
+                                  style={styles.intensityInfo}
+                                >
+                                  <Text style={styles.intensityText}>
+                                    RPE: {workout.postWorkoutData.rpe}/10 • {workout.postWorkoutData.feeling}
+                                  </Text>
+                                  <MaterialCommunityIcons name="pencil" size={12} color="#FFFFFF" />
+                                </Pressable>
+                              )}
+                              
+                              {/* Botón para añadir intensidad si no existe */}
+                              {!workout.postWorkoutData && (
+                                <Pressable
+                                  onPress={() => startEditIntensity(workout.id)}
+                                  style={styles.addIntensityBtn}
+                                >
+                                  <MaterialCommunityIcons name="plus" size={12} color="#FFFFFF" />
+                                  <Text style={styles.addIntensityText}>Añadir intensidad</Text>
+                                </Pressable>
+                              )}
                             </View>
                           )}
                         </View>
@@ -722,25 +841,25 @@ export default function MainTrainingScreen() {
                         {isActive && (
                           <Pressable
                             onPress={() => toggleWorkoutMinimized(workout.id)}
-                            style={styles.minimizeBtn}
+                            style={styles.actionBtn}
                           >
                             <MaterialCommunityIcons
                               name={isMinimized ? "window-maximize" : "window-minimize"}
                               size={20}
-                              color="#B0B0C4"
+                              color={workout.completed ? "#FFFFFF" : "#B0B0C4"}
                             />
                           </Pressable>
                         )}
 
                         {/* Botón eliminar */}
                         <Pressable
-                          onPress={() => removeWorkout(workout.id)}
-                          style={styles.removeWorkoutBtn}
+                          onPress={() => startRemoveWorkout(workout.id)}
+                          style={styles.actionBtn}
                         >
                           <MaterialCommunityIcons
                             name="close"
                             size={20}
-                            color="#FF6B6B"
+                            color={workout.completed ? "#FFFFFF" : "#FF6B6B"}
                           />
                         </Pressable>
 
@@ -748,7 +867,7 @@ export default function MainTrainingScreen() {
                         <MaterialCommunityIcons
                           name={isActive && !isMinimized ? "chevron-up" : "chevron-down"}
                           size={24}
-                          color="#B0B0C4"
+                          color={workout.completed ? "#FFFFFF" : "#B0B0C4"}
                         />
                       </View>
                     </View>
@@ -861,17 +980,75 @@ export default function MainTrainingScreen() {
         </View>
       </Modal>
 
+      {/* Modal de confirmación de eliminación */}
+      <Modal
+        visible={showDeleteConfirmation}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={cancelRemoveWorkout}
+      >
+        <View style={styles.modalOverlay}>
+          <LinearGradient
+            colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
+            style={styles.deleteConfirmationModal}
+          >
+            <View style={styles.deleteConfirmationHeader}>
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={32}
+                color="#FF6B6B"
+              />
+              <Text style={styles.deleteConfirmationTitle}>¿Eliminar entrenamiento?</Text>
+            </View>
+
+            <Text style={styles.deleteConfirmationText}>
+              Estás a punto de eliminar:
+            </Text>
+            
+            <Text style={styles.deleteConfirmationWorkoutName}>
+              &quot;{getWorkoutToDeleteName()}&quot;
+            </Text>
+
+            <Text style={styles.deleteConfirmationWarning}>
+              Esta acción no se puede deshacer.
+            </Text>
+
+            <View style={styles.deleteConfirmationActions}>
+              <Pressable
+                onPress={cancelRemoveWorkout}
+                style={styles.deleteCancelBtn}
+              >
+                <Text style={styles.deleteCancelText}>Cancelar</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={confirmRemoveWorkout}
+                style={styles.deleteConfirmBtn}
+              >
+                <LinearGradient
+                  colors={["#FF6B6B", "#FF5252"]}
+                  style={styles.deleteConfirmGradient}
+                >
+                  <Text style={styles.deleteConfirmText}>Eliminar</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
+
       {/* Modal de intensidad post-entrenamiento */}
-      {showIntensityModal && completingWorkoutId && (
+      {showIntensityModal && (completingWorkoutId || editingIntensityWorkoutId) && (
         <PostWorkoutIntensity
           visible={showIntensityModal}
           onClose={() => {
             setShowIntensityModal(false);
             setCompletingWorkoutId(null);
+            setEditingIntensityWorkoutId(null);
           }}
-          onSubmit={completeWorkoutWithIntensity}
+          onSubmit={editingIntensityWorkoutId ? updateWorkoutIntensity : completeWorkoutWithIntensity}
           workoutName={
-            todaysWorkouts.find(w => w.id === completingWorkoutId)?.name || 
+            todaysWorkouts.find(w => w.id === (completingWorkoutId || editingIntensityWorkoutId))?.name || 
             'Entrenamiento'
           }
         />
@@ -1128,7 +1305,7 @@ const styles = StyleSheet.create({
 
   workoutHeaderCompleted: {
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.5)',
+    borderColor: 'rgba(78, 205, 196, 0.5)',
   },
 
   workoutHeaderContent: {
@@ -1162,14 +1339,18 @@ const styles = StyleSheet.create({
   },
 
   workoutNameCompleted: {
-    color: '#00D4AA',
+    color: '#FFFFFF',
     fontWeight: '700',
+  },
+
+  completedInfo: {
+    gap: 4,
   },
 
   completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1180,8 +1361,42 @@ const styles = StyleSheet.create({
   completedBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#00D4AA',
+    color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+
+  intensityInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+
+  intensityText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  addIntensityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+
+  addIntensityText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 
   workoutHeaderActions: {
@@ -1190,11 +1405,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  minimizeBtn: {
-    padding: 4,
-  },
-
-  removeWorkoutBtn: {
+  actionBtn: {
     padding: 4,
   },
 
@@ -1230,7 +1441,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ===== MODAL NOMBRAR ENTRENAMIENTO =====
+  // ===== MODAL OVERLAY =====
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1239,6 +1450,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
+  // ===== MODAL NOMBRAR ENTRENAMIENTO =====
   workoutNamerModal: {
     width: '100%',
     maxWidth: 400,
@@ -1313,6 +1525,87 @@ const styles = StyleSheet.create({
   },
 
   workoutNamerConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // ===== MODAL CONFIRMACIÓN ELIMINACIÓN =====
+  deleteConfirmationModal: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+  },
+
+  deleteConfirmationHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+
+  deleteConfirmationTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+
+  deleteConfirmationText: {
+    fontSize: 16,
+    color: '#B0B0C4',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  deleteConfirmationWorkoutName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  deleteConfirmationWarning: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    textAlign: 'center',
+    marginBottom: 24,
+    fontStyle: 'italic',
+  },
+
+  deleteConfirmationActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  deleteCancelBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+
+  deleteCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  deleteConfirmBtn: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  deleteConfirmGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+
+  deleteConfirmText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',

@@ -14,42 +14,45 @@ import {
 
 /**
  * Tipos de pasos de entrenamiento siguiendo el patrón de Garmin/Suunto
+ * DATOS BD: Estructura para tabla workout_steps
  */
 interface WorkoutStep {
-  id: string;
-  name: string;
-  stepType: 'warmup' | 'work' | 'rest' | 'recovery' | 'cooldown';
-  durationType: 'time' | 'distance' | 'lap_button' | 'heart_rate';
-  duration?: number; // tiempo en segundos
-  distance?: number; // distancia en metros
-  targetType?: 'pace' | 'heart_rate' | 'power' | 'none';
-  targetMin?: number;
-  targetMax?: number;
-  color: string;
+  id: string; // BD: step_id (PRIMARY KEY)
+  name: string; // BD: step_name
+  stepType: 'warmup' | 'interval' | 'recovery' | 'cooldown'; // BD: step_type (ENUM)
+  durationType: 'time' | 'distance' | 'lap_button' | 'heart_rate'; // BD: duration_type (ENUM)
+  duration?: number; // BD: duration_seconds (tiempo en segundos)
+  distance?: number; // BD: distance_meters (distancia en metros)
+  targetType?: 'pace' | 'heart_rate' | 'power' | 'none'; // BD: target_type (ENUM)
+  targetMin?: number; // BD: target_min_value
+  targetMax?: number; // BD: target_max_value
+  color: string; // BD: step_color (para UI)
 }
 
 /**
  * Estructura de loops/repeticiones como en Garmin Connect
+ * DATOS BD: Tabla workout_loops con foreign key a workout_plans
  */
 interface WorkoutLoop {
-  id: string;
-  name: string;
-  repetitions: number;
-  steps: WorkoutStep[];
-  color: string;
+  id: string; // BD: loop_id (PRIMARY KEY)
+  name: string; // BD: loop_name
+  repetitions: number; // BD: repetition_count
+  steps: WorkoutStep[]; // BD: Relación con workout_steps
+  color: string; // BD: loop_color
 }
 
 /**
  * Plan de entrenamiento completo
+ * DATOS BD: Tabla workout_plans
  */
 interface WorkoutPlan {
-  id: string;
-  name: string;
-  sport: 'running' | 'cycling' | 'swimming';
-  steps: (WorkoutStep | WorkoutLoop)[];
-  estimatedDuration: number;
-  estimatedDistance: number;
-  createdAt: string;
+  id: string; // BD: plan_id (PRIMARY KEY)
+  name: string; // BD: plan_name
+  sport: 'running' | 'cycling' | 'swimming'; // BD: sport_type
+  steps: (WorkoutStep | WorkoutLoop)[]; // BD: Estructura JSON o relaciones
+  estimatedDuration: number; // BD: estimated_duration_seconds
+  estimatedDistance: number; // BD: estimated_distance_meters
+  createdAt: string; // BD: created_at
 }
 
 /**
@@ -63,13 +66,59 @@ interface AdvancedWorkoutBuilderProps {
 }
 
 /**
- * Plantillas predefinidas siguiendo el patrón de apps profesionales
- * Basadas en la investigación de Garmin Connect, Suunto App y Apple Fitness
+ * Plantillas predefinidas mejoradas (movidas desde OtherSportsSessions)
+ * DATOS BD: Tabla workout_templates con datos predefinidos
  */
 const WORKOUT_TEMPLATES = {
-  running: {
-    intervals_400m: {
+  running: [
+    {
+      id: 'easy_run',
+      name: 'Rodaje Suave',
+      description: '30-60 min a ritmo conversacional',
+      icon: 'run',
+      color: '#4CAF50',
+      estimatedTime: 45,
+      steps: [
+        { 
+          id: '1', 
+          name: 'Calentamiento', 
+          stepType: 'warmup', 
+          durationType: 'time', 
+          duration: 600, 
+          targetType: 'heart_rate', 
+          targetMin: 120, 
+          targetMax: 140, 
+          color: '#4CAF50' 
+        },
+        { 
+          id: '2', 
+          name: 'Rodaje Suave', 
+          stepType: 'interval', 
+          durationType: 'time', 
+          duration: 2400, 
+          targetType: 'pace', 
+          targetMin: 300, 
+          targetMax: 330, 
+          color: '#00BCD4' 
+        },
+        { 
+          id: '3', 
+          name: 'Enfriamiento', 
+          stepType: 'cooldown', 
+          durationType: 'time', 
+          duration: 300, 
+          targetType: 'none', 
+          color: '#9C27B0' 
+        },
+      ]
+    },
+    {
+      id: 'intervals_400m',
       name: 'Intervalos 400m',
+      description: 'Series de velocidad con descanso',
+      icon: 'speedometer',
+      color: '#FF5722',
+      estimatedTime: 40,
       steps: [
         { 
           id: '1', 
@@ -90,7 +139,7 @@ const WORKOUT_TEMPLATES = {
             { 
               id: '2', 
               name: 'Intervalo 400m', 
-              stepType: 'work', 
+              stepType: 'interval', 
               durationType: 'distance', 
               distance: 400, 
               targetType: 'pace', 
@@ -123,8 +172,13 @@ const WORKOUT_TEMPLATES = {
         },
       ]
     },
-    tempo_20min: {
+    {
+      id: 'tempo_20min',
       name: 'Tempo 20 min',
+      description: '20 min a ritmo de umbral',
+      icon: 'timer',
+      color: '#FF9800',
+      estimatedTime: 35,
       steps: [
         { 
           id: '1', 
@@ -140,7 +194,7 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '2', 
           name: 'Tempo', 
-          stepType: 'work', 
+          stepType: 'interval', 
           durationType: 'time', 
           duration: 1200, 
           targetType: 'pace', 
@@ -159,8 +213,13 @@ const WORKOUT_TEMPLATES = {
         },
       ]
     },
-    long_run: {
+    {
+      id: 'long_run',
       name: 'Tirada Larga 10K',
+      description: 'Carrera continua de resistencia',
+      icon: 'map-marker-distance',
+      color: '#00BCD4',
+      estimatedTime: 60,
       steps: [
         { 
           id: '1', 
@@ -176,7 +235,7 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '2', 
           name: 'Carrera Base', 
-          stepType: 'work', 
+          stepType: 'interval', 
           durationType: 'distance', 
           distance: 10000, 
           targetType: 'heart_rate', 
@@ -195,10 +254,58 @@ const WORKOUT_TEMPLATES = {
         },
       ]
     }
-  },
-  cycling: {
-    power_intervals: {
+  ],
+  cycling: [
+    {
+      id: 'endurance_60km',
+      name: 'Resistencia 60km',
+      description: '60-120 min a ritmo aeróbico',
+      icon: 'bike',
+      color: '#00BCD4',
+      estimatedTime: 120,
+      steps: [
+        { 
+          id: '1', 
+          name: 'Calentamiento', 
+          stepType: 'warmup', 
+          durationType: 'time', 
+          duration: 900, 
+          targetType: 'power', 
+          targetMin: 120, 
+          targetMax: 150, 
+          color: '#4CAF50' 
+        },
+        { 
+          id: '2', 
+          name: 'Zona Aeróbica', 
+          stepType: 'interval', 
+          durationType: 'distance', 
+          distance: 60000, 
+          targetType: 'power', 
+          targetMin: 180, 
+          targetMax: 220, 
+          color: '#00BCD4' 
+        },
+        { 
+          id: '3', 
+          name: 'Enfriamiento', 
+          stepType: 'cooldown', 
+          durationType: 'time', 
+          duration: 600, 
+          targetType: 'power', 
+          targetMin: 100, 
+          targetMax: 130, 
+          color: '#9C27B0' 
+        },
+      ]
+    },
+    {
+      id: 'power_intervals',
       name: 'Intervalos de Potencia',
+      description: 'Series de potencia con recuperación',
+      icon: 'speedometer',
+      color: '#FF5722',
+      estimatedTime: 75,
       steps: [
         { 
           id: '1', 
@@ -219,7 +326,7 @@ const WORKOUT_TEMPLATES = {
             { 
               id: '2', 
               name: 'Trabajo', 
-              stepType: 'work', 
+              stepType: 'interval', 
               durationType: 'time', 
               duration: 240, 
               targetType: 'power', 
@@ -253,49 +360,16 @@ const WORKOUT_TEMPLATES = {
           color: '#9C27B0' 
         },
       ]
-    },
-    endurance_60km: {
-      name: 'Resistencia 60km',
-      steps: [
-        { 
-          id: '1', 
-          name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
-          duration: 900, 
-          targetType: 'power', 
-          targetMin: 120, 
-          targetMax: 150, 
-          color: '#4CAF50' 
-        },
-        { 
-          id: '2', 
-          name: 'Zona Aeróbica', 
-          stepType: 'work', 
-          durationType: 'distance', 
-          distance: 60000, 
-          targetType: 'power', 
-          targetMin: 180, 
-          targetMax: 220, 
-          color: '#00BCD4' 
-        },
-        { 
-          id: '3', 
-          name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'power', 
-          targetMin: 100, 
-          targetMax: 130, 
-          color: '#9C27B0' 
-        },
-      ]
     }
-  },
-  swimming: {
-    technique_endurance: {
+  ],
+  swimming: [
+    {
+      id: 'technique_endurance',
       name: 'Técnica y Resistencia',
+      description: 'Ejercicios de técnica y drills',
+      icon: 'swim',
+      color: '#4CAF50',
+      estimatedTime: 60,
       steps: [
         { 
           id: '1', 
@@ -314,7 +388,7 @@ const WORKOUT_TEMPLATES = {
             { 
               id: '2', 
               name: 'Técnica', 
-              stepType: 'work', 
+              stepType: 'interval', 
               durationType: 'distance', 
               distance: 200, 
               targetType: 'none', 
@@ -323,7 +397,7 @@ const WORKOUT_TEMPLATES = {
             { 
               id: '3', 
               name: 'Descanso', 
-              stepType: 'rest', 
+              stepType: 'recovery', 
               durationType: 'time', 
               duration: 30, 
               targetType: 'none', 
@@ -335,7 +409,7 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '4', 
           name: 'Serie Principal', 
-          stepType: 'work', 
+          stepType: 'interval', 
           durationType: 'distance', 
           distance: 800, 
           targetType: 'none', 
@@ -352,12 +426,13 @@ const WORKOUT_TEMPLATES = {
         },
       ]
     }
-  }
+  ]
 };
 
 /**
  * Componente principal del constructor avanzado
  * Implementa patrones de UX de Garmin Connect y Suunto App
+ * DATOS BD: Crea planes en workout_plans y relaciona con workout_steps/workout_loops
  */
 export default function AdvancedWorkoutBuilder({
   sport,
@@ -372,6 +447,7 @@ export default function AdvancedWorkoutBuilder({
   const [showItemEditor, setShowItemEditor] = useState(false);
   const [showLoopBuilder, setShowLoopBuilder] = useState(false);
   const [selectedStepsForLoop, setSelectedStepsForLoop] = useState<string[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   /**
    * Obtiene la configuración específica del deporte
@@ -384,9 +460,14 @@ export default function AdvancedWorkoutBuilder({
           color: '#4ECDC4',
           icon: 'run',
           targetTypes: [
-            { value: 'pace', label: 'Ritmo (min/km)', unit: 'min/km' },
+            { value: 'pace', label: 'Ritmo', unit: 'min/km' },
             { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
             { value: 'none', label: 'Sin Objetivo', unit: '' }
+          ],
+          durationTypes: [
+            { value: 'time', label: 'Tiempo', unit: 'min' },
+            { value: 'distance', label: 'Distancia', unit: 'km' },
+            { value: 'lap_button', label: 'Botón de vuelta', unit: '' }
           ]
         };
       case 'cycling':
@@ -395,9 +476,14 @@ export default function AdvancedWorkoutBuilder({
           color: '#45B7D1',
           icon: 'bike',
           targetTypes: [
-            { value: 'power', label: 'Potencia (W)', unit: 'W' },
+            { value: 'power', label: 'Potencia', unit: 'W' },
             { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
             { value: 'none', label: 'Sin Objetivo', unit: '' }
+          ],
+          durationTypes: [
+            { value: 'time', label: 'Tiempo', unit: 'min' },
+            { value: 'distance', label: 'Distancia', unit: 'km' },
+            { value: 'lap_button', label: 'Botón de vuelta', unit: '' }
           ]
         };
       case 'swimming':
@@ -407,6 +493,10 @@ export default function AdvancedWorkoutBuilder({
           icon: 'swim',
           targetTypes: [
             { value: 'none', label: 'Sin Objetivo', unit: '' }
+          ],
+          durationTypes: [
+            { value: 'time', label: 'Tiempo', unit: 'min' },
+            { value: 'distance', label: 'Distancia', unit: 'm' }
           ]
         };
       default:
@@ -416,6 +506,9 @@ export default function AdvancedWorkoutBuilder({
           icon: 'dumbbell',
           targetTypes: [
             { value: 'none', label: 'Sin Objetivo', unit: '' }
+          ],
+          durationTypes: [
+            { value: 'time', label: 'Tiempo', unit: 'min' }
           ]
         };
     }
@@ -425,20 +518,19 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Carga una plantilla predefinida
+   * DATOS BD: Clona datos de workout_templates a nuevo workout_plan
    */
-  const loadTemplate = (templateKey: string) => {
-    const template = WORKOUT_TEMPLATES[sport]?.[templateKey as keyof typeof WORKOUT_TEMPLATES[typeof sport]] as { name: string; steps: any[] } | undefined;
-    if (template) {
-      setWorkoutName(template.name);
-      setSteps(template.steps.map((step: any) => ({
-        ...step,
-        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      })));
-    }
+  const loadTemplate = (template: any) => {
+    setWorkoutName(template.name);
+    setSteps(template.steps.map((step: any) => ({
+      ...step,
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    })));
   };
 
   /**
    * Añade un nuevo paso individual
+   * DATOS BD: Nuevo registro en workout_steps
    */
   const addStep = (stepType: WorkoutStep['stepType']) => {
     const newStep: WorkoutStep = {
@@ -455,14 +547,35 @@ export default function AdvancedWorkoutBuilder({
   };
 
   /**
+   * Edita un paso o loop - NUEVA FUNCIONALIDAD
+   */
+  const editItem = (item: WorkoutStep | WorkoutLoop) => {
+    setEditingItem(item);
+    setShowItemEditor(true);
+  };
+
+  /**
+   * Guarda cambios en un paso - NUEVA FUNCIONALIDAD MEJORADA
+   */
+  const saveStep = (updatedStep: WorkoutStep) => {
+    setSteps(steps.map(item => 
+      item.id === updatedStep.id ? updatedStep : item
+    ));
+    setShowItemEditor(false);
+    setEditingItem(null);
+  };
+
+  /**
    * Crea un loop con los pasos seleccionados
+   * DATOS BD: Nuevo registro en workout_loops con relaciones a workout_steps
    */
   const createLoop = (repetitions: number) => {
     if (selectedStepsForLoop.length < 2) return;
 
-    const selectedSteps = steps.filter(item => 
-      'stepType' in item && selectedStepsForLoop.includes(item.id)
-    ) as WorkoutStep[];
+    // Obtener pasos en el orden seleccionado (orden importa para ejecución)
+    const selectedSteps = selectedStepsForLoop.map(stepId => 
+      steps.find(item => 'stepType' in item && item.id === stepId)
+    ).filter(Boolean) as WorkoutStep[];
 
     const newLoop: WorkoutLoop = {
       id: `loop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -486,13 +599,22 @@ export default function AdvancedWorkoutBuilder({
   };
 
   /**
+   * Reordena los ejercicios seleccionados para el loop
+   */
+  const reorderSelectedStep = (fromIndex: number, toIndex: number) => {
+    const newOrder = [...selectedStepsForLoop];
+    const [movedItem] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, movedItem);
+    setSelectedStepsForLoop(newOrder);
+  };
+
+  /**
    * Obtiene el nombre del tipo de paso
    */
   const getStepTypeName = (stepType: WorkoutStep['stepType']) => {
     const names = {
       warmup: 'Calentamiento',
-      work: 'Trabajo',
-      rest: 'Descanso',
+      interval: 'Intervalo',
       recovery: 'Recuperación',
       cooldown: 'Enfriamiento'
     };
@@ -505,8 +627,7 @@ export default function AdvancedWorkoutBuilder({
   const getStepColor = (stepType: WorkoutStep['stepType']) => {
     const colors = {
       warmup: '#4CAF50',
-      work: '#FF5722',
-      rest: '#2196F3',
+      interval: '#FF5722',
       recovery: '#2196F3',
       cooldown: '#9C27B0'
     };
@@ -526,6 +647,9 @@ export default function AdvancedWorkoutBuilder({
    * Formatea distancia en formato legible
    */
   const formatDistance = (meters: number) => {
+    if (sport === 'swimming') {
+      return `${meters} m`;
+    }
     if (meters >= 1000) {
       return `${(meters / 1000).toFixed(1)} km`;
     }
@@ -574,24 +698,8 @@ export default function AdvancedWorkoutBuilder({
   const { totalTime, totalDistance } = calculateEstimates();
 
   /**
-   * Edita un paso o loop
-   */
-  const editItem = (item: WorkoutStep | WorkoutLoop) => {
-    setEditingItem(item);
-    setShowItemEditor(true);
-  };
-
-  /**
-   * Guarda cambios en un paso o loop
-   */
-  const saveItem = (updatedItem: WorkoutStep | WorkoutLoop) => {
-    setSteps(steps.map(item => item.id === updatedItem.id ? updatedItem : item));
-    setShowItemEditor(false);
-    setEditingItem(null);
-  };
-
-  /**
    * Elimina un paso o loop
+   * DATOS BD: DELETE de workout_steps o workout_loops
    */
   const deleteItem = (itemId: string) => {
     setSteps(steps.filter(item => item.id !== itemId));
@@ -599,6 +707,7 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Guarda el plan de entrenamiento
+   * DATOS BD: INSERT en workout_plans con todas las relaciones
    */
   const saveWorkout = () => {
     const workoutPlan: WorkoutPlan = {
@@ -705,12 +814,17 @@ export default function AdvancedWorkoutBuilder({
     );
   };
 
+  const templates = WORKOUT_TEMPLATES[sport] || [];
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <LinearGradient colors={['#0F0F23', '#1A1A3A', '#2D2D5F']} style={styles.container}>
         {/* ===== HEADER ===== */}
         <View style={styles.header}>
-          <Text style={styles.title}>Constructor de {config.name}</Text>
+          <View style={styles.headerContent}>
+            <MaterialCommunityIcons name="cog" size={24} color="#FF6B6B" />
+            <Text style={styles.title}>Constructor de {config.name}</Text>
+          </View>
           <Pressable onPress={onClose}>
             <MaterialCommunityIcons name="close" size={24} color="#FFFFFF" />
           </Pressable>
@@ -729,21 +843,41 @@ export default function AdvancedWorkoutBuilder({
             />
           </View>
 
-          {/* ===== PLANTILLAS RÁPIDAS ===== */}
+          {/* ===== PLANTILLAS RÁPIDAS (MINIMIZABLES) ===== */}
           <View style={styles.templatesSection}>
-            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
-            <View style={styles.templateButtons}>
-              {Object.entries(WORKOUT_TEMPLATES[sport] || {}).map(([key, template]) => (
-                <Pressable
-                  key={key}
-                  onPress={() => loadTemplate(key)}
-                  style={styles.templateButton}
-                >
-                  <MaterialCommunityIcons name={config.icon as any} size={16} color={config.color} />
-                  <Text style={styles.templateButtonText}>{template.name}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Pressable 
+              onPress={() => setShowTemplates(!showTemplates)}
+              style={styles.templatesSectionHeader}
+            >
+              <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
+              <MaterialCommunityIcons 
+                name={showTemplates ? "chevron-up" : "chevron-down"} 
+                size={24} 
+                color="#B0B0C4" 
+              />
+            </Pressable>
+            
+            {showTemplates && (
+              <View style={styles.templateButtons}>
+                {templates.map((template) => (
+                  <Pressable
+                    key={template.id}
+                    onPress={() => loadTemplate(template)}
+                    style={styles.templateButton}
+                  >
+                    <LinearGradient
+                      colors={[template.color + '20', template.color + '10']}
+                      style={styles.templateButtonGradient}
+                    >
+                      <MaterialCommunityIcons name={template.icon as any} size={20} color={template.color} />
+                      <Text style={styles.templateButtonName}>{template.name}</Text>
+                      <Text style={styles.templateButtonDescription}>{template.description}</Text>
+                      <Text style={styles.templateButtonTime}>{template.estimatedTime} min</Text>
+                    </LinearGradient>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* ===== AÑADIR PASOS ===== */}
@@ -752,8 +886,7 @@ export default function AdvancedWorkoutBuilder({
             <View style={styles.stepTypeButtons}>
               {[
                 { type: 'warmup', label: 'Calentamiento', icon: 'thermometer-plus' },
-                { type: 'work', label: 'Trabajo', icon: 'speedometer' },
-                { type: 'rest', label: 'Descanso', icon: 'pause' },
+                { type: 'interval', label: 'Intervalo', icon: 'speedometer' },
                 { type: 'recovery', label: 'Recuperación', icon: 'heart-pulse' },
                 { type: 'cooldown', label: 'Enfriamiento', icon: 'thermometer-minus' }
               ].map((stepType) => (
@@ -852,7 +985,7 @@ export default function AdvancedWorkoutBuilder({
           </Pressable>
         </View>
 
-        {/* ===== MODAL CONSTRUCTOR DE LOOPS ===== */}
+        {/* ===== MODAL CONSTRUCTOR DE LOOPS CON REORDENAMIENTO ===== */}
         <Modal
           visible={showLoopBuilder}
           animationType="fade"
@@ -867,7 +1000,7 @@ export default function AdvancedWorkoutBuilder({
               <Text style={styles.loopBuilderModalTitle}>Crear Loop de Repetición</Text>
               
               <Text style={styles.loopBuilderModalText}>
-                Se repetirán los pasos seleccionados en orden:
+                Orden de ejecución (el primero se ejecuta primero):
               </Text>
               
               <View style={styles.selectedStepsList}>
@@ -877,8 +1010,28 @@ export default function AdvancedWorkoutBuilder({
                     <View key={stepId} style={styles.selectedStepItem}>
                       <View style={[styles.selectedStepIndicator, { backgroundColor: step.color }]} />
                       <Text style={styles.selectedStepText}>
-                        {String.fromCharCode(65 + index)}. {step.name}
+                        {index + 1}. {step.name}
                       </Text>
+                      
+                      {/* Botones de reordenamiento */}
+                      <View style={styles.reorderButtons}>
+                        {index > 0 && (
+                          <Pressable
+                            onPress={() => reorderSelectedStep(index, index - 1)}
+                            style={styles.reorderBtn}
+                          >
+                            <MaterialCommunityIcons name="arrow-up" size={16} color="#00D4AA" />
+                          </Pressable>
+                        )}
+                        {index < selectedStepsForLoop.length - 1 && (
+                          <Pressable
+                            onPress={() => reorderSelectedStep(index, index + 1)}
+                            style={styles.reorderBtn}
+                          >
+                            <MaterialCommunityIcons name="arrow-down" size={16} color="#00D4AA" />
+                          </Pressable>
+                        )}
+                      </View>
                     </View>
                   );
                 })}
@@ -908,8 +1061,250 @@ export default function AdvancedWorkoutBuilder({
             </LinearGradient>
           </View>
         </Modal>
+
+        {/* ===== MODAL EDITOR DE PASOS ESTILO GARMIN ===== */}
+        <Modal
+          visible={showItemEditor}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowItemEditor(false)}
+        >
+          {editingItem && 'stepType' in editingItem && (
+            <StepEditor
+              step={editingItem}
+              sport={sport}
+              config={config}
+              onSave={saveStep}
+              onClose={() => setShowItemEditor(false)}
+            />
+          )}
+        </Modal>
       </LinearGradient>
     </Modal>
+  );
+}
+
+/**
+ * Componente Editor de Pasos estilo Garmin/Suunto
+ */
+interface StepEditorProps {
+  step: WorkoutStep;
+  sport: 'running' | 'cycling' | 'swimming';
+  config: any;
+  onSave: (step: WorkoutStep) => void;
+  onClose: () => void;
+}
+
+function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
+  const [editedStep, setEditedStep] = useState<WorkoutStep>({ ...step });
+
+  const updateStep = (field: keyof WorkoutStep, value: any) => {
+    setEditedStep(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = () => {
+    onSave(editedStep);
+  };
+
+  const formatDurationValue = () => {
+    if (editedStep.durationType === 'time' && editedStep.duration) {
+      return Math.floor(editedStep.duration / 60).toString();
+    }
+    if (editedStep.durationType === 'distance' && editedStep.distance) {
+      return sport === 'swimming' 
+        ? editedStep.distance.toString()
+        : (editedStep.distance / 1000).toString();
+    }
+    return '';
+  };
+
+  const handleDurationValueChange = (value: string) => {
+    const numValue = parseFloat(value) || 0;
+    if (editedStep.durationType === 'time') {
+      updateStep('duration', numValue * 60);
+    } else if (editedStep.durationType === 'distance') {
+      const meters = sport === 'swimming' ? numValue : numValue * 1000;
+      updateStep('distance', meters);
+    }
+  };
+
+  return (
+    <LinearGradient colors={['#0F0F23', '#1A1A3A', '#2D2D5F']} style={styles.stepEditorContainer}>
+      <View style={styles.stepEditorHeader}>
+        <Text style={styles.stepEditorTitle}>EDITAR PASO</Text>
+        <Pressable onPress={onClose} style={styles.stepEditorCloseBtn}>
+          <MaterialCommunityIcons name="close" size={24} color="#B0B0C4" />
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.stepEditorContent}>
+        {/* Fase */}
+        <View style={styles.editorSection}>
+          <Text style={styles.editorLabel}>Fase</Text>
+          <View style={styles.phaseSelector}>
+            {[
+              { type: 'warmup', label: 'Calentamiento', color: '#4CAF50' },
+              { type: 'interval', label: 'Intervalo', color: '#FF5722' },
+              { type: 'recovery', label: 'Recuperación', color: '#2196F3' },
+              { type: 'cooldown', label: 'Enfriamiento', color: '#9C27B0' }
+            ].map((phase) => (
+              <Pressable
+                key={phase.type}
+                onPress={() => {
+                  updateStep('stepType', phase.type);
+                  updateStep('color', phase.color);
+                }}
+                style={[
+                  styles.phaseOption,
+                  editedStep.stepType === phase.type && styles.phaseOptionSelected,
+                  { borderColor: phase.color }
+                ]}
+              >
+                <View style={[styles.phaseIndicator, { backgroundColor: phase.color }]} />
+                <Text style={[
+                  styles.phaseOptionText,
+                  editedStep.stepType === phase.type && { color: phase.color }
+                ]}>
+                  {phase.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Nombre del paso */}
+        <View style={styles.editorSection}>
+          <Text style={styles.editorLabel}>Nombre del paso</Text>
+          <TextInput
+            value={editedStep.name}
+            onChangeText={(text) => updateStep('name', text)}
+            style={styles.stepNameInput}
+            placeholder="Nombre del paso"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+
+        {/* Duración */}
+        <View style={styles.editorSection}>
+          <Text style={styles.editorLabel}>Duración</Text>
+          
+          {/* Selector de tipo de duración */}
+          <View style={styles.durationTypeSelector}>
+            {config.durationTypes.map((durationType: any) => (
+              <Pressable
+                key={durationType.value}
+                onPress={() => updateStep('durationType', durationType.value)}
+                style={[
+                  styles.durationTypeOption,
+                  editedStep.durationType === durationType.value && styles.durationTypeOptionSelected
+                ]}
+              >
+                <Text style={[
+                  styles.durationTypeText,
+                  editedStep.durationType === durationType.value && styles.durationTypeTextSelected
+                ]}>
+                  {durationType.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Input de valor */}
+          {editedStep.durationType !== 'lap_button' && (
+            <View style={styles.durationValueContainer}>
+              <TextInput
+                value={formatDurationValue()}
+                onChangeText={handleDurationValueChange}
+                style={styles.durationValueInput}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#6B7280"
+              />
+              <Text style={styles.durationValueUnit}>
+                {editedStep.durationType === 'time' ? 'min' :
+                 sport === 'swimming' ? 'm' : 'km'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Objetivo */}
+        <View style={styles.editorSection}>
+          <Text style={styles.editorLabel}>Objetivo</Text>
+          
+          {/* Selector de tipo de objetivo */}
+          <View style={styles.targetTypeSelector}>
+            {config.targetTypes.map((targetType: any) => (
+              <Pressable
+                key={targetType.value}
+                onPress={() => updateStep('targetType', targetType.value)}
+                style={[
+                  styles.targetTypeOption,
+                  editedStep.targetType === targetType.value && styles.targetTypeOptionSelected
+                ]}
+              >
+                <Text style={[
+                  styles.targetTypeText,
+                  editedStep.targetType === targetType.value && styles.targetTypeTextSelected
+                ]}>
+                  {targetType.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Inputs de rango de objetivo */}
+          {editedStep.targetType !== 'none' && (
+            <View style={styles.targetRangeContainer}>
+              <View style={styles.targetRangeInputGroup}>
+                <Text style={styles.targetRangeLabel}>Mínimo</Text>
+                <TextInput
+                  value={editedStep.targetMin?.toString() || ''}
+                  onChangeText={(text) => updateStep('targetMin', parseInt(text) || 0)}
+                  style={styles.targetRangeInput}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+              
+              <Text style={styles.targetRangeSeparator}>-</Text>
+              
+              <View style={styles.targetRangeInputGroup}>
+                <Text style={styles.targetRangeLabel}>Máximo</Text>
+                <TextInput
+                  value={editedStep.targetMax?.toString() || ''}
+                  onChangeText={(text) => updateStep('targetMax', parseInt(text) || 0)}
+                  style={styles.targetRangeInput}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <Text style={styles.targetRangeUnit}>
+                {config.targetTypes.find((t: any) => t.value === editedStep.targetType)?.unit || ''}
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Botones de acción */}
+      <View style={styles.stepEditorActions}>
+        <Pressable onPress={onClose} style={styles.stepEditorCancelBtn}>
+          <Text style={styles.stepEditorCancelText}>Cancelar</Text>
+        </Pressable>
+        <Pressable onPress={handleSave} style={styles.stepEditorSaveBtn}>
+          <LinearGradient
+            colors={["#00D4AA", "#00B894"]}
+            style={styles.stepEditorSaveGradient}
+          >
+            <Text style={styles.stepEditorSaveText}>Guardar Paso</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </LinearGradient>
   );
 }
 
@@ -926,6 +1321,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
 
   title: {
@@ -964,26 +1365,57 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  templatesSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
   templateButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
   },
 
   templateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 6,
+    width: '47%',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
 
-  templateButtonText: {
+  templateButtonGradient: {
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    minHeight: 120,
+  },
+
+  templateButtonName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+
+  templateButtonDescription: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+
+  templateButtonTime: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
 
   addStepsSection: {
@@ -1252,6 +1684,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 12,
+    borderRadius: 8,
   },
 
   selectedStepIndicator: {
@@ -1264,6 +1699,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '500',
+    flex: 1,
+  },
+
+  reorderButtons: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+
+  reorderBtn: {
+    padding: 4,
+    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    borderRadius: 4,
   },
 
   repetitionsInput: {
@@ -1309,5 +1756,266 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#B0B0C4',
+  },
+
+  // ===== STEP EDITOR STYLES =====
+  stepEditorContainer: {
+    flex: 1,
+  },
+
+  stepEditorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  stepEditorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  stepEditorCloseBtn: {
+    padding: 8,
+  },
+
+  stepEditorContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+
+  editorSection: {
+    marginBottom: 24,
+  },
+
+  editorLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 12,
+  },
+
+  // Fase selector
+  phaseSelector: {
+    gap: 8,
+  },
+
+  phaseOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    gap: 12,
+  },
+
+  phaseOptionSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  phaseIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+
+  phaseOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+
+  // Nombre del paso
+  stepNameInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+
+  // Duración
+  durationTypeSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  durationTypeOption: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  durationTypeOptionSelected: {
+    backgroundColor: '#00D4AA',
+  },
+
+  durationTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#B0B0C4',
+  },
+
+  durationTypeTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+
+  durationValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+
+  durationValueInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  durationValueUnit: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  // Objetivo
+  targetTypeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  targetTypeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  targetTypeOptionSelected: {
+    backgroundColor: '#00D4AA',
+  },
+
+  targetTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#B0B0C4',
+  },
+
+  targetTypeTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+
+  targetRangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+
+  targetRangeInputGroup: {
+    flex: 1,
+  },
+
+  targetRangeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 4,
+  },
+
+  targetRangeInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+
+  targetRangeSeparator: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    paddingBottom: 8,
+  },
+
+  targetRangeUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    paddingBottom: 8,
+  },
+
+  // Botones de acción
+  stepEditorActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  stepEditorCancelBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+
+  stepEditorCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  stepEditorSaveBtn: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  stepEditorSaveGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+
+  stepEditorSaveText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

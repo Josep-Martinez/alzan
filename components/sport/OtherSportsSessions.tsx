@@ -19,15 +19,16 @@ import {
 
 /**
  * Interfaz para plan de entrenamiento estructurado
+ * DATOS BD: Estructura completa para tabla workout_plans
  */
 interface WorkoutPlan {
-  id: string;
-  name: string;
-  sport: 'running' | 'cycling' | 'swimming';
-  steps: any[];
-  estimatedDuration: number;
-  estimatedDistance: number;
-  createdAt: string;
+  id: string; // BD: plan_id (PRIMARY KEY)
+  name: string; // BD: plan_name
+  sport: 'running' | 'cycling' | 'swimming'; // BD: sport_type
+  steps: any[]; // BD: plan_structure (JSON con pasos y loops)
+  estimatedDuration: number; // BD: estimated_duration_seconds
+  estimatedDistance: number; // BD: estimated_distance_meters
+  createdAt: string; // BD: created_at
 }
 
 // ===== RUNNING COMPONENT =====
@@ -40,7 +41,13 @@ interface RunningSessionProps {
 
 /**
  * Componente para sesiones de running con constructor avanzado
- * Integra plantillas predefinidas y construcción personalizada
+ * Integra solamente el constructor personalizado, plantillas movidas al AdvancedWorkoutBuilder
+ * 
+ * DATOS BD: Actualiza session_data en tabla workouts con:
+ * - type: running_session_type (ENUM)
+ * - plannedDuration: planned_duration_seconds (INTEGER)
+ * - plannedDistance: planned_distance_meters (INTEGER)
+ * - workoutPlan: workout_plan_id (FOREIGN KEY a workout_plans)
  */
 export function RunningSessionComponent({ 
   session, 
@@ -52,62 +59,8 @@ export function RunningSessionComponent({
   const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
 
   /**
-   * Plantillas rápidas para running
-   */
-  const quickTemplates = [
-    {
-      id: 'easy_run',
-      name: 'Rodaje Suave',
-      description: '30-60 min a ritmo conversacional',
-      icon: 'run',
-      color: '#4CAF50',
-      estimatedTime: '45 min'
-    },
-    {
-      id: 'intervals',
-      name: 'Intervalos',
-      description: 'Series de velocidad con descanso',
-      icon: 'speedometer',
-      color: '#FF5722',
-      estimatedTime: '40 min'
-    },
-    {
-      id: 'tempo',
-      name: 'Tempo Run',
-      description: '20 min a ritmo de umbral',
-      icon: 'timer',
-      color: '#FF9800',
-      estimatedTime: '35 min'
-    },
-    {
-      id: 'long_run',
-      name: 'Tirada Larga',
-      description: 'Carrera continua de resistencia',
-      icon: 'map-marker-distance',
-      color: '#00BCD4',
-      estimatedTime: '90 min'
-    }
-  ];
-
-  /**
-   * Maneja la selección de plantilla rápida
-   */
-  const handleQuickTemplate = (templateId: string) => {
-    const template = quickTemplates.find(t => t.id === templateId);
-    if (!template) return;
-
-    // Actualizar sesión básica
-    onUpdateSession({
-      ...session,
-      type: templateId as any,
-      plannedDuration: templateId === 'long_run' ? 90 * 60 : 
-                      templateId === 'intervals' ? 40 * 60 :
-                      templateId === 'tempo' ? 35 * 60 : 45 * 60
-    });
-  };
-
-  /**
-   * Maneja el plan de entrenamiento creado
+   * Maneja el plan de entrenamiento creado desde el constructor avanzado
+   * DATOS BD: Guarda referencia al workout_plan_id en session_data
    */
   const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
     setCurrentWorkoutPlan(workoutPlan);
@@ -115,10 +68,10 @@ export function RunningSessionComponent({
     // Actualizar sesión con datos del plan
     onUpdateSession({
       ...session,
-      type: 'intervals', // Determinar tipo basado en los pasos
-      plannedDuration: workoutPlan.estimatedDuration,
-      plannedDistance: workoutPlan.estimatedDistance,
-      workoutPlan: workoutPlan // Guardar plan completo para ejecución
+      type: 'intervals', // Determinar tipo basado en los pasos del plan
+      plannedDuration: workoutPlan.estimatedDuration, // BD: planned_duration_seconds
+      plannedDistance: workoutPlan.estimatedDistance, // BD: planned_distance_meters
+      workoutPlan: workoutPlan // BD: workout_plan_reference (JSON o FOREIGN KEY)
     });
     
     setShowWorkoutBuilder(false);
@@ -209,37 +162,7 @@ export function RunningSessionComponent({
           </View>
         )}
 
-        {/* ===== PLANTILLAS RÁPIDAS ===== */}
-        {!isCompleted && !currentWorkoutPlan && (
-          <View style={styles.quickTemplatesSection}>
-            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
-            <View style={styles.quickTemplatesGrid}>
-              {quickTemplates.map((template) => (
-                <Pressable
-                  key={template.id}
-                  onPress={() => handleQuickTemplate(template.id)}
-                  style={styles.quickTemplateBtn}
-                >
-                  <LinearGradient
-                    colors={[template.color + '20', template.color + '10']}
-                    style={styles.quickTemplateGradient}
-                  >
-                    <MaterialCommunityIcons
-                      name={template.icon as any}
-                      size={20}
-                      color={template.color}
-                    />
-                    <Text style={styles.quickTemplateName}>{template.name}</Text>
-                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
-                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
-                  </LinearGradient>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ===== CONSTRUCTOR AVANZADO ===== */}
+        {/* ===== CONSTRUCTOR AVANZADO (ÚNICO BOTÓN) ===== */}
         {!isCompleted && (
           <Pressable 
             onPress={() => setShowWorkoutBuilder(true)} 
@@ -251,7 +174,7 @@ export function RunningSessionComponent({
             >
               <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
               <Text style={styles.advancedBuilderText}>
-                Constructor Avanzado de Running
+                Crear Entrenamiento de Running
               </Text>
               <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
             </LinearGradient>
@@ -291,18 +214,6 @@ export function RunningSessionComponent({
           </View>
         )}
 
-        {/* ===== CONSEJOS ===== */}
-        <View style={styles.tipsContainer}>
-          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <View style={styles.tipsContent}>
-            <Text style={styles.tipsTitle}>Consejos para Running:</Text>
-            <Text style={styles.tipsText}>🏃‍♂️ Calienta 10-15 minutos antes de empezar</Text>
-            <Text style={styles.tipsText}>💧 Mantén hidratación cada 15-20 minutos</Text>
-            <Text style={styles.tipsText}>👟 Usa calzado apropiado y revisa la técnica</Text>
-            <Text style={styles.tipsText}>📱 Tu reloj/app registrará las métricas automáticamente</Text>
-          </View>
-        </View>
-
         {/* ===== BOTÓN COMPLETAR ===== */}
         {!isCompleted && (
           <Pressable 
@@ -323,7 +234,7 @@ export function RunningSessionComponent({
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete() ? "Completar Running" : "Configura tu entrenamiento"}
+                {isReadyToComplete() ? "Completar Running" : "Crea tu entrenamiento arriba"}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -351,6 +262,7 @@ interface CyclingSessionProps {
 
 /**
  * Componente para sesiones de ciclismo con constructor avanzado
+ * DATOS BD: Similar estructura a Running pero para cycling_session_type
  */
 export function CyclingSessionComponent({ 
   session, 
@@ -360,54 +272,6 @@ export function CyclingSessionComponent({
 }: CyclingSessionProps) {
   const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false);
   const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
-
-  const quickTemplates = [
-    {
-      id: 'endurance',
-      name: 'Resistencia',
-      description: '60-120 min a ritmo aeróbico',
-      icon: 'bike',
-      color: '#00BCD4',
-      estimatedTime: '90 min'
-    },
-    {
-      id: 'intervals',
-      name: 'Intervalos',
-      description: 'Series de potencia con recuperación',
-      icon: 'speedometer',
-      color: '#FF5722',
-      estimatedTime: '60 min'
-    },
-    {
-      id: 'recovery',
-      name: 'Recuperación',
-      description: 'Pedaleo suave y regenerativo',
-      icon: 'heart-pulse',
-      color: '#4CAF50',
-      estimatedTime: '45 min'
-    },
-    {
-      id: 'indoor',
-      name: 'Indoor',
-      description: 'Entrenamiento en rodillo/estática',
-      icon: 'home',
-      color: '#9C27B0',
-      estimatedTime: '60 min'
-    }
-  ];
-
-  const handleQuickTemplate = (templateId: string) => {
-    const template = quickTemplates.find(t => t.id === templateId);
-    if (!template) return;
-
-    onUpdateSession({
-      ...session,
-      type: templateId as any,
-      plannedDuration: templateId === 'endurance' ? 90 * 60 : 
-                      templateId === 'intervals' ? 60 * 60 :
-                      templateId === 'recovery' ? 45 * 60 : 60 * 60
-    });
-  };
 
   const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
     setCurrentWorkoutPlan(workoutPlan);
@@ -500,35 +364,6 @@ export function CyclingSessionComponent({
           </View>
         )}
 
-        {!isCompleted && !currentWorkoutPlan && (
-          <View style={styles.quickTemplatesSection}>
-            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
-            <View style={styles.quickTemplatesGrid}>
-              {quickTemplates.map((template) => (
-                <Pressable
-                  key={template.id}
-                  onPress={() => handleQuickTemplate(template.id)}
-                  style={styles.quickTemplateBtn}
-                >
-                  <LinearGradient
-                    colors={[template.color + '20', template.color + '10']}
-                    style={styles.quickTemplateGradient}
-                  >
-                    <MaterialCommunityIcons
-                      name={template.icon as any}
-                      size={20}
-                      color={template.color}
-                    />
-                    <Text style={styles.quickTemplateName}>{template.name}</Text>
-                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
-                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
-                  </LinearGradient>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
         {!isCompleted && (
           <Pressable 
             onPress={() => setShowWorkoutBuilder(true)} 
@@ -540,23 +375,12 @@ export function CyclingSessionComponent({
             >
               <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
               <Text style={styles.advancedBuilderText}>
-                Constructor Avanzado de Ciclismo
+                Crear Entrenamiento de Ciclismo
               </Text>
               <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
             </LinearGradient>
           </Pressable>
         )}
-
-        <View style={styles.tipsContainer}>
-          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <View style={styles.tipsContent}>
-            <Text style={styles.tipsTitle}>Consejos para Ciclismo:</Text>
-            <Text style={styles.tipsText}>🚴‍♂️ Ajusta bien la altura del sillín y manillar</Text>
-            <Text style={styles.tipsText}>⚡ Controla la potencia y cadencia durante el entrenamiento</Text>
-            <Text style={styles.tipsText}>🦺 Usa casco y ropa visible si sales a la carretera</Text>
-            <Text style={styles.tipsText}>📱 Tu ciclocomputador registrará métricas de potencia y velocidad</Text>
-          </View>
-        </View>
 
         {!isCompleted && (
           <Pressable 
@@ -577,7 +401,7 @@ export function CyclingSessionComponent({
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete() ? "Completar Ciclismo" : "Configura tu entrenamiento"}
+                {isReadyToComplete() ? "Completar Ciclismo" : "Crea tu entrenamiento arriba"}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -604,6 +428,7 @@ interface SwimmingSessionProps {
 
 /**
  * Componente para sesiones de natación con constructor avanzado
+ * DATOS BD: Similar estructura para swimming_session_type
  */
 export function SwimmingSessionComponent({ 
   session, 
@@ -613,54 +438,6 @@ export function SwimmingSessionComponent({
 }: SwimmingSessionProps) {
   const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false);
   const [currentWorkoutPlan, setCurrentWorkoutPlan] = useState<WorkoutPlan | null>(null);
-
-  const quickTemplates = [
-    {
-      id: 'endurance',
-      name: 'Resistencia',
-      description: '1500-3000m continuos',
-      icon: 'swim',
-      color: '#00BCD4',
-      estimatedTime: '60 min'
-    },
-    {
-      id: 'technique',
-      name: 'Técnica',
-      description: 'Ejercicios de técnica y drills',
-      icon: 'school',
-      color: '#4CAF50',
-      estimatedTime: '45 min'
-    },
-    {
-      id: 'speed',
-      name: 'Velocidad',
-      description: 'Series cortas de alta intensidad',
-      icon: 'speedometer',
-      color: '#FF5722',
-      estimatedTime: '50 min'
-    },
-    {
-      id: 'open_water',
-      name: 'Aguas Abiertas',
-      description: 'Entrenamiento para mar/lago',
-      icon: 'waves',
-      color: '#2196F3',
-      estimatedTime: '75 min'
-    }
-  ];
-
-  const handleQuickTemplate = (templateId: string) => {
-    const template = quickTemplates.find(t => t.id === templateId);
-    if (!template) return;
-
-    onUpdateSession({
-      ...session,
-      type: templateId as any,
-      plannedDistance: templateId === 'endurance' ? 2000 : 
-                      templateId === 'technique' ? 1200 :
-                      templateId === 'speed' ? 1000 : 1500
-    });
-  };
 
   const handleWorkoutPlan = (workoutPlan: WorkoutPlan) => {
     setCurrentWorkoutPlan(workoutPlan);
@@ -752,35 +529,6 @@ export function SwimmingSessionComponent({
           </View>
         )}
 
-        {!isCompleted && !currentWorkoutPlan && (
-          <View style={styles.quickTemplatesSection}>
-            <Text style={styles.sectionTitle}>Plantillas Rápidas</Text>
-            <View style={styles.quickTemplatesGrid}>
-              {quickTemplates.map((template) => (
-                <Pressable
-                  key={template.id}
-                  onPress={() => handleQuickTemplate(template.id)}
-                  style={styles.quickTemplateBtn}
-                >
-                  <LinearGradient
-                    colors={[template.color + '20', template.color + '10']}
-                    style={styles.quickTemplateGradient}
-                  >
-                    <MaterialCommunityIcons
-                      name={template.icon as any}
-                      size={20}
-                      color={template.color}
-                    />
-                    <Text style={styles.quickTemplateName}>{template.name}</Text>
-                    <Text style={styles.quickTemplateDescription}>{template.description}</Text>
-                    <Text style={styles.quickTemplateTime}>{template.estimatedTime}</Text>
-                  </LinearGradient>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
         {!isCompleted && (
           <Pressable 
             onPress={() => setShowWorkoutBuilder(true)} 
@@ -792,23 +540,12 @@ export function SwimmingSessionComponent({
             >
               <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
               <Text style={styles.advancedBuilderText}>
-                Constructor Avanzado de Natación
+                Crear Entrenamiento de Natación
               </Text>
               <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
             </LinearGradient>
           </Pressable>
         )}
-
-        <View style={styles.tipsContainer}>
-          <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#FFB84D" />
-          <View style={styles.tipsContent}>
-            <Text style={styles.tipsTitle}>Consejos para Natación:</Text>
-            <Text style={styles.tipsText}>🏊‍♂️ Calienta fuera del agua antes de entrar</Text>
-            <Text style={styles.tipsText}>👓 Usa gafas apropiadas y ajusta bien las correas</Text>
-            <Text style={styles.tipsText}>🫁 Enfócate en la respiración bilateral y técnica</Text>
-            <Text style={styles.tipsText}>⏱️ Tu reloj waterproof registrará brazadas y distancia</Text>
-          </View>
-        </View>
 
         {!isCompleted && (
           <Pressable 
@@ -829,7 +566,7 @@ export function SwimmingSessionComponent({
                 color="#FFFFFF" 
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete() ? "Completar Natación" : "Configura tu entrenamiento"}
+                {isReadyToComplete() ? "Completar Natación" : "Crea tu entrenamiento arriba"}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -857,7 +594,7 @@ interface GenericSportSessionProps {
 
 /**
  * Exportar el componente genérico desde el archivo separado
- * Ya está implementado en GenericSportSessionComponent.tsx
+ * Ya está implementado en GenericSportSessionComponent.tsx (actualizado)
  */
 export { default as GenericSportSessionComponent } from './GenericSportSessionComponent';
 
@@ -971,66 +708,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // ===== PLANTILLAS RÁPIDAS =====
-  quickTemplatesSection: {
-    marginBottom: 16,
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 12,
-  },
-
-  quickTemplatesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  quickTemplateBtn: {
-    width: '48%',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  quickTemplateGradient: {
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    minHeight: 100,
-    justifyContent: 'center',
-  },
-
-  quickTemplateName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-
-  quickTemplateDescription: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-
-  quickTemplateTime: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-
-  // ===== CONSTRUCTOR AVANZADO =====
+  // ===== CONSTRUCTOR AVANZADO (ÚNICO) =====
   advancedBuilderBtn: {
     marginBottom: 16,
     borderRadius: 16,
@@ -1041,7 +719,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
     gap: 8,
   },
@@ -1081,35 +759,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFFFFF',
     fontWeight: '500',
-  },
-
-  // ===== CONSEJOS =====
-  tipsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255, 184, 77, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    marginBottom: 16,
-  },
-
-  tipsContent: {
-    flex: 1,
-  },
-
-  tipsTitle: {
-    fontSize: 12,
-    color: '#FFB84D',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-
-  tipsText: {
-    fontSize: 11,
-    color: '#FFB84D',
-    lineHeight: 14,
-    marginBottom: 2,
   },
 
   // ===== BOTÓN COMPLETAR =====

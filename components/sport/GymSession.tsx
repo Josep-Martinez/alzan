@@ -1,4 +1,4 @@
-// components/sport/GymSession.tsx - Versión mejorada sin constructor avanzado
+// components/sport/GymSession.tsx - Versión mejorada sin tips y botón mejorado
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -767,18 +767,18 @@ export default function GymSession({
       {/* ===== BOTONES DE ACCIÓN ===== */}
       {!isCompleted && (
         <View style={styles.actionButtons}>
-          {/* Botón añadir ejercicio */}
+          {/* Botón añadir ejercicio - DISEÑO NUEVO Y DIFERENTE */}
           <Pressable 
             onPress={() => setShowExerciseSelector(true)} 
             style={styles.addExerciseBtn}
           >
-            <LinearGradient
-              colors={["#00D4AA", "#00B894"]}
-              style={styles.addExerciseGradient}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+            <View style={styles.addExerciseBtnContent}>
+              <View style={styles.addExerciseIcon}>
+                <MaterialCommunityIcons name="plus" size={20} color="#FFB84D" />
+              </View>
               <Text style={styles.addExerciseText}>Añadir Ejercicio</Text>
-            </LinearGradient>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#FFB84D" />
+            </View>
           </Pressable>
 
           {/* Botón crear superserie */}
@@ -1438,25 +1438,37 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
+  // NUEVO DISEÑO DEL BOTÓN AÑADIR EJERCICIO
   addExerciseBtn: {
     flex: 1,
+    backgroundColor: 'rgba(255, 184, 77, 0.1)',
     borderRadius: 16,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 77, 0.3)',
   },
 
-  addExerciseGradient: {
+  addExerciseBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+
+  addExerciseIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    gap: 8,
+    backgroundColor: 'rgba(255, 184, 77, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   addExerciseText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#FFB84D',
   },
 
   createSupersetBtn: {

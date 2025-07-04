@@ -3,22 +3,23 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 
 /**
  * Interfaz para los datos de intensidad post-entrenamiento
+ * DATOS BD: Estructura para tabla post_workout_data
  */
 interface PostWorkoutData {
-  rpe: number;       // Rate of Perceived Exertion (1-10)
-  feeling: string;   // Categoría de sensación
-  notes?: string;    // Notas adicionales opcionales
+  rpe: number;       // BD: rpe_score (Rate of Perceived Exertion 1-10)
+  feeling: string;   // BD: feeling_category (great/good/ok/tired/exhausted)
+  notes?: string;    // BD: workout_notes (TEXT opcional)
 }
 
 /**
@@ -27,13 +28,14 @@ interface PostWorkoutData {
 interface PostWorkoutIntensityProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: PostWorkoutData) => void;
+  onSubmit: (data: PostWorkoutData | null) => void; // null = omitir intensidad
   workoutName: string;
 }
 
 /**
  * Escalas de RPE basadas en investigación de apps fitness profesionales
  * Siguiendo el patrón de Garmin Connect y Apple Fitness
+ * DATOS BD: Valores predefinidos para validación en backend
  */
 const RPE_SCALES = [
   { value: 1, label: 'Muy Fácil', description: 'Sin esfuerzo', color: '#4CAF50', emoji: '😌' },
@@ -50,6 +52,7 @@ const RPE_SCALES = [
 
 /**
  * Categorías de sensación basadas en Apple Fitness y Garmin
+ * DATOS BD: Enum values para feeling_category
  */
 const FEELING_CATEGORIES = [
   { id: 'great', label: 'Excelente', description: 'Me siento genial', icon: 'emoticon-excited', color: '#4CAF50' },
@@ -63,6 +66,7 @@ const FEELING_CATEGORIES = [
  * Componente PostWorkoutIntensity
  * Modal para capturar métricas subjetivas post-entrenamiento
  * Implementa escalas RPE y categorías de sensación estándar
+ * DATOS BD: Inserta datos en tabla post_workout_data con foreign key a workouts
  */
 export default function PostWorkoutIntensity({
   visible,
@@ -78,6 +82,7 @@ export default function PostWorkoutIntensity({
 
   /**
    * Maneja el envío de datos de intensidad
+   * DATOS BD: INSERT en post_workout_data con workout_id, rpe_score, feeling_category, notes
    */
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -85,9 +90,9 @@ export default function PostWorkoutIntensity({
     setIsSubmitting(true);
 
     const data: PostWorkoutData = {
-      rpe: selectedRPE,
-      feeling: selectedFeeling,
-      notes: notes.trim() || undefined
+      rpe: selectedRPE, // BD: rpe_score
+      feeling: selectedFeeling, // BD: feeling_category
+      notes: notes.trim() || undefined // BD: workout_notes (puede ser NULL)
     };
 
     try {
@@ -97,6 +102,14 @@ export default function PostWorkoutIntensity({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  /**
+   * Omite la captura de intensidad y completa el entrenamiento sin datos subjetivos
+   * DATOS BD: El workout se marca como completed pero sin datos en post_workout_data
+   */
+  const handleSkip = () => {
+    onSubmit(null); // null indica que se omitió la intensidad
   };
 
   /**
@@ -356,14 +369,16 @@ export default function PostWorkoutIntensity({
 
         {/* ===== BOTONES DE ACCIÓN ===== */}
         <View style={styles.actions}>
+          {/* Botón Omitir - Color diferente, completa sin datos */}
           <Pressable 
-            onPress={onClose} 
-            style={styles.cancelBtn}
+            onPress={handleSkip} 
+            style={styles.skipBtn}
             disabled={isSubmitting}
           >
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.skipText}>Omitir</Text>
           </Pressable>
           
+          {/* Botón Guardar Intensidad */}
           <Pressable 
             onPress={handleSubmit} 
             style={[
@@ -390,7 +405,7 @@ export default function PostWorkoutIntensity({
                 />
               )}
               <Text style={styles.submitText}>
-                {isSubmitting ? 'Guardando...' : 'Completar Entrenamiento'}
+                {isSubmitting ? 'Guardando...' : 'Guardar Intensidad'}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -689,20 +704,24 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
 
-  cancelBtn: {
+  // Botón Omitir - Color naranaja/amarillo para diferenciarlo
+  skipBtn: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 184, 77, 0.2)',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 77, 0.4)',
   },
 
-  cancelText: {
+  skipText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#B0B0C4',
+    color: '#FFB84D',
   },
 
+  // Botón principal (Guardar)
   submitBtn: {
     flex: 2,
     borderRadius: 12,

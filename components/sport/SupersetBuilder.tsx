@@ -3,18 +3,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import { GymExercise } from './sports';
 
 /**
  * Tipos de superseries disponibles
+ * DATOS BD: Enum values para superset_type en tabla supersets
  */
 const SUPERSET_TYPES = [
   {
@@ -25,7 +26,7 @@ const SUPERSET_TYPES = [
     color: '#FF6B6B',
     minExercises: 2,
     maxExercises: 2,
-    benefits: ['Ahorra tiempo', 'Aumenta intensidad', 'Musculos antagonistas']
+    benefits: ['Ahorra tiempo', 'Aumenta intensidad', 'Músculos antagonistas']
   },
   {
     type: 'triset',
@@ -68,6 +69,14 @@ interface SupersetBuilderProps {
 /**
  * Componente constructor de superseries
  * Permite crear superseries, triseries y circuitos con interfaz intuitiva
+ * 
+ * DATOS BD: Crea registros en tabla supersets con relaciones a exercises
+ * - superset_id (PRIMARY KEY)
+ * - superset_name (VARCHAR)
+ * - superset_type (ENUM: superset/triset/circuit)
+ * - rounds_count (INTEGER)
+ * - rest_time_seconds (INTEGER)
+ * - created_at (TIMESTAMP)
  */
 export default function SupersetBuilder({
   visible,
@@ -111,7 +120,7 @@ export default function SupersetBuilder({
   };
 
   /**
-   * Continúa al siguiente paso
+   * Continúa al siguiente paso o retrocede al anterior
    */
   const nextStep = () => {
     if (currentStep === 'type') {
@@ -123,13 +132,16 @@ export default function SupersetBuilder({
   };
 
   /**
-   * Retrocede al paso anterior
+   * Función para retroceder (botón "Atrás")
    */
   const prevStep = () => {
     if (currentStep === 'config') {
       setCurrentStep('exercises');
     } else if (currentStep === 'exercises') {
       setCurrentStep('type');
+    } else {
+      // Si estamos en el primer paso, cerrar el modal
+      handleClose();
     }
   };
 
@@ -179,6 +191,7 @@ export default function SupersetBuilder({
 
   /**
    * Crea la superserie
+   * DATOS BD: INSERT en tabla supersets con foreign keys a exercises
    */
   const createSuperset = () => {
     const selectedExerciseObjects = selectedExercises.map(id => 
@@ -186,11 +199,11 @@ export default function SupersetBuilder({
     );
 
     onCreateSuperset({
-      name: supersetName.trim(),
-      type: selectedType,
-      exercises: selectedExerciseObjects,
-      rounds,
-      restTime
+      name: supersetName.trim(), // BD: superset_name
+      type: selectedType, // BD: superset_type
+      exercises: selectedExerciseObjects, // BD: Relación superset_exercises
+      rounds, // BD: rounds_count
+      restTime // BD: rest_time_seconds
     });
 
     resetBuilder();
@@ -209,22 +222,15 @@ export default function SupersetBuilder({
         colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
         style={styles.container}
       >
-        {/* ===== HEADER ===== */}
+        {/* ===== HEADER SIMPLIFICADO ===== */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            {currentStep !== 'type' && (
-              <Pressable onPress={prevStep} style={styles.backBtn}>
-                <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-              </Pressable>
-            )}
-            <View style={styles.headerContent}>
-              <MaterialCommunityIcons
-                name="lightning-bolt"
-                size={24}
-                color="#FF6B6B"
-              />
-              <Text style={styles.title}>Constructor de Superseries</Text>
-            </View>
+          <View style={styles.headerContent}>
+            <MaterialCommunityIcons
+              name="lightning-bolt"
+              size={24}
+              color="#FF6B6B"
+            />
+            <Text style={styles.title}>Constructor de Superseries</Text>
           </View>
           
           <Pressable onPress={handleClose} style={styles.closeBtn}>
@@ -585,12 +591,19 @@ export default function SupersetBuilder({
           )}
         </ScrollView>
 
-        {/* ===== BOTONES DE ACCIÓN ===== */}
+        {/* ===== BOTONES DE ACCIÓN SIMPLIFICADOS ===== */}
         <View style={styles.actions}>
-          <Pressable onPress={handleClose} style={styles.cancelBtn}>
-            <Text style={styles.cancelText}>Cancelar</Text>
+          {/* Botón Atrás - Mismo color que omitir (naranaja/amarillo) */}
+          <Pressable 
+            onPress={prevStep} 
+            style={styles.backBtn}
+          >
+            <Text style={styles.backText}>
+              {currentStep === 'type' ? 'Cancelar' : 'Atrás'}
+            </Text>
           </Pressable>
           
+          {/* Botón principal */}
           {currentStep === 'config' ? (
             <Pressable
               onPress={createSuperset}
@@ -637,7 +650,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ===== HEADER =====
+  // ===== HEADER SIMPLIFICADO =====
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -646,17 +659,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-
-  backBtn: {
-    padding: 8,
-    marginRight: 8,
   },
 
   headerContent: {
@@ -1146,7 +1148,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  // ===== BOTONES =====
+  // ===== BOTONES SIMPLIFICADOS =====
   actions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -1156,18 +1158,21 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
 
-  cancelBtn: {
+  // Botón Atrás - Mismo color que omitir (naranaja/amarillo)
+  backBtn: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 184, 77, 0.2)',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 77, 0.4)',
   },
 
-  cancelText: {
+  backText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#B0B0C4',
+    color: '#FFB84D',
   },
 
   primaryBtn: {

@@ -1,0 +1,1962 @@
+[
+  {
+    "Ejercicio": "Press de banca con barra",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado en banco plano, baja barra al pecho y extiende brazos verticalmente",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Dominadas",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Cuelga de barra con palmas hacia adelante, eleva cuerpo hasta barbilla supere la barra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Press militar",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie o sentado, eleva barra desde hombros hasta extender brazos sobre cabeza",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl de bíceps con barra",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, sujeta barra con palmas arriba, flexiona codos llevando barra hacia hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Fondos en paralelas",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Sujeta barras paralelas, baja cuerpo flexionando codos hasta 90° y sube",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Curl de muñeca",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado con antebrazo sobre muslo, flexiona muñeca hacia arriba con mancuerna",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Sentadillas con barra",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Barra sobre espalda, flexiona rodillas bajando hasta muslos paralelos al suelo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Peso muerto rumano",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra frente a muslos, flexiona cadera manteniendo piernas rectas, baja hasta pantorrillas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Hip thrust",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Espalda en banco, barra sobre cadera, eleva cadera hasta alinear con hombros-rodillas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Elevaciones de talón de pie",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Apoya hombros en almohadilla, eleva talones presionando con metatarsos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Press de pantorrilla sentado",
+    "Grupo Muscular": "Soleos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado con rodillas flexionadas, eleva talones manteniendo muslos fijos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado boca arriba, eleva torso contrayendo abdominales sin despegar lumbares",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Plancha",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Apoyado en antebrazos y puntas de pies, cuerpo recto desde hombros a tobillos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Burpees",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie, baja a plancha, haz flexión, salta pies hacia manos y salta vertical",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Carrera en cinta",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Cintas",
+    "Nivel": "Principiante",
+    "Descripción": "Corre a ritmo constante manteniendo postura erguida",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Press inclinado con mancuernas",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Banco inclinado, baja mancuernas a lados del pecho y empuja hacia arriba",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Jalón al pecho",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, tira barra hacia pecho manteniendo espalda recta y codos atrás",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Elevaciones laterales",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie, levanta mancuernas a los lados hasta altura de hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl martillo",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, levanta mancuernas con palmas enfrentadas flexionando codos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Extensiones de tríceps en polea",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, empuja barra hacia abajo extendiendo codos pegados al cuerpo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Farmer's walk",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Sujeta mancuernas pesadas, camina erguido con core tenso",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Prensa de piernas",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, empuja plataforma con pies separados extendiendo rodillas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl femoral",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Boca abajo, flexiona rodillas llevando tobillos hacia glúteos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Sentadilla búlgara",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Pie en banco trasero, baja rodilla trasera hacia suelo con torso erguido",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Elevaciones de talón en prensa",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "En prensa, empuja con metatarsos extendiendo tobillos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Russian twist",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Sentado con torso inclinado, gira tronco tocando suelo alternativamente",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Mountain climbers",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En plancha, lleva rodillas alternativamente hacia pecho rápidamente",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Remo con barra",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Flexiona cadera con espalda recta, tira barra hacia abdomen acercando escápulas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Press de hombros con mancuernas",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Sentado, eleva mancuernas desde hombros hasta extender brazos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Flexiones",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Manos separadas, baja pecho al suelo flexionando codos y vuelve",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Curl concentrado",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, apoya codo en muslo, flexiona brazo llevando mancuerna a hombro",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Fondos en banco",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Manos en banco trasero, pies apoyados, flexiona codos bajando cadera",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Remo invertido",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "TRX",
+    "Nivel": "Intermedio",
+    "Descripción": "Sujeta asas TRX, tira del pecho hacia las manos con cuerpo recto",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Zancadas con mancuernas",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Da paso adelante, baja rodilla trasera casi al suelo y vuelve",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Peso muerto sumo",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Piernas abiertas, manos dentro rodillas, levanta barra extendiendo caderas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Sentadilla copa",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta kettlebell al pecho, realiza sentadilla profunda con codos altos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Elevaciones de talón sentado",
+    "Grupo Muscular": "Soleos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado con rodillas flexionadas, eleva talones presionando metatarsos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Plancha lateral",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Apoyado en un antebrazo, mantén cuerpo en línea recta lateral",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Ski-erg",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Remos y Ski-ergs",
+    "Nivel": "Intermedio",
+    "Descripción": "Tira de cuerdas hacia abajo extendiendo cadera y rodillas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Aperturas en banco plano",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, baja mancuernas en arco hasta nivel del pecho",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Face pull",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "Con cuerda en polea alta, tira hacia cara separando manos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl 21",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "7 repeticiones mitad inferior, 7 mitad superior, 7 completas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Patada de tríceps",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Inclinado, extiende codo hacia atrás con antebrazo paralelo al suelo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Sentadilla frontal",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra sobre hombros frontales, realiza sentadilla con torso vertical",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Buenos días",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra sobre espalda, flexiona cadera bajando torso hasta paralelo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Patada de glúteo en cuadrupedia",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Apoyado en manos y rodillas, extiende pierna hacia atrás elevando talón",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Crunch inverso",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, eleva rodillas hacia pecho despegando glúteos del suelo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Bird dog",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En cuadrupedia, extiende brazo derecho y pierna izquierda simultáneamente",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Remo en máquina",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, tira de agarre hacia abdomen comprimiendo escápulas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable crossover",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "Poleas altas, junta manos frente al cuerpo con ligera flexión de codos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Arnold press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Avanzado",
+    "Descripción": "Sentado, comienza con palmas hacia ti, gira al subir hasta palmas adelante",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl en predicador",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Apoya brazos en almohadilla, flexiona codos contra resistencia",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Extensiones sobre cabeza",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, eleva mancuerna con ambas manos, flexiona codos bajando tras nuca",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Roller de antebrazo",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Foam rollers",
+    "Nivel": "Principiante",
+    "Descripción": "Rueda foam roller con antebrazos para fortalecer músculos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Leg extension",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, extiende rodillas elevando almohadilla con tobillos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Nordic ham curl",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "Arrodillado, fija pies, baja torso hacia adelante controlando con isquios",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Sentadilla con salto",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Realiza sentadilla y salta explosivamente al subir",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Elevaciones de talón sentado con disco",
+    "Grupo Muscular": "Soleos",
+    "Equipamiento": "Discos",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, coloca disco sobre rodillas, eleva talones",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "V-ups",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, eleva torso y piernas simultáneamente tocando manos-pies",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Ab wheel",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Rodillos abdominales",
+    "Nivel": "Intermedio",
+    "Descripción": "Arrodillado, rueda hacia adelante extendiendo cuerpo y vuelve contrayendo abdomen",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Remo en barra T",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "Apoya pecho en soporte, tira de agarre hacia el pecho",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Pike push-up",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "En V invertida, flexiona codos bajando cabeza hacia suelo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Flexiones diamante",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Manos juntas formando diamante, flexiona codos bajando pecho",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Paseo del cangrejo",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado con manos atrás, eleva cadera y camina hacia adelante/atrás",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Step-ups",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Cajones",
+    "Nivel": "Principiante",
+    "Descripción": "Sube y baja de cajón alternando piernas manteniendo torso erguido",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Good mornings",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra sobre hombros, flexiona cadera manteniendo espalda recta",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Glute bridge",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado boca arriba, eleva cadera contrayendo glúteos",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Toes to bar",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Colgado de barra, eleva piernas rectas tocando pies a la barra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Paloff press",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie lateral a punto de anclaje, empuja banda frente a pecho manteniendo torso estable",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Remo con mancuerna a una mano",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Apoya mano en banco, tira mancuerna hacia cadera con codo alto",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "L-sit",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Sujeta barras paralelas, eleva piernas rectas hasta formar ángulo 90° con torso",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Curl de bíceps con banda",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Principiante",
+    "Descripción": "Pisa banda con pies, flexiona codos llevando manos hacia hombros",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Press francés",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, baja barra desde brazos verticales flexionando codos hacia frente",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Wrist roller",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Rodillos abdominales",
+    "Nivel": "Principiante",
+    "Descripción": "Gira manivela enrollando cuerda con peso usando flexión de muñecas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Sissy squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "De pie, inclina torso atrás mientras flexiona rodillas y levanta talones",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Kettlebell swing",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Intermedio",
+    "Descripción": "Flexiona cadera, impulsa kettlebell hacia adelante con extensión explosiva",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Calf raise en escalón",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Punta de pies en escalón, sube y baja talones con control",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Dragon flag",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "Acostado, sujeta soporte tras cabeza, eleva cuerpo recto manteniendo solo hombros apoyados",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Dead bug",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado boca arriba, alterna extensión brazo/pierna contraria sin arquear lumbar",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Pull-over con mancuerna",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado en banco, baja mancuerna tras cabeza extendiendo brazos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Upright row",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Sujeta barra con agarre estrecho, eleva hasta altura de mentón con codos altos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Flexiones con aplauso",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "Realiza flexión explosiva despegando manos para aplaudir antes de caer",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Zottman curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Sube con palmas arriba, gira muñecas al bajar para descender con palmas abajo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Extensiones en polea alta",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Con cuerda, empuja hacia abajo separando manos al final del movimiento",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Pinch grip",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Discos",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta dos discos lisos con una mano manteniéndolos unidos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Hack squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "Espalda contra respaldo, empuja plataforma con hombros bajo almohadillas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Hyperextensiones",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Apoya caderas en almohadilla, baja torso y sube contrayendo espalda baja/glúteos",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Kickback de glúteos en máquina",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Apoya torso en soporte, empuja almohadilla con pierna extendida hacia atrás",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Bicicleta estática",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Bicis",
+    "Nivel": "Principiante",
+    "Descripción": "Pedalea a ritmo constante ajustando resistencia",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Elíptica",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Elípticas",
+    "Nivel": "Principiante",
+    "Descripción": "Simula caminata sin impacto, empuja pedales con manos y pies coordinados",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Remo ergómetro",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Remos y Ski-ergs",
+    "Nivel": "Intermedio",
+    "Descripción": "Tira de manija extendiendo piernas y llevando manos al pecho",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Flexiones declinadas",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Pies elevados en banco, manos en suelo, flexiona codos bajando pecho",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Pallof press con rotación",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Avanzado",
+    "Descripción": "Presiona banda frente a pecho, gira torso hacia un lado manteniendo cadera fija",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Press de banca cerrado",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Agarre estrecho en barra, baja al esternón manteniendo codos pegados al cuerpo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl inverso",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Barras",
+    "Nivel": "Principiante",
+    "Descripción": "Agarre prono, flexiona codos llevando barra hacia hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Pistol squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "De pie, extiende una pierna y realiza sentadilla profunda con la otra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Stiff-legged deadlift",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Piernas casi rectas, flexiona cadera bajando barra manteniendo espalda neutra",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Fire hydrant",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En cuadrupedia, eleva rodilla lateralmente manteniendo ángulo 90°",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Jump rope",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Salta cuerda manteniendo tobillos activos y rodillas ligeramente flexionadas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Cable crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Arrodillado frente a polea alta, contrae abdomen llevando codos a muslos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Windshield wipers",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Colgado de barra, gira piernas extendidas de lado a lado como limpiaparabrisas",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Thruster",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Desde sentadilla, sube explosivamente empujando mancuernas sobre cabeza",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Chest press máquina",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, empuja agarres hacia adelante extendiendo brazos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Pull-ups pronos",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Agarre prono (palmas hacia ti), eleva cuerpo hasta barbilla sobre barra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Lateral raise en máquina",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, empuja almohadillas lateralmente con codos flexionados",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Curl con banda en pie",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Principiante",
+    "Descripción": "Pisa banda, flexiona codos llevando manos hacia hombros contra resistencia",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Overhead triceps extension",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, sujeta mancuerna con ambas manos, extiende brazos sobre cabeza",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Towel hang",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Cuelga de barra con toalla enrollada, mantén agarre",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Sled push",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Empuja trineo cargado con manos en estructura, camina rápido",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "GHR (Glute Ham Raise)",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Avanzado",
+    "Descripción": "Fija pies, baja torso flexionando rodillas y sube contrayendo isquios",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Clamshell",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado de lado, abre rodillas contra banda manteniendo pies juntos",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Calf press",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "En prensa, empuja plataforma con puntas de pies extendiendo tobillos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Hanging leg raise",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Colgado de barra, eleva rodillas al pecho manteniendo torso estable",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Stir the pot",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Fitball",
+    "Nivel": "Intermedio",
+    "Descripción": "En plancha con antebrazos sobre fitball, traza círculos pequeños con codos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Box jump",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Cajones",
+    "Nivel": "Intermedio",
+    "Descripción": "Salta explosivamente sobre cajón, aterriza suavemente",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Incline dumbbell press",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Banco inclinado, empuja mancuernas desde pecho hasta brazos extendidos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Seated cable row",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, tira de agarre hacia abdomen con espalda recta",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Front raise",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, levanta mancuernas al frente hasta altura de hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Spider curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Apoya torso en banco inclinado, flexiona codos llevando barra hacia frente",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Close grip bench press",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Agarre estrecho en press de banca, baja barra al pecho inferior",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Plate pinch",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Discos",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta dos discos por el borde con una mano, mantén",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Walking lunges",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Da zancadas hacia adelante alternando piernas bajando rodilla trasera",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Romanian deadlift",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Mancuernas frente a muslos, flexiona cadera bajándolas manteniendo espalda recta",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable pull-through",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De espaldas a polea baja, pasa cable entre piernas y tira hacia adelante con cadera",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Seated calf raise",
+    "Grupo Muscular": "Soleos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado con rodillas flexionadas, eleva talones contra resistencia",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Flutter kicks",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado boca arriba, alterna elevaciones pequeñas de piernas rectas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Superman",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Boca abajo, eleva simultáneamente brazos y piernas contrayendo espalda baja",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Battle ropes",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Cuerdas",
+    "Nivel": "Intermedio",
+    "Descripción": "Agita cuerdas alternando brazos con movimiento de olas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Push-up plus",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Tras flexión, empuja escapulas hacia techo adicionalmente",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Lat pulldown",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, tira de barra hacia pecho arqueando ligeramente espalda",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cuban press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Avanzado",
+    "Descripción": "Eleva mancuernas rotando hombros en movimiento circular",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Preacher curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Brazos apoyados en almohadilla, flexiona codos contra resistencia",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Skullcrusher",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, baja mancuernas flexionando codos hacia cabeza",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Wrist flexion",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Antebrazo sobre muslo, flexiona muñeca hacia arriba con mancuerna",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Leg press",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, empuja plataforma con pies separados al ancho de hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Single leg deadlift",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Sobre una pierna, flexiona cadera bajando torso paralelo al suelo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Donkey kick",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En cuadrupedia, eleva pierna flexionada hacia techo contrayendo glúteo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Standing calf raise",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "De pie bajo almohadillas, eleva talones presionando con metatarsos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Reverse crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, eleva caderas despegando glúteos usando abdomen inferior",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Side plank",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Apoyado en antebrazo y borde pie, mantén cuerpo alineado lateralmente",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Kettlebell snatch",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Avanzado",
+    "Descripción": "Balancea kettlebell entre piernas y súbela extendiendo cuerpo en un movimiento",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Cable flyes",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "Poleas altas, junta manos frente a pecho con codos ligeramente flexionados",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Straight arm pulldown",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Brazos rectos, tira barra hacia muslos usando dorsales",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Shrugs",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, eleva hombros hacia orejas con mancuernas en manos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Incline dumbbell curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Banco inclinado 45°, flexiona codos contra gravedad con control",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Diamond push-up",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Manos juntas formando diamante, flexiona codos bajando pecho",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Plate curl",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Discos",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta disco por bordes, flexiona codo llevándolo hacia hombro",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Squat jump",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Sentadilla seguida de salto explosivo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Swiss ball hamstring curl",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Fitball",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado boca arriba, talones sobre fitball, eleva cadera y flexiona rodillas",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Step mill",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sube escalones giratorios manteniendo postura erguida",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Bottoms-up kettlebell press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Avanzado",
+    "Descripción": "Sujeta kettlebell invertida, presiónala sobre cabeza con control",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable woodchop",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "Tira de polea alta diagonalmente hacia rodilla opuesta rotando torso",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Landmine press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Barra en esquina, presiónala desde hombro hasta extensión de brazo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Zercher squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra en pliegue codos, realiza sentadilla manteniendo torso vertical",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Banded deadlift",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Avanzado",
+    "Descripción": "Coloca bandas en barra, realiza peso muerto con resistencia adicional",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Glute ham raise",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Avanzado",
+    "Descripción": "Fija tobillos, flexiona rodillas bajando torso y sube contrayendo glúteos/isquios",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Calf raise con barra",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Barras",
+    "Nivel": "Principiante",
+    "Descripción": "Barra sobre espalda, eleva talones en borde de step",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Dragon flag progression",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, sujeta soporte, eleva piernas y cadera despegando espalda",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Turkish get-up",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Avanzado",
+    "Descripción": "Acostado, levanta kettlebell y ponte de pie en secuencia controlada",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Man makers",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Avanzado",
+    "Descripción": "Combina plancha, flexión, remo y press sobre cabeza en un movimiento",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable chest press",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Poleas a altura media, empuja agarres hacia adelante",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Chin-ups",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Agarre supino (palmas hacia ti), eleva cuerpo hasta barbilla sobre barra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Tate press",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado, baja mancuernas hacia pecho con codos separados",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Sledgehammer swings",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Martillo",
+    "Nivel": "Intermedio",
+    "Descripción": "Golpea neumático con martillo alternando manos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Belt squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Avanzado",
+    "Descripción": "Sujeta peso en cinturón, realiza sentadilla con apoyo de manijas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Single leg glute bridge",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, una pierna elevada, eleva cadera con la otra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Seated leg curl",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, flexiona rodillas llevando almohadilla hacia glúteos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Box calf raise",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Cajones",
+    "Nivel": "Principiante",
+    "Descripción": "Punta de pies en cajón, sube y baja talones con control",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Lying leg raise",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, eleva piernas rectas a 90° y baja con control",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Pallof walk",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Intermedio",
+    "Descripción": "Con banda a altura pecho, camina lateralmente manteniendo torso estable",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Sled drag",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Arnes en cintura, tira de trineo cargado caminando hacia atrás",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Kneeling overhead press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Arrodillado, presiona mancuernas sobre cabeza manteniendo core activo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Incline bicep curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Banco inclinado 45°, flexiona codos con mancuernas contra gravedad",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "JM press",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra en press banca, baja hacia cuello flexionando codos hacia pies",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Trap bar deadlift",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Sujeta agarres laterales de barra trapecio, levántate extendiendo caderas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable bicep curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De pie frente a polea baja, flexiona codos llevando manos a hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Overhead squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra sobre cabeza, realiza sentadilla profunda manteniendo brazos extendidos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Reverse hyperextension",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Boca abajo, eleva piernas extendidas contrayendo glúteos",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Standing hamstring curl",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, flexiona rodilla llevando tobillo hacia glúteo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Calf jump",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Salta rápidamente usando solo movimiento de tobillos",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Scissor kicks",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, alterna elevaciones de piernas rectas cruzadas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Bear crawl",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Desplázate en cuadrupedia manteniendo cadera baja y espalda plana",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Kettlebell clean",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Avanzado",
+    "Descripción": "Balancea kettlebell entre piernas y súbela a rack position en un movimiento",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Resistance band push-up",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Intermedio",
+    "Descripción": "Coloca banda sobre espalda bajo manos, realiza flexión con resistencia",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "T-bar row",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "Apoya pecho en soporte, tira de agarre en forma de T hacia pecho",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Bent-over lateral raise",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Flexiona cadera 90°, levanta mancuernas lateralmente",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Drag curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Barra cerca de muslos, flexiona codos deslizando barra por cuerpo hacia hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Dips machine",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Empuja agarres hacia abajo extendiendo codos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Plate wrist curl",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Discos",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta disco con ambas manos, flexiona muñecas hacia arriba",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Goblet squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Kettlebells",
+    "Nivel": "Principiante",
+    "Descripción": "Sujeta kettlebell al pecho, realiza sentadilla profunda",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Stability ball hamstring curl",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Fitball",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado boca arriba, talones sobre fitball, eleva cadera y lleva rodillas al pecho",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Cable glute kickback",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De pie frente a polea baja, extiende pierna hacia atrás contrayendo glúteo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Jumping calf raise",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Elevación explosiva de talones con salto al final",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Hollow body hold",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Acostado boca arriba, eleva hombros y piernas manteniendo zona lumbar pegada",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Plank with leg lift",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "En plancha, alterna elevación de piernas rectas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Rowing machine",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Remos y Ski-ergs",
+    "Nivel": "Principiante",
+    "Descripción": "Tira de manija coordinando piernas, espalda y brazos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Plyo push-up",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "Flexión explosiva despegando manos del suelo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Lateral lunge",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Da paso lateral, flexiona rodilla cargando peso sobre esa pierna",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Single leg press",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "En prensa, empuja con una sola pierna manteniendo control",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Bosu ball squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Bosu",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie sobre bosu (lado cúpula), realiza sentadilla manteniendo equilibrio",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Reverse crunch on bench",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Bancos",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado en banco, sujeta borde, eleva rodillas al pecho despegando cadera",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Stability ball plank",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Fitball",
+    "Nivel": "Principiante",
+    "Descripción": "Antebrazos sobre fitball, mantén cuerpo recto",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Assault bike",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Bicis",
+    "Nivel": "Intermedio",
+    "Descripción": "Pedalea con brazos y piernas simultáneamente contra resistencia",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Guillotine press",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Press banca bajando barra a cuello con agarre ancho",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Rack pull",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Barra en soporte a media altura, levántala extendiendo caderas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Handstand push-up",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Avanzado",
+    "Descripción": "Parado de manos contra pared, flexiona codos bajando cabeza al suelo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Cable curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De pie frente a polea baja, flexiona codos llevando barra a hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Lying triceps extension",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, baja mancuerna tras cabeza flexionando codos",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Wrist roller machine",
+    "Grupo Muscular": "Antebrazos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Gira manivela enrollando peso con flexión de muñecas",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Bulgarian split squat",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Pie trasero en banco, baja rodilla trasera hacia suelo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Seated good morning",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Sentado con barra sobre hombros, flexiona cadera bajando torso",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable hip abduction",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "De pie lateral a polea baja, eleva pierna lateralmente contra resistencia",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Donkey calf raise",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Intermedio",
+    "Descripción": "Inclinado en soporte, eleva talones con piernas rectas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable rope crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Cable",
+    "Nivel": "Principiante",
+    "Descripción": "Arrodillado, tira de cuerda hacia rodillas contrayendo abdomen",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Medicine ball slam",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Balones medicinales",
+    "Nivel": "Principiante",
+    "Descripción": "Eleva balón sobre cabeza y golpéalo contra suelo con fuerza",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Wall ball shots",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Balones medicinales",
+    "Nivel": "Intermedio",
+    "Descripción": "Realiza sentadilla y al subir lanza balón a pared",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Cable crossover low",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "Poleas bajas, cruza brazos hacia arriba frente al cuerpo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Neutral grip pull-up",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Agarre neutral (palmas enfrentadas), eleva cuerpo hasta barbilla sobre barra",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Leaning lateral raise",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Avanzado",
+    "Descripción": "De pie inclinado lateral, levanta mancuerna lateralmente",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Concentration curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, codo apoyado en muslo interno, flexiona brazo llevando mancuerna a hombro",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Bench dip",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Bancos",
+    "Nivel": "Principiante",
+    "Descripción": "Manos en banco trasero, pies apoyados, flexiona codos bajando cadera",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Farmers walk on toes",
+    "Grupo Muscular": "Gemelos",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Intermedio",
+    "Descripción": "Camina de puntillas sosteniendo mancuernas pesadas",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Squat thrust",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, baja a posición de cuclillas, salta pies atrás a plancha y vuelve",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Glute bridge march",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En puente de glúteos, alterna elevación de piernas rectas",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Standing cable crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Cable",
+    "Nivel": "Intermedio",
+    "Descripción": "De pie, tira de cuerda hacia abajo contrayendo abdomen",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Ab rollout",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Rodillos abdominales",
+    "Nivel": "Intermedio",
+    "Descripción": "Arrodillado, rueda hacia adelante extendiendo cuerpo y vuelve",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Rope climb",
+    "Grupo Muscular": "Cuerpo Completo",
+    "Equipamiento": "Cuerdas",
+    "Nivel": "Avanzado",
+    "Descripción": "Sube cuerda usando brazos y piernas coordinadamente",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Spoto press",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Press banca pausando barra 5cm sobre pecho",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Snatch grip deadlift",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Barras",
+    "Nivel": "Avanzado",
+    "Descripción": "Agarre ancho (snatch), levanta barra extendiendo caderas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Push press",
+    "Grupo Muscular": "Hombros",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Usa impulso de piernas para ayudar a levantar barra sobre cabeza",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cross body hammer curl",
+    "Grupo Muscular": "Bíceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "De pie, levanta mancuerna hacia hombro contrario con palmas enfrentadas",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Close grip push-up",
+    "Grupo Muscular": "Tríceps",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Manos juntas bajo pecho, flexiona codos manteniéndolos pegados",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Suitcase carry",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Camina sosteniendo mancuerna pesada en una mano, manteniendo torso erguido",
+    "Record": "Distancia"
+  },
+  {
+    "Ejercicio": "Reverse lunge",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Mancuernas",
+    "Nivel": "Principiante",
+    "Descripción": "Da paso atrás, baja rodilla trasera casi al suelo y vuelve",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Swiss ball back extension",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Fitball",
+    "Nivel": "Principiante",
+    "Descripción": "Boca abajo sobre fitball, eleva torso contrayendo espalda baja",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Quadruped hip extension",
+    "Grupo Muscular": "Glúteos",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "En cuadrupedia, extiende cadera elevando rodilla flexionada hacia techo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Toe press",
+    "Grupo Muscular": "Soleos",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, presiona con puntas de pies contra resistencia",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Bicycle crunch",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Principiante",
+    "Descripción": "Acostado, toca codo con rodilla contraria alternando",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Side plank with rotation",
+    "Grupo Muscular": "Core",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "En plancha lateral, gira torso pasando brazo bajo cuerpo",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Concept2 rower",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Remos y Ski-ergs",
+    "Nivel": "Principiante",
+    "Descripción": "Remo sentado coordinando piernas, espalda y brazos",
+    "Record": "Tiempo"
+  },
+  {
+    "Ejercicio": "Decline push-up",
+    "Grupo Muscular": "Pectorales",
+    "Equipamiento": "Peso corporal",
+    "Nivel": "Intermedio",
+    "Descripción": "Pies elevados, manos en suelo, flexiona codos bajando pecho",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Hanging oblique raise",
+    "Grupo Muscular": "Abdominales",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Colgado, eleva rodillas lateralmente alternando lados",
+    "Record": "Repeticiones"
+  },
+  {
+    "Ejercicio": "Landmine row",
+    "Grupo Muscular": "Dorsales",
+    "Equipamiento": "Barras",
+    "Nivel": "Intermedio",
+    "Descripción": "Barra en esquina, tira de agarre hacia cadera con un brazo",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Banded good morning",
+    "Grupo Muscular": "Isquiotibiales",
+    "Equipamiento": "Bandas elásticas",
+    "Nivel": "Intermedio",
+    "Descripción": "Bandas bajo pies, flexiona cadera con barra sobre hombros",
+    "Record": "Peso"
+  },
+  {
+    "Ejercicio": "Cable bicep curl",
+    "Grupo Muscular": "Cuádriceps",
+    "Equipamiento": "Máquina",
+    "Nivel": "Principiante",
+    "Descripción": "Sentado, empuja plataforma con pies juntos apuntando hacia adelante",
+    "Record": "Peso"
+  }
+]
