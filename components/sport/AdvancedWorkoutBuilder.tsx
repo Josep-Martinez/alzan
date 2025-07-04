@@ -460,8 +460,10 @@ export default function AdvancedWorkoutBuilder({
           color: '#4ECDC4',
           icon: 'run',
           targetTypes: [
-            { value: 'pace', label: 'Ritmo', unit: 'min/km' },
-            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
+            { value: 'pace', label: 'Ritmo', unit: 'min/km', inputType: 'pace' },
+            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm', inputType: 'bpm' },
+            { value: 'power', label: 'Potencia', unit: 'W', inputType: 'power' },
+            { value: 'velocity', label: 'Velocidad', unit: 'km/h', inputType: 'velocity' },
             { value: 'none', label: 'Sin Objetivo', unit: '' }
           ],
           durationTypes: [
@@ -470,16 +472,17 @@ export default function AdvancedWorkoutBuilder({
             { value: 'lap_button', label: 'Botón de vuelta', unit: '' }
           ]
         };
-      case 'cycling':
-        return {
-          name: 'Ciclismo',
-          color: '#45B7D1',
-          icon: 'bike',
-          targetTypes: [
-            { value: 'power', label: 'Potencia', unit: 'W' },
-            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
-            { value: 'none', label: 'Sin Objetivo', unit: '' }
-          ],
+        case 'cycling':
+          return {
+            name: 'Ciclismo',
+            color: '#45B7D1',
+            icon: 'bike',
+            targetTypes: [
+              { value: 'power', label: 'Potencia', unit: 'W', inputType: 'power' },
+              { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm', inputType: 'bpm' },
+              { value: 'velocity', label: 'Velocidad', unit: 'km/h', inputType: 'velocity' },
+              { value: 'none', label: 'Sin Objetivo', unit: '' }
+            ],
           durationTypes: [
             { value: 'time', label: 'Tiempo', unit: 'min' },
             { value: 'distance', label: 'Distancia', unit: 'km' },

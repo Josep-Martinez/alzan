@@ -219,7 +219,7 @@ export default function SupersetBuilder({
       onRequestClose={handleClose}
     >
       <LinearGradient
-        colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
+        colors={["#0F0F23", "#1A1A3A", "#2D2D5F"]}
         style={styles.container}
       >
         {/* ===== HEADER SIMPLIFICADO ===== */}
@@ -232,7 +232,7 @@ export default function SupersetBuilder({
             />
             <Text style={styles.title}>Constructor de Superseries</Text>
           </View>
-          
+
           <Pressable onPress={handleClose} style={styles.closeBtn}>
             <MaterialCommunityIcons name="close" size={24} color="#B0B0C4" />
           </Pressable>
@@ -241,38 +241,64 @@ export default function SupersetBuilder({
         {/* ===== INDICADOR DE PROGRESO ===== */}
         <View style={styles.progressIndicator}>
           <View style={styles.progressSteps}>
-            {['type', 'exercises', 'config'].map((step, index) => (
+            {["type", "exercises", "config"].map((step, index) => (
               <View key={step} style={styles.progressStepContainer}>
-                <View style={[
-                  styles.progressStep,
-                  currentStep === step && styles.progressStepActive,
-                  ['type', 'exercises', 'config'].indexOf(currentStep) > index && styles.progressStepCompleted
-                ]}>
-                  <Text style={[
-                    styles.progressStepText,
-                    (currentStep === step || ['type', 'exercises', 'config'].indexOf(currentStep) > index) && styles.progressStepTextActive
-                  ]}>
+                <View
+                  style={[
+                    styles.progressStep,
+                    currentStep === step && styles.progressStepActive,
+                    ["type", "exercises", "config"].indexOf(currentStep) >
+                      index && styles.progressStepCompleted,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.progressStepText,
+                      (currentStep === step ||
+                        ["type", "exercises", "config"].indexOf(currentStep) >
+                          index) &&
+                        styles.progressStepTextActive,
+                    ]}
+                  >
                     {index + 1}
                   </Text>
                 </View>
                 {index < 2 && (
-                  <View style={[
-                    styles.progressLine,
-                    ['type', 'exercises', 'config'].indexOf(currentStep) > index && styles.progressLineCompleted
-                  ]} />
+                  <View
+                    style={[
+                      styles.progressLine,
+                      ["type", "exercises", "config"].indexOf(currentStep) >
+                        index && styles.progressLineCompleted,
+                    ]}
+                  />
                 )}
               </View>
             ))}
           </View>
-          
+
           <View style={styles.progressLabels}>
-            <Text style={[styles.progressLabel, currentStep === 'type' && styles.progressLabelActive]}>
+            <Text
+              style={[
+                styles.progressLabel,
+                currentStep === "type" && styles.progressLabelActive,
+              ]}
+            >
               Tipo
             </Text>
-            <Text style={[styles.progressLabel, currentStep === 'exercises' && styles.progressLabelActive]}>
+            <Text
+              style={[
+                styles.progressLabel,
+                currentStep === "exercises" && styles.progressLabelActive,
+              ]}
+            >
               Ejercicios
             </Text>
-            <Text style={[styles.progressLabel, currentStep === 'config' && styles.progressLabelActive]}>
+            <Text
+              style={[
+                styles.progressLabel,
+                currentStep === "config" && styles.progressLabelActive,
+              ]}
+            >
               Configuración
             </Text>
           </View>
@@ -280,9 +306,11 @@ export default function SupersetBuilder({
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* ===== PASO 1: SELECCIÓN DE TIPO ===== */}
-          {currentStep === 'type' && (
+          {currentStep === "type" && (
             <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>¿Qué tipo de entrenamiento quieres crear?</Text>
+              <Text style={styles.stepTitle}>
+                ¿Qué tipo de entrenamiento quieres crear?
+              </Text>
               <Text style={styles.stepSubtitle}>
                 Cada tipo tiene características diferentes para tus objetivos
               </Text>
@@ -294,14 +322,14 @@ export default function SupersetBuilder({
                     onPress={() => setSelectedType(type.type)}
                     style={[
                       styles.typeOption,
-                      selectedType === type.type && styles.typeOptionSelected
+                      selectedType === type.type && styles.typeOptionSelected,
                     ]}
                   >
                     <LinearGradient
                       colors={
                         selectedType === type.type
-                          ? [type.color, type.color + '80']
-                          : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
+                          ? [type.color, type.color + "80"]
+                          : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]
                       }
                       style={styles.typeOptionGradient}
                     >
@@ -309,29 +337,40 @@ export default function SupersetBuilder({
                         <MaterialCommunityIcons
                           name={type.icon as any}
                           size={32}
-                          color={selectedType === type.type ? '#FFFFFF' : type.color}
+                          color={
+                            selectedType === type.type ? "#FFFFFF" : type.color
+                          }
                         />
                         <View style={styles.typeOptionInfo}>
-                          <Text style={[
-                            styles.typeOptionName,
-                            selectedType === type.type && styles.typeOptionNameSelected
-                          ]}>
+                          <Text
+                            style={[
+                              styles.typeOptionName,
+                              selectedType === type.type &&
+                                styles.typeOptionNameSelected,
+                            ]}
+                          >
                             {type.name}
                           </Text>
-                          <Text style={[
-                            styles.typeOptionDescription,
-                            selectedType === type.type && styles.typeOptionDescriptionSelected
-                          ]}>
+                          <Text
+                            style={[
+                              styles.typeOptionDescription,
+                              selectedType === type.type &&
+                                styles.typeOptionDescriptionSelected,
+                            ]}
+                          >
                             {type.description}
                           </Text>
                         </View>
                       </View>
 
                       <View style={styles.typeOptionBenefits}>
-                        <Text style={[
-                          styles.benefitsTitle,
-                          selectedType === type.type && styles.benefitsTitleSelected
-                        ]}>
+                        <Text
+                          style={[
+                            styles.benefitsTitle,
+                            selectedType === type.type &&
+                              styles.benefitsTitleSelected,
+                          ]}
+                        >
                           Beneficios:
                         </Text>
                         {type.benefits.map((benefit, index) => (
@@ -339,7 +378,8 @@ export default function SupersetBuilder({
                             key={index}
                             style={[
                               styles.benefitText,
-                              selectedType === type.type && styles.benefitTextSelected
+                              selectedType === type.type &&
+                                styles.benefitTextSelected,
                             ]}
                           >
                             • {benefit}
@@ -348,15 +388,25 @@ export default function SupersetBuilder({
                       </View>
 
                       <View style={styles.typeOptionFooter}>
-                        <Text style={[
-                          styles.exerciseCount,
-                          selectedType === type.type && styles.exerciseCountSelected
-                        ]}>
-                          {type.minExercises === type.maxExercises 
-                            ? `${type.minExercises} ejercicios`
-                            : `${type.minExercises}-${type.maxExercises} ejercicios`
-                          }
-                        </Text>
+                        <View
+                          style={[
+                            styles.exerciseCountContainer,
+                            selectedType === type.type &&
+                              styles.exerciseCountContainerSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.exerciseCountText,
+                              selectedType === type.type &&
+                                styles.exerciseCountTextSelected,
+                            ]}
+                          >
+                            {type.minExercises === type.maxExercises
+                              ? `${type.minExercises} ejercicios`
+                              : `${type.minExercises}-${type.maxExercises} ejercicios`}
+                          </Text>
+                        </View>
                       </View>
                     </LinearGradient>
                   </Pressable>
@@ -366,58 +416,87 @@ export default function SupersetBuilder({
           )}
 
           {/* ===== PASO 2: SELECCIÓN DE EJERCICIOS ===== */}
-          {currentStep === 'exercises' && (
+          {currentStep === "exercises" && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepTitle}>
                 Selecciona ejercicios para tu {typeConfig.name}
               </Text>
               <Text style={styles.stepSubtitle}>
-                Necesitas seleccionar {typeConfig.minExercises === typeConfig.maxExercises 
+                Necesitas seleccionar{" "}
+                {typeConfig.minExercises === typeConfig.maxExercises
                   ? `exactamente ${typeConfig.minExercises}`
-                  : `entre ${typeConfig.minExercises} y ${typeConfig.maxExercises}`
-                } ejercicios
+                  : `entre ${typeConfig.minExercises} y ${typeConfig.maxExercises}`}{" "}
+                ejercicios
               </Text>
 
               {/* Ejercicios seleccionados (orden) */}
               {selectedExercises.length > 0 && (
                 <View style={styles.selectedExercisesSection}>
                   <Text style={styles.sectionTitle}>
-                    Orden de ejecución ({selectedExercises.length}/{typeConfig.maxExercises})
+                    Orden de ejecución ({selectedExercises.length}/
+                    {typeConfig.maxExercises})
                   </Text>
-                  
+
                   <View style={styles.selectedExercisesList}>
                     {selectedExercises.map((exerciseId, index) => {
-                      const exercise = exercises.find(ex => ex.id === exerciseId)!;
+                      const exercise = exercises.find(
+                        (ex) => ex.id === exerciseId
+                      )!;
                       return (
-                        <View key={exerciseId} style={styles.selectedExerciseItem}>
+                        <View
+                          key={exerciseId}
+                          style={styles.selectedExerciseItem}
+                        >
                           <LinearGradient
-                            colors={[typeConfig.color + '33', typeConfig.color + '1A']}
+                            colors={[
+                              typeConfig.color + "33",
+                              typeConfig.color + "1A",
+                            ]}
                             style={styles.selectedExerciseGradient}
                           >
                             <View style={styles.selectedExerciseContent}>
-                              <View style={[styles.exerciseOrder, { backgroundColor: typeConfig.color }]}>
+                              <View
+                                style={[
+                                  styles.exerciseOrder,
+                                  { backgroundColor: typeConfig.color },
+                                ]}
+                              >
                                 <Text style={styles.exerciseOrderText}>
                                   {String.fromCharCode(65 + index)}
                                 </Text>
                               </View>
-                              
-                              <Text style={styles.selectedExerciseName}>{exercise.name}</Text>
-                              
+
+                              <Text style={styles.selectedExerciseName}>
+                                {exercise.name}
+                              </Text>
+
                               <View style={styles.orderControls}>
                                 {index > 0 && (
                                   <Pressable
-                                    onPress={() => reorderExercise(index, index - 1)}
+                                    onPress={() =>
+                                      reorderExercise(index, index - 1)
+                                    }
                                     style={styles.orderBtn}
                                   >
-                                    <MaterialCommunityIcons name="arrow-up" size={16} color="#B0B0C4" />
+                                    <MaterialCommunityIcons
+                                      name="arrow-up"
+                                      size={16}
+                                      color="#B0B0C4"
+                                    />
                                   </Pressable>
                                 )}
                                 {index < selectedExercises.length - 1 && (
                                   <Pressable
-                                    onPress={() => reorderExercise(index, index + 1)}
+                                    onPress={() =>
+                                      reorderExercise(index, index + 1)
+                                    }
                                     style={styles.orderBtn}
                                   >
-                                    <MaterialCommunityIcons name="arrow-down" size={16} color="#B0B0C4" />
+                                    <MaterialCommunityIcons
+                                      name="arrow-down"
+                                      size={16}
+                                      color="#B0B0C4"
+                                    />
                                   </Pressable>
                                 )}
                               </View>
@@ -433,12 +512,13 @@ export default function SupersetBuilder({
               {/* Lista de ejercicios disponibles */}
               <View style={styles.availableExercisesSection}>
                 <Text style={styles.sectionTitle}>Ejercicios Disponibles</Text>
-                
+
                 <View style={styles.exercisesList}>
                   {exercises.map((exercise) => {
                     const isSelected = selectedExercises.includes(exercise.id);
-                    const canSelect = selectedExercises.length < typeConfig.maxExercises;
-                    
+                    const canSelect =
+                      selectedExercises.length < typeConfig.maxExercises;
+
                     return (
                       <Pressable
                         key={exercise.id}
@@ -446,26 +526,43 @@ export default function SupersetBuilder({
                         style={[
                           styles.exerciseOption,
                           isSelected && styles.exerciseOptionSelected,
-                          !canSelect && !isSelected && styles.exerciseOptionDisabled
+                          !canSelect &&
+                            !isSelected &&
+                            styles.exerciseOptionDisabled,
                         ]}
                         disabled={!canSelect && !isSelected}
                       >
                         <MaterialCommunityIcons
-                          name={isSelected ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
+                          name={
+                            isSelected
+                              ? "checkbox-marked-circle"
+                              : "checkbox-blank-circle-outline"
+                          }
                           size={24}
-                          color={isSelected ? typeConfig.color : '#B0B0C4'}
+                          color={isSelected ? typeConfig.color : "#B0B0C4"}
                         />
-                        <Text style={[
-                          styles.exerciseOptionText,
-                          isSelected && styles.exerciseOptionTextSelected,
-                          !canSelect && !isSelected && styles.exerciseOptionTextDisabled
-                        ]}>
+                        <Text
+                          style={[
+                            styles.exerciseOptionText,
+                            isSelected && styles.exerciseOptionTextSelected,
+                            !canSelect &&
+                              !isSelected &&
+                              styles.exerciseOptionTextDisabled,
+                          ]}
+                        >
                           {exercise.name}
                         </Text>
                         {isSelected && (
-                          <View style={[styles.exerciseSelectedBadge, { backgroundColor: typeConfig.color }]}>
+                          <View
+                            style={[
+                              styles.exerciseSelectedBadge,
+                              { backgroundColor: typeConfig.color },
+                            ]}
+                          >
                             <Text style={styles.exerciseSelectedBadgeText}>
-                              {String.fromCharCode(65 + selectedExercises.indexOf(exercise.id))}
+                              {String.fromCharCode(
+                                65 + selectedExercises.indexOf(exercise.id)
+                              )}
                             </Text>
                           </View>
                         )}
@@ -478,9 +575,11 @@ export default function SupersetBuilder({
           )}
 
           {/* ===== PASO 3: CONFIGURACIÓN ===== */}
-          {currentStep === 'config' && (
+          {currentStep === "config" && (
             <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Configuración de tu {typeConfig.name}</Text>
+              <Text style={styles.stepTitle}>
+                Configuración de tu {typeConfig.name}
+              </Text>
               <Text style={styles.stepSubtitle}>
                 Personaliza los detalles finales del entrenamiento
               </Text>
@@ -488,7 +587,7 @@ export default function SupersetBuilder({
               {/* Resumen de ejercicios */}
               <View style={styles.configSummary}>
                 <LinearGradient
-                  colors={[typeConfig.color + '20', typeConfig.color + '10']}
+                  colors={[typeConfig.color + "20", typeConfig.color + "10"]}
                   style={styles.configSummaryGradient}
                 >
                   <View style={styles.configSummaryHeader}>
@@ -497,14 +596,21 @@ export default function SupersetBuilder({
                       size={20}
                       color={typeConfig.color}
                     />
-                    <Text style={styles.configSummaryTitle}>Ejercicios Seleccionados</Text>
+                    <Text style={styles.configSummaryTitle}>
+                      Ejercicios Seleccionados
+                    </Text>
                   </View>
-                  
+
                   <View style={styles.configSummaryExercises}>
                     {selectedExercises.map((exerciseId, index) => {
-                      const exercise = exercises.find(ex => ex.id === exerciseId)!;
+                      const exercise = exercises.find(
+                        (ex) => ex.id === exerciseId
+                      )!;
                       return (
-                        <Text key={exerciseId} style={styles.configSummaryExercise}>
+                        <Text
+                          key={exerciseId}
+                          style={styles.configSummaryExercise}
+                        >
                           {String.fromCharCode(65 + index)}. {exercise.name}
                         </Text>
                       );
@@ -515,7 +621,9 @@ export default function SupersetBuilder({
 
               {/* Nombre */}
               <View style={styles.configField}>
-                <Text style={styles.configLabel}>Nombre del {typeConfig.name}</Text>
+                <Text style={styles.configLabel}>
+                  Nombre del {typeConfig.name}
+                </Text>
                 <TextInput
                   value={supersetName}
                   onChangeText={setSupersetName}
@@ -537,13 +645,15 @@ export default function SupersetBuilder({
                       style={[
                         styles.roundOption,
                         rounds === num && styles.roundOptionSelected,
-                        rounds === num && { backgroundColor: typeConfig.color }
+                        rounds === num && { backgroundColor: typeConfig.color },
                       ]}
                     >
-                      <Text style={[
-                        styles.roundOptionText,
-                        rounds === num && styles.roundOptionTextSelected
-                      ]}>
+                      <Text
+                        style={[
+                          styles.roundOptionText,
+                          rounds === num && styles.roundOptionTextSelected,
+                        ]}
+                      >
                         {num}
                       </Text>
                     </Pressable>
@@ -571,19 +681,31 @@ export default function SupersetBuilder({
               {/* Preview final */}
               <View style={styles.finalPreview}>
                 <LinearGradient
-                  colors={[typeConfig.color + '15', typeConfig.color + '08']}
+                  colors={[typeConfig.color + "15", typeConfig.color + "08"]}
                   style={styles.finalPreviewGradient}
                 >
                   <View style={styles.finalPreviewHeader}>
-                    <MaterialCommunityIcons name="eye" size={16} color={typeConfig.color} />
+                    <MaterialCommunityIcons
+                      name="eye"
+                      size={16}
+                      color={typeConfig.color}
+                    />
                     <Text style={styles.finalPreviewTitle}>Vista Previa</Text>
                   </View>
-                  
+
                   <Text style={styles.finalPreviewText}>
-                    &quot;{supersetName}&quot; - {selectedExercises.length} ejercicios × {rounds} rondas
+                    &quot;{supersetName}&quot; - {selectedExercises.length}{" "}
+                    ejercicios × {rounds} rondas
                   </Text>
                   <Text style={styles.finalPreviewSubtext}>
-                    Descanso de {restTime}s entre rondas • Tiempo estimado: ~{Math.round((selectedExercises.length * 60 + parseInt(restTime || '90')) * rounds / 60)} minutos
+                    Descanso de {restTime}s entre rondas • Tiempo estimado: ~
+                    {Math.round(
+                      ((selectedExercises.length * 60 +
+                        parseInt(restTime || "90")) *
+                        rounds) /
+                        60
+                    )}{" "}
+                    minutos
                   </Text>
                 </LinearGradient>
               </View>
@@ -594,31 +716,38 @@ export default function SupersetBuilder({
         {/* ===== BOTONES DE ACCIÓN SIMPLIFICADOS ===== */}
         <View style={styles.actions}>
           {/* Botón Atrás - Mismo color que omitir (naranaja/amarillo) */}
-          <Pressable 
-            onPress={prevStep} 
-            style={styles.backBtn}
-          >
+          <Pressable onPress={prevStep} style={styles.backBtn}>
             <Text style={styles.backText}>
-              {currentStep === 'type' ? 'Cancelar' : 'Atrás'}
+              {currentStep === "type" ? "Cancelar" : "Atrás"}
             </Text>
           </Pressable>
-          
+
           {/* Botón principal */}
-          {currentStep === 'config' ? (
+          {currentStep === "config" ? (
             <Pressable
               onPress={createSuperset}
               style={[
                 styles.primaryBtn,
-                !canProceed() && styles.primaryBtnDisabled
+                !canProceed() && styles.primaryBtnDisabled,
               ]}
               disabled={!canProceed()}
             >
               <LinearGradient
-                colors={canProceed() ? [typeConfig.color, typeConfig.color + '80'] : ["#6B7280", "#4B5563"]}
+                colors={
+                  canProceed()
+                    ? [typeConfig.color, typeConfig.color + "80"]
+                    : ["#6B7280", "#4B5563"]
+                }
                 style={styles.primaryBtnGradient}
               >
-                <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                <Text style={styles.primaryBtnText}>Crear {typeConfig.name}</Text>
+                <MaterialCommunityIcons
+                  name="check"
+                  size={20}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.primaryBtnText}>
+                  Crear {typeConfig.name}
+                </Text>
               </LinearGradient>
             </Pressable>
           ) : (
@@ -626,16 +755,24 @@ export default function SupersetBuilder({
               onPress={nextStep}
               style={[
                 styles.primaryBtn,
-                !canProceed() && styles.primaryBtnDisabled
+                !canProceed() && styles.primaryBtnDisabled,
               ]}
               disabled={!canProceed()}
             >
               <LinearGradient
-                colors={canProceed() ? [typeConfig.color, typeConfig.color + '80'] : ["#6B7280", "#4B5563"]}
+                colors={
+                  canProceed()
+                    ? [typeConfig.color, typeConfig.color + "80"]
+                    : ["#6B7280", "#4B5563"]
+                }
                 style={styles.primaryBtnGradient}
               >
                 <Text style={styles.primaryBtnText}>Continuar</Text>
-                <MaterialCommunityIcons name="arrow-right" size={20} color="#FFFFFF" />
+                <MaterialCommunityIcons
+                  name="arrow-right"
+                  size={20}
+                  color="#FFFFFF"
+                />
               </LinearGradient>
             </Pressable>
           )}
@@ -734,6 +871,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginHorizontal: 8,
   },
+  // Reemplaza los estilos existentes con estos:
+exerciseCountContainer: {
+  backgroundColor: 'rgba(255, 184, 77, 0.2)',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+},
+
+exerciseCountContainerSelected: {
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+},
+
+exerciseCountText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#FFB84D',
+},
+
+exerciseCountTextSelected: {
+  color: '#FFFFFF',
+},
 
   progressLineCompleted: {
     backgroundColor: '#00D4AA',
@@ -860,15 +1018,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  exerciseCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFB84D',
-    backgroundColor: 'rgba(255, 184, 77, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
+// En SupersetBuilder.tsx
+exerciseCount: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#FFB84D',
+  backgroundColor: 'rgba(255, 184, 77, 0.2)', // Línea problemática
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+},
 
   exerciseCountSelected: {
     color: '#FFFFFF',

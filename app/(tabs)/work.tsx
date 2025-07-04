@@ -755,25 +755,39 @@ export default function MainTrainingScreen() {
           {todaysWorkouts.map((workout) => {
             const isActive = activeWorkoutId === workout.id;
             const isMinimized = minimizedWorkouts.has(workout.id);
+            const isExpanded = isActive && !isMinimized;
             
             return (
               <View key={workout.id} style={styles.workoutCard}>
                 {/* Header del entrenamiento */}
                 <Pressable
-                  onPress={() => setActiveWorkoutId(isActive ? null : workout.id)}
+                  onPress={() => {
+                    if (isActive) {
+                      // Si ya está activo, alternar minimizado
+                      toggleWorkoutMinimized(workout.id);
+                    } else {
+                      // Si no está activo, activarlo y expandirlo
+                      setActiveWorkoutId(workout.id);
+                      setMinimizedWorkouts(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(workout.id);
+                        return newSet;
+                      });
+                    }
+                  }}
                   style={styles.workoutHeader}
                 >
                   <LinearGradient
                     colors={
                       workout.completed
-                        ? ['#4ECDC4', '#26C6DA'] as [string, string] // Color del running completado
-                        : isActive
+                        ? ['#4ECDC4', '#26C6DA'] as [string, string]
+                        : isExpanded
                         ? SPORT_COLORS[workout.sport] as [string, string]
                         : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
                     }
                     style={[
                       styles.workoutHeaderGradient,
-                      isActive && styles.workoutHeaderActive,
+                      isExpanded && styles.workoutHeaderActive,
                       workout.completed && styles.workoutHeaderCompleted
                     ]}
                   >
@@ -782,16 +796,12 @@ export default function MainTrainingScreen() {
                         <MaterialCommunityIcons
                           name={SPORT_ICONS[workout.sport] as any}
                           size={24}
-                          color={
-                            workout.completed ? '#FFFFFF' : // Siempre blanco cuando está completado
-                            isActive ? '#FFFFFF' : 
-                            SPORT_COLORS[workout.sport][0]
-                          }
+                          color="#FFFFFF" // Siempre blanco
                         />
                         <View style={styles.workoutHeaderText}>
                           <Text style={[
                             styles.workoutName,
-                            isActive && styles.workoutNameActive,
+                            isExpanded && styles.workoutNameActive,
                             workout.completed && styles.workoutNameCompleted
                           ]}>
                             {workout.name || `Entrenamiento de ${SPORT_TRANSLATIONS[workout.sport]}`}
@@ -838,44 +848,49 @@ export default function MainTrainingScreen() {
 
                       <View style={styles.workoutHeaderActions}>
                         {/* Botón minimizar */}
-                        {isActive && (
-                          <Pressable
-                            onPress={() => toggleWorkoutMinimized(workout.id)}
-                            style={styles.actionBtn}
-                          >
-                            <MaterialCommunityIcons
-                              name={isMinimized ? "window-maximize" : "window-minimize"}
-                              size={20}
-                              color={workout.completed ? "#FFFFFF" : "#B0B0C4"}
-                            />
-                          </Pressable>
-                        )}
-
-                        {/* Botón eliminar */}
                         <Pressable
-                          onPress={() => startRemoveWorkout(workout.id)}
-                          style={styles.actionBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            toggleWorkoutMinimized(workout.id);
+                          }}
+                          style={({ pressed }) => [
+                            styles.actionBtn,
+                            styles.minimizeBtn,
+                            { transform: [{ scale: pressed ? 0.95 : 1 }] }
+                          ]}
                         >
                           <MaterialCommunityIcons
-                            name="close"
-                            size={20}
-                            color={workout.completed ? "#FFFFFF" : "#FF6B6B"}
+                            name={isMinimized ? "chevron-down" : "chevron-up"}
+                            size={16}
+                            color="#FFFFFF" // Siempre blanco
                           />
                         </Pressable>
 
-                        {/* Indicador expandido/colapsado */}
-                        <MaterialCommunityIcons
-                          name={isActive && !isMinimized ? "chevron-up" : "chevron-down"}
-                          size={24}
-                          color={workout.completed ? "#FFFFFF" : "#B0B0C4"}
-                        />
+                        {/* Botón eliminar */}
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            startRemoveWorkout(workout.id);
+                          }}
+                          style={({ pressed }) => [
+                            styles.actionBtn,
+                            styles.deleteBtn,
+                            { transform: [{ scale: pressed ? 0.95 : 1 }] }
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name="close"
+                            size={16}
+                            color="#FFFFFF" // Siempre blanco
+                          />
+                        </Pressable>
                       </View>
                     </View>
                   </LinearGradient>
                 </Pressable>
 
                 {/* Contenido del entrenamiento */}
-                {isActive && (
+                {isExpanded && (
                   <View style={styles.workoutContent}>
                     {renderSportSession(workout, isMinimized)}
                   </View>
@@ -1406,7 +1421,28 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+
+  minimizeBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+
+  deleteBtn: {
+    backgroundColor: 'rgba(255, 107, 107, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.5)',
   },
 
   workoutContent: {

@@ -1,7 +1,7 @@
-// components/sport/ExerciseSelector.tsx - Selector de ejercicios de gimnasio mejorado
+// components/sport/ExerciseSelector.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -12,16 +12,21 @@ import {
   View
 } from 'react-native';
 
+// Importar la base de datos desde el JSON
+import exercisesData from '../../assets/data/BDD_Gym.json';
+
 /**
  * Interfaz para ejercicio manual con datos adicionales
- * DATOS BD: Estructura para tabla exercises
  */
 interface ManualExercise {
-  id: string; // BD: exercise_id (PRIMARY KEY)
-  name: string; // BD: exercise_name
-  muscleGroup?: string; // BD: muscle_group
-  equipment?: string; // BD: equipment_needed
-  maxWeight?: number; // BD: personal_max_weight (registro personal del usuario)
+  id: string;
+  name: string;
+  muscleGroup?: string;
+  specificMuscle?: string;
+  equipment?: string;
+  maxWeight?: number;
+  description?: string;
+  recordType?: string;
 }
 
 /**
@@ -34,136 +39,7 @@ interface ExerciseSelectorProps {
 }
 
 /**
- * Base de datos de ejercicios organizada por grupo muscular y equipamiento
- * DATOS BD: Datos predefinidos en tabla exercises con relaciones a equipment_types
- */
-const EXERCISE_DATABASE = {
-  pecho: {
-    name: 'Pecho',
-    icon: 'arm-flex',
-    color: '#FF6B6B',
-    exercises: [
-      { id: 'press_banca', name: 'Press de Banca', equipment: 'barra', maxWeight: 80 },
-      { id: 'press_inclinado', name: 'Press Inclinado', equipment: 'barra', maxWeight: 70 },
-      { id: 'press_declinado', name: 'Press Declinado', equipment: 'barra', maxWeight: 75 },
-      { id: 'aperturas_mancuernas', name: 'Aperturas con Mancuernas', equipment: 'mancuernas', maxWeight: 25 },
-      { id: 'aperturas_cables', name: 'Aperturas en Cables', equipment: 'cables', maxWeight: 40 },
-      { id: 'fondos_paralelas', name: 'Fondos en Paralelas', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'flexiones', name: 'Flexiones', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'press_mancuernas', name: 'Press con Mancuernas', equipment: 'mancuernas', maxWeight: 35 }
-    ]
-  },
-  espalda: {
-    name: 'Espalda',
-    icon: 'human-handsup',
-    color: '#4ECDC4',
-    exercises: [
-      { id: 'dominadas', name: 'Dominadas', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'remo_barra', name: 'Remo con Barra', equipment: 'barra', maxWeight: 90 },
-      { id: 'remo_mancuerna', name: 'Remo con Mancuerna', equipment: 'mancuernas', maxWeight: 40 },
-      { id: 'jalones_lat', name: 'Jalones en Polea Alta', equipment: 'cables', maxWeight: 70 },
-      { id: 'remo_cable', name: 'Remo en Cable Sentado', equipment: 'cables', maxWeight: 80 },
-      { id: 'peso_muerto', name: 'Peso Muerto', equipment: 'barra', maxWeight: 120 },
-      { id: 'hiperextensiones', name: 'Hiperextensiones', equipment: 'maquina', maxWeight: 20 },
-      { id: 'pullover', name: 'Pullover', equipment: 'mancuernas', maxWeight: 30 }
-    ]
-  },
-  piernas: {
-    name: 'Piernas',
-    icon: 'run',
-    color: '#45B7D1',
-    exercises: [
-      { id: 'sentadillas', name: 'Sentadillas', equipment: 'barra', maxWeight: 100 },
-      { id: 'prensa', name: 'Prensa de Piernas', equipment: 'maquina', maxWeight: 200 },
-      { id: 'zancadas', name: 'Zancadas', equipment: 'mancuernas', maxWeight: 20 },
-      { id: 'peso_muerto_rumano', name: 'Peso Muerto Rumano', equipment: 'barra', maxWeight: 80 },
-      { id: 'curl_femoral', name: 'Curl Femoral', equipment: 'maquina', maxWeight: 60 },
-      { id: 'extension_cuadriceps', name: 'Extensión de Cuádriceps', equipment: 'maquina', maxWeight: 80 },
-      { id: 'elevacion_gemelos', name: 'Elevación de Gemelos', equipment: 'maquina', maxWeight: 150 },
-      { id: 'sentadilla_bulgara', name: 'Sentadilla Búlgara', equipment: 'mancuernas', maxWeight: 15 }
-    ]
-  },
-  hombros: {
-    name: 'Hombros',
-    icon: 'account-arrow-up',
-    color: '#FF9800',
-    exercises: [
-      { id: 'press_militar', name: 'Press Militar', equipment: 'barra', maxWeight: 50 },
-      { id: 'press_mancuernas_hombro', name: 'Press con Mancuernas', equipment: 'mancuernas', maxWeight: 25 },
-      { id: 'elevaciones_laterales', name: 'Elevaciones Laterales', equipment: 'mancuernas', maxWeight: 12 },
-      { id: 'elevaciones_frontales', name: 'Elevaciones Frontales', equipment: 'mancuernas', maxWeight: 15 },
-      { id: 'pajaros', name: 'Pájaros (Deltoides Posterior)', equipment: 'mancuernas', maxWeight: 10 },
-      { id: 'press_arnold', name: 'Press Arnold', equipment: 'mancuernas', maxWeight: 20 },
-      { id: 'remo_al_menton', name: 'Remo al Mentón', equipment: 'barra', maxWeight: 30 },
-      { id: 'encogimientos', name: 'Encogimientos de Hombros', equipment: 'mancuernas', maxWeight: 40 }
-    ]
-  },
-  brazos: {
-    name: 'Brazos',
-    icon: 'arm-flex-outline',
-    color: '#9C27B0',
-    exercises: [
-      { id: 'curl_biceps_barra', name: 'Curl de Bíceps con Barra', equipment: 'barra', maxWeight: 40 },
-      { id: 'curl_biceps_mancuernas', name: 'Curl de Bíceps con Mancuernas', equipment: 'mancuernas', maxWeight: 20 },
-      { id: 'curl_martillo', name: 'Curl Martillo', equipment: 'mancuernas', maxWeight: 18 },
-      { id: 'press_frances', name: 'Press Francés', equipment: 'barra', maxWeight: 25 },
-      { id: 'extensiones_triceps', name: 'Extensiones de Tríceps', equipment: 'cables', maxWeight: 30 },
-      { id: 'fondos_banco', name: 'Fondos en Banco', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'curl_predicador', name: 'Curl en Predicador', equipment: 'maquina', maxWeight: 35 },
-      { id: 'patadas_triceps', name: 'Patadas de Tríceps', equipment: 'mancuernas', maxWeight: 12 }
-    ]
-  },
-  core: {
-    name: 'Core',
-    icon: 'human-male',
-    color: '#4CAF50',
-    exercises: [
-      { id: 'abdominales_crunch', name: 'Abdominales Crunch', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'plancha', name: 'Plancha', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'abdominales_bicicleta', name: 'Abdominales Bicicleta', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'elevacion_piernas', name: 'Elevación de Piernas', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'mountain_climbers', name: 'Mountain Climbers', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'russian_twist', name: 'Russian Twist', equipment: 'mancuernas', maxWeight: 10 },
-      { id: 'plancha_lateral', name: 'Plancha Lateral', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'dead_bug', name: 'Dead Bug', equipment: 'peso_corporal', maxWeight: 0 }
-    ]
-  },
-  cardio: {
-    name: 'Cardio',
-    icon: 'heart-pulse',
-    color: '#E91E63',
-    exercises: [
-      { id: 'cinta_correr', name: 'Cinta de Correr', equipment: 'maquina', maxWeight: 0 },
-      { id: 'bicicleta_estatica', name: 'Bicicleta Estática', equipment: 'maquina', maxWeight: 0 },
-      { id: 'eliptica', name: 'Elíptica', equipment: 'maquina', maxWeight: 0 },
-      { id: 'remo_cardio', name: 'Remo Cardio', equipment: 'maquina', maxWeight: 0 },
-      { id: 'burpees', name: 'Burpees', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'jumping_jacks', name: 'Jumping Jacks', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'escalador', name: 'Escalador', equipment: 'peso_corporal', maxWeight: 0 },
-      { id: 'battle_ropes', name: 'Battle Ropes', equipment: 'funcional', maxWeight: 0 }
-    ]
-  }
-};
-
-/**
- * Tipos de equipamiento disponibles
- * DATOS BD: Tabla equipment_types
- */
-const EQUIPMENT_TYPES = [
-  { id: 'barra', name: 'Barra', icon: 'dumbbell', color: '#FF6B6B' },
-  { id: 'mancuernas', name: 'Mancuernas', icon: 'dumbbell', color: '#4ECDC4' },
-  { id: 'maquina', name: 'Máquina', icon: 'cog', color: '#45B7D1' },
-  { id: 'cables', name: 'Cables/Poleas', icon: 'cable-data', color: '#FF9800' },
-  { id: 'peso_corporal', name: 'Peso Corporal', icon: 'human-male', color: '#4CAF50' },
-  { id: 'funcional', name: 'Funcional', icon: 'format-list-bulleted', color: '#9C27B0' }
-];
-
-/**
  * Componente selector de ejercicios mejorado
- * Permite buscar, filtrar por grupo muscular y equipamiento
- * Muestra máximo peso personal para cada ejercicio
- * 
- * DATOS BD: Lee de tabla exercises y personal_records del usuario
  */
 export default function ExerciseSelector({
   visible,
@@ -174,46 +50,164 @@ export default function ExerciseSelector({
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<ManualExercise | null>(null);
+
+  // Categorías principales de grupos musculares
+  const MUSCLE_CATEGORIES = [
+    { id: 'Pectorales', name: 'Pectorales', icon: 'arm-flex', color: '#FF6B6B' },
+    { id: 'Espalda', name: 'Espalda', icon: 'human-handsup', color: '#4ECDC4' },
+    { id: 'Piernas', name: 'Piernas', icon: 'run', color: '#45B7D1' },
+    { id: 'Hombros', name: 'Hombros', icon: 'account-arrow-up', color: '#FF9800' },
+    { id: 'Brazo', name: 'Brazo', icon: 'arm-flex-outline', color: '#9C27B0' },
+    { id: 'Core', name: 'Core', icon: 'human-male', color: '#4CAF50' },
+    { id: 'Cardio', name: 'Cardio', icon: 'heart-pulse', color: '#E91E63' },
+    { id: 'Cuerpo Completo', name: 'Cuerpo Completo', icon: 'human-handsdown', color: '#9C27B0' }
+  ];
+
+  // Categorías de equipamiento
+  const EQUIPMENT_CATEGORIES = [
+    { id: 'Barras', name: 'Barras', icon: 'dumbbell', color: '#FF6B6B' },
+    { id: 'Mancuernas', name: 'Mancuernas', icon: 'dumbbell', color: '#4ECDC4' },
+    { id: 'Máquina', name: 'Máquina', icon: 'cog', color: '#45B7D1' },
+    { id: 'Kettlebells', name: 'Kettlebells', icon: 'kettlebell', color: '#9C27B0' },
+    { id: 'Peso corporal', name: 'Peso corporal', icon: 'human-male', color: '#4CAF50' },
+    { id: 'Otros', name: 'Otros', icon: 'toolbox', color: '#9C27B0' }
+  ];
+
+  // Mapeo de músculos específicos a categorías
+  const MUSCLE_TO_CATEGORY_MAP: Record<string, string> = {
+    'Pectorales': 'Pectorales',
+    'Dorsales': 'Espalda',
+    'Hombros': 'Hombros',
+    'Bíceps': 'Brazo',
+    'Tríceps': 'Brazo',
+    'Antebrazos': 'Brazo',
+    'Cuádriceps': 'Piernas',
+    'Isquiotibiales': 'Piernas',
+    'Glúteos': 'Piernas',
+    'Gemelos': 'Piernas',
+    'Soleos': 'Piernas',
+    'Abdominales': 'Core',
+    'Core': 'Core',
+    'Cuerpo Completo': 'Cuerpo Completo'
+  };
+
+  /**
+   * Organizar ejercicios por categoría muscular principal
+   */
+  const EXERCISE_DATABASE = useMemo(() => {
+    const categories: Record<string, {
+      name: string;
+      icon: string;
+      color: string;
+      exercises: ManualExercise[];
+    }> = {};
+
+    // Inicializar categorías
+    MUSCLE_CATEGORIES.forEach(cat => {
+      categories[cat.id] = {
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color,
+        exercises: []
+      };
+    });
+
+    // Procesar ejercicios del JSON
+    exercisesData.forEach((exercise: any) => {
+      const specificMuscle = exercise['Grupo Muscular'];
+      const category = MUSCLE_TO_CATEGORY_MAP[specificMuscle] || 'Otros';
+      const equipment = exercise.Equipamiento;
+      const description = exercise['Descripción'];
+      const recordType = exercise['Record'];
+      
+      if (categories[category]) {
+        categories[category].exercises.push({
+          id: exercise.Ejercicio,
+          name: exercise.Ejercicio,
+          muscleGroup: category,
+          specificMuscle,
+          equipment,
+          description,
+          recordType,
+          maxWeight: 0 // Se cargaría de la base de datos del usuario
+        });
+      }
+    });
+
+    return categories;
+  }, []);
+
+  /**
+   * Obtener tipos de equipamiento automáticamente desde los datos
+   */
+  const EQUIPMENT_TYPES = useMemo(() => {
+    const equipmentSet = new Set<string>();
+    
+    // Recoger todos los equipamientos únicos
+    Object.values(EXERCISE_DATABASE).forEach(category => {
+      category.exercises.forEach(exercise => {
+        if (exercise.equipment) {
+          equipmentSet.add(exercise.equipment);
+        }
+      });
+    });
+    
+    return Array.from(equipmentSet).map(eq => {
+      // Buscar si coincide con alguna categoría principal
+      const mainCategory = EQUIPMENT_CATEGORIES.find(cat => 
+        cat.name.toLowerCase() === eq.toLowerCase()
+      );
+      
+      return mainCategory ? mainCategory : EQUIPMENT_CATEGORIES.find(cat => cat.id === 'Otros')!;
+    })
+    // Filtrar duplicados
+    .filter((eq, index, self) => 
+      index === self.findIndex(t => t.id === eq.id)
+    );
+  }, [EXERCISE_DATABASE]);
 
   /**
    * Filtra ejercicios basado en búsqueda, categoría y equipamiento
    */
-  const getFilteredExercises = () => {
-    let allExercises: (ManualExercise & { category: string; categoryColor: string })[] = [];
+  const getFilteredExercises = useMemo(() => {
+    let allExercises: ManualExercise[] = [];
     
     // Si hay una categoría seleccionada, solo mostrar esos ejercicios
     if (selectedCategory) {
-      const categoryData = EXERCISE_DATABASE[selectedCategory as keyof typeof EXERCISE_DATABASE];
-      allExercises = categoryData.exercises.map(ex => ({
-        ...ex,
-        category: categoryData.name,
-        categoryColor: categoryData.color
-      }));
+      const categoryData = EXERCISE_DATABASE[selectedCategory];
+      if (categoryData) {
+        allExercises = [...categoryData.exercises];
+      }
     } else {
       // Mostrar todos los ejercicios
-      Object.entries(EXERCISE_DATABASE).forEach(([key, categoryData]) => {
-        allExercises.push(...categoryData.exercises.map(ex => ({
-          ...ex,
-          category: categoryData.name,
-          categoryColor: categoryData.color
-        })));
+      Object.values(EXERCISE_DATABASE).forEach(categoryData => {
+        allExercises.push(...categoryData.exercises);
       });
     }
 
     // Filtrar por equipamiento
     if (selectedEquipment) {
-      allExercises = allExercises.filter(exercise => exercise.equipment === selectedEquipment);
+      allExercises = allExercises.filter(exercise => {
+        const equipmentCategory = EQUIPMENT_TYPES.find(eq => 
+          eq.name.toLowerCase() === exercise.equipment?.toLowerCase()
+        )?.id || 'Otros';
+        
+        return equipmentCategory === selectedEquipment;
+      });
     }
 
     // Filtrar por búsqueda
     if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase();
       allExercises = allExercises.filter(exercise =>
-        exercise.name.toLowerCase().includes(searchText.toLowerCase())
+        exercise.name.toLowerCase().includes(searchLower) ||
+        exercise.specificMuscle?.toLowerCase().includes(searchLower)
       );
     }
 
     return allExercises;
-  };
+  }, [selectedCategory, selectedEquipment, searchText, EXERCISE_DATABASE]);
 
   /**
    * Maneja la selección de un ejercicio
@@ -221,6 +215,20 @@ export default function ExerciseSelector({
   const handleSelectExercise = (exercise: ManualExercise) => {
     onSelectExercise(exercise);
     onClose();
+  };
+
+  /**
+   * Muestra los detalles de un ejercicio
+   */
+  const showExerciseDetails = (exercise: ManualExercise) => {
+    setSelectedExercise(exercise);
+  };
+
+  /**
+   * Cierra el modal de detalles
+   */
+  const closeExerciseDetails = () => {
+    setSelectedExercise(null);
   };
 
   /**
@@ -232,23 +240,34 @@ export default function ExerciseSelector({
     const customExercise: ManualExercise = {
       id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: searchText.trim(),
-      equipment: selectedEquipment || 'peso_corporal'
+      equipment: selectedEquipment || 'Peso corporal'
     };
     
     handleSelectExercise(customExercise);
   };
 
   /**
-   * Formatea el máximo peso para mostrar
+   * Formatea el récord para mostrar
    */
-  const formatMaxWeight = (weight: number, equipment: string) => {
-    if (equipment === 'peso_corporal') return 'Peso corporal';
-    if (weight === 0) return 'Sin peso';
-    return `RP: ${weight}kg`; // RP = Record Personal
+  const formatRecord = (exercise: ManualExercise) => {
+    if (!exercise.recordType) return 'Sin récord';
+    
+    switch (exercise.recordType) {
+      case 'Peso':
+        return `Récord: ${exercise.maxWeight || 0}kg`;
+      case 'Repeticiones':
+        return `Récord: ${exercise.maxWeight || 0} repeticiones`;
+      case 'Tiempo':
+        return `Récord: ${exercise.maxWeight || 0} minutos`;
+      case 'Distancia':
+        return `Récord: ${exercise.maxWeight || 0} metros`;
+      default:
+        return 'Sin récord';
+    }
   };
 
-  const filteredExercises = getFilteredExercises();
   const categories = Object.entries(EXERCISE_DATABASE);
+  const filteredExercises = getFilteredExercises;
 
   return (
     <Modal
@@ -257,6 +276,63 @@ export default function ExerciseSelector({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
+      {/* Modal de detalles del ejercicio */}
+      {selectedExercise && (
+        <View style={styles.detailsModal}>
+          <LinearGradient
+            colors={['#1A1A3A', '#2D2D5F']}
+            style={styles.detailsContainer}
+          >
+            <Pressable onPress={closeExerciseDetails} style={styles.closeDetailsBtn}>
+              <MaterialCommunityIcons name="close" size={24} color="#FFFFFF" />
+            </Pressable>
+            
+            <Text style={styles.detailsTitle}>{selectedExercise.name}</Text>
+            
+            <View style={styles.detailsSection}>
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="arm-flex" size={20} color="#FF6B6B" />
+                <Text style={styles.detailLabel}>Músculo:</Text>
+                <Text style={styles.detailValue}>{selectedExercise.specificMuscle}</Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="dumbbell" size={20} color="#4ECDC4" />
+                <Text style={styles.detailLabel}>Equipamiento:</Text>
+                <Text style={styles.detailValue}>{selectedExercise.equipment}</Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+                <Text style={styles.detailLabel}>Tu récord:</Text>
+                <Text style={styles.detailValue}>{formatRecord(selectedExercise)}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Descripción</Text>
+              <Text style={styles.descriptionText}>
+                {selectedExercise.description || 'No hay descripción disponible para este ejercicio.'}
+              </Text>
+            </View>
+            
+            <Pressable 
+              onPress={() => handleSelectExercise(selectedExercise)}
+              style={styles.selectExerciseBtn}
+            >
+              <LinearGradient
+                colors={["#00D4AA", "#00B894"]}
+                style={styles.selectExerciseGradient}
+              >
+                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+                <Text style={styles.selectExerciseText}>Seleccionar ejercicio</Text>
+              </LinearGradient>
+            </Pressable>
+          </LinearGradient>
+        </View>
+      )}
+
+      {/* Selector principal de ejercicios */}
       <LinearGradient
         colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
         style={styles.container}
@@ -279,9 +355,9 @@ export default function ExerciseSelector({
               <MaterialCommunityIcons name="dumbbell" size={24} color="#FF6B6B" />
               <Text style={styles.title}>
                 {selectedCategory 
-                  ? EXERCISE_DATABASE[selectedCategory as keyof typeof EXERCISE_DATABASE].name
+                  ? EXERCISE_DATABASE[selectedCategory]?.name || 'Ejercicios'
                   : selectedEquipment
-                  ? EQUIPMENT_TYPES.find(eq => eq.id === selectedEquipment)?.name
+                  ? EQUIPMENT_CATEGORIES.find(eq => eq.id === selectedEquipment)?.name
                   : 'Ejercicios'
                 }
               </Text>
@@ -301,7 +377,7 @@ export default function ExerciseSelector({
               value={searchText}
               onChangeText={setSearchText}
               style={styles.searchInput}
-              placeholder="Buscar ejercicio..."
+              placeholder="Buscar ejercicio o músculo..."
               placeholderTextColor="#6B7280"
               autoCapitalize="words"
             />
@@ -335,12 +411,43 @@ export default function ExerciseSelector({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* ===== CATEGORÍAS DE EJERCICIOS ===== */}
+          {!selectedCategory && !selectedEquipment && !searchText && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Grupos Musculares</Text>
+              <View style={styles.categoriesGrid}>
+                {MUSCLE_CATEGORIES.map((category) => (
+                  <Pressable
+                    key={category.id}
+                    onPress={() => setSelectedCategory(category.id)}
+                    style={styles.categoryBtn}
+                  >
+                    <LinearGradient
+                      colors={[category.color + '20', category.color + '10']}
+                      style={styles.categoryGradient}
+                    >
+                      <MaterialCommunityIcons
+                        name={category.icon as any}
+                        size={28}
+                        color={category.color}
+                      />
+                      <Text style={styles.categoryName}>{category.name}</Text>
+                      <Text style={styles.categoryCount}>
+                        {EXERCISE_DATABASE[category.id]?.exercises.length || 0} ejercicios
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* ===== FILTROS DE EQUIPAMIENTO ===== */}
           {!selectedCategory && !selectedEquipment && !searchText && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Filtrar por Equipamiento</Text>
               <View style={styles.equipmentGrid}>
-                {EQUIPMENT_TYPES.map((equipment) => (
+                {EQUIPMENT_CATEGORIES.map((equipment) => (
                   <Pressable
                     key={equipment.id}
                     onPress={() => setSelectedEquipment(equipment.id)}
@@ -363,37 +470,6 @@ export default function ExerciseSelector({
             </View>
           )}
 
-          {/* ===== CATEGORÍAS DE EJERCICIOS ===== */}
-          {!selectedCategory && !selectedEquipment && !searchText && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Grupos Musculares</Text>
-              <View style={styles.categoriesGrid}>
-                {categories.map(([key, categoryData]) => (
-                  <Pressable
-                    key={key}
-                    onPress={() => setSelectedCategory(key)}
-                    style={styles.categoryBtn}
-                  >
-                    <LinearGradient
-                      colors={[categoryData.color + '20', categoryData.color + '10']}
-                      style={styles.categoryGradient}
-                    >
-                      <MaterialCommunityIcons
-                        name={categoryData.icon as any}
-                        size={28}
-                        color={categoryData.color}
-                      />
-                      <Text style={styles.categoryName}>{categoryData.name}</Text>
-                      <Text style={styles.categoryCount}>
-                        {categoryData.exercises.length} ejercicios
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          )}
-
           {/* ===== LISTA DE EJERCICIOS ===== */}
           {(selectedCategory || selectedEquipment || searchText) && (
             <View style={styles.section}>
@@ -401,7 +477,7 @@ export default function ExerciseSelector({
                 {searchText 
                   ? `Resultados (${filteredExercises.length})`
                   : selectedEquipment
-                  ? `Ejercicios con ${EQUIPMENT_TYPES.find(eq => eq.id === selectedEquipment)?.name}`
+                  ? `Ejercicios con ${EQUIPMENT_CATEGORIES.find(eq => eq.id === selectedEquipment)?.name}`
                   : `Ejercicios de ${EXERCISE_DATABASE[selectedCategory as keyof typeof EXERCISE_DATABASE]?.name}`
                 }
               </Text>
@@ -411,7 +487,6 @@ export default function ExerciseSelector({
                   {filteredExercises.map((exercise) => (
                     <Pressable
                       key={exercise.id}
-                      onPress={() => handleSelectExercise(exercise)}
                       style={styles.exerciseItem}
                     >
                       <LinearGradient
@@ -419,36 +494,48 @@ export default function ExerciseSelector({
                         style={styles.exerciseItemGradient}
                       >
                         <View style={styles.exerciseItemContent}>
-                          <View style={[styles.exerciseIcon, { backgroundColor: exercise.categoryColor }]}>
+                          <View style={[styles.exerciseIcon, { 
+                            backgroundColor: MUSCLE_CATEGORIES.find(c => c.id === exercise.muscleGroup)?.color || '#6B7280' 
+                          }]}>
                             <MaterialCommunityIcons name="dumbbell" size={16} color="#FFFFFF" />
                           </View>
                           
                           <View style={styles.exerciseInfo}>
                             <Text style={styles.exerciseName}>{exercise.name}</Text>
                             <View style={styles.exerciseMetadata}>
-                              {(searchText || selectedEquipment) && (
-                                <Text style={styles.exerciseCategory}>{exercise.category}</Text>
-                              )}
+                              <Text style={styles.specificMuscle}>
+                                {exercise.specificMuscle}
+                              </Text>
                               <View style={styles.exerciseEquipment}>
                                 <MaterialCommunityIcons 
-                                  name={EQUIPMENT_TYPES.find(eq => eq.id === exercise.equipment)?.icon as any || 'help'}
+                                  name={EQUIPMENT_CATEGORIES.find(eq => 
+                                    eq.id === (EQUIPMENT_TYPES.find(e => e.name === exercise.equipment)?.id || 'Otros')
+                                  )?.icon as any || 'help'}
                                   size={12} 
                                   color="#FFB84D" 
                                 />
                                 <Text style={styles.exerciseEquipmentText}>
-                                  {EQUIPMENT_TYPES.find(eq => eq.id === exercise.equipment)?.name || 'Desconocido'}
+                                  {exercise.equipment}
                                 </Text>
                               </View>
-                              {/* DATOS BD: Mostrar récord personal del usuario */}
-                              {exercise.maxWeight !== undefined && (
-                                <Text style={styles.exerciseMaxWeight}>
-                                  {formatMaxWeight(exercise.maxWeight, exercise.equipment || 'peso_corporal')}
-                                </Text>
-                              )}
                             </View>
                           </View>
                           
-                          <MaterialCommunityIcons name="plus-circle" size={24} color="#00D4AA" />
+                          <View style={styles.exerciseActions}>
+                            <Pressable 
+                              onPress={() => showExerciseDetails(exercise)}
+                              style={styles.infoButton}
+                            >
+                              <MaterialCommunityIcons 
+                                name="information-outline" 
+                                size={24} 
+                                color="#B0B0C4" 
+                              />
+                            </Pressable>
+                            <Pressable onPress={() => handleSelectExercise(exercise)}>
+                              <MaterialCommunityIcons name="plus-circle" size={24} color="#00D4AA" />
+                            </Pressable>
+                          </View>
                         </View>
                       </LinearGradient>
                     </Pressable>
@@ -460,7 +547,7 @@ export default function ExerciseSelector({
                   <Text style={styles.noResultsTitle}>Sin resultados</Text>
                   <Text style={styles.noResultsText}>
                     No se encontraron ejercicios para &quot;{searchText}&quot;
-                    {selectedEquipment && ` con ${EQUIPMENT_TYPES.find(eq => eq.id === selectedEquipment)?.name}`}
+                    {selectedEquipment && ` con ${EQUIPMENT_CATEGORIES.find(eq => eq.id === selectedEquipment)?.name}`}
                   </Text>
                 </View>
               )}
@@ -475,7 +562,8 @@ export default function ExerciseSelector({
             >
               <MaterialCommunityIcons name="information-outline" size={16} color="#FFB84D" />
               <Text style={styles.infoText}>
-                💡 Filtra por equipamiento o grupo muscular para encontrar ejercicios específicos. Los récords personales (RP) te ayudan a planificar tu progresión.
+                💡 Filtra por equipamiento o grupo muscular para encontrar ejercicios específicos. 
+                Toca el ícono de información para ver detalles de cada ejercicio.
               </Text>
             </LinearGradient>
           </View>
@@ -488,6 +576,109 @@ export default function ExerciseSelector({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  // ===== MODAL DE DETALLES =====
+  detailsModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  detailsContainer: {
+    width: '90%',
+    borderRadius: 20,
+    padding: 20,
+    paddingTop: 40,
+  },
+
+  closeDetailsBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 8,
+  },
+
+  detailsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  detailsSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFB84D',
+    minWidth: 120,
+  },
+
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+
+  descriptionSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  descriptionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 10,
+  },
+
+  descriptionText: {
+    fontSize: 16,
+    color: '#E0E0E0',
+    lineHeight: 24,
+  },
+
+  selectExerciseBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+
+  selectExerciseGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 10,
+  },
+
+  selectExerciseText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   // ===== HEADER =====
@@ -698,13 +889,18 @@ const styles = StyleSheet.create({
   },
 
   exerciseMetadata: {
-    gap: 2,
+    gap: 4,
   },
 
-  exerciseCategory: {
-    fontSize: 12,
+  specificMuscle: {
+    fontSize: 13,
     color: '#B0B0C4',
     fontWeight: '500',
+    backgroundColor: 'rgba(176, 176, 196, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
   },
 
   exerciseEquipment: {
@@ -714,21 +910,20 @@ const styles = StyleSheet.create({
   },
 
   exerciseEquipmentText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#FFB84D',
     fontWeight: '500',
   },
 
-  // DATOS BD: Estilo para mostrar máximo peso personal
-  exerciseMaxWeight: {
-    fontSize: 11,
-    color: '#00D4AA',
-    fontWeight: '600',
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+  // Acciones para cada ejercicio
+  exerciseActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+
+  infoButton: {
+    padding: 4
   },
 
   // ===== SIN RESULTADOS =====

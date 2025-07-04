@@ -88,7 +88,7 @@ export function RunningSessionComponent({
     <View style={styles.sessionContainer}>
       <LinearGradient
         colors={
-          isCompleted 
+          isCompleted
             ? ["rgba(78, 205, 196, 0.2)", "rgba(78, 205, 196, 0.1)"]
             : ["#2D2D5F", "#3D3D7F"]
         }
@@ -97,10 +97,17 @@ export function RunningSessionComponent({
         {/* ===== HEADER ===== */}
         <View style={styles.sessionHeader}>
           <MaterialCommunityIcons name="run" size={24} color="#4ECDC4" />
-          <Text style={[styles.sessionTitle, isCompleted && styles.sessionTitleCompleted]}>
+          <Text
+            style={[
+              styles.sessionTitle,
+              isCompleted && styles.sessionTitleCompleted,
+            ]}
+          >
             Sesión de Running {isCompleted && "- Completada"}
           </Text>
-          {isCompleted && <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />}
+          {isCompleted && (
+            <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />
+          )}
         </View>
 
         {/* ===== MENSAJE DE COMPLETADO ===== */}
@@ -108,7 +115,8 @@ export function RunningSessionComponent({
           <View style={styles.completedMessage}>
             <MaterialCommunityIcons name="trophy" size={16} color="#00D4AA" />
             <Text style={styles.completedMessageText}>
-              Este entrenamiento ya fue completado. Los datos se muestran en modo solo lectura.
+              Este entrenamiento ya fue completado. Los datos se muestran en
+              modo solo lectura.
             </Text>
           </View>
         )}
@@ -121,28 +129,47 @@ export function RunningSessionComponent({
               style={styles.activeWorkoutPlanGradient}
             >
               <View style={styles.workoutPlanHeader}>
-                <MaterialCommunityIcons name="playlist-check" size={20} color="#FFFFFF" />
-                <Text style={styles.workoutPlanName}>{currentWorkoutPlan.name}</Text>
+                <MaterialCommunityIcons
+                  name="playlist-check"
+                  size={20}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.workoutPlanName}>
+                  {currentWorkoutPlan.name}
+                </Text>
               </View>
-              
+
               <View style={styles.workoutPlanStats}>
                 <View style={styles.workoutPlanStat}>
-                  <MaterialCommunityIcons name="clock" size={14} color="#FFFFFF" />
+                  <MaterialCommunityIcons
+                    name="clock"
+                    size={14}
+                    color="#FFFFFF"
+                  />
                   <Text style={styles.workoutPlanStatText}>
                     {Math.round(currentWorkoutPlan.estimatedDuration / 60)} min
                   </Text>
                 </View>
                 <View style={styles.workoutPlanStat}>
-                  <MaterialCommunityIcons name="map-marker-distance" size={14} color="#FFFFFF" />
+                  <MaterialCommunityIcons
+                    name="map-marker-distance"
+                    size={14}
+                    color="#FFFFFF"
+                  />
                   <Text style={styles.workoutPlanStatText}>
-                    {currentWorkoutPlan.estimatedDistance >= 1000 
-                      ? `${(currentWorkoutPlan.estimatedDistance / 1000).toFixed(1)} km`
-                      : `${currentWorkoutPlan.estimatedDistance} m`
-                    }
+                    {currentWorkoutPlan.estimatedDistance >= 1000
+                      ? `${(
+                          currentWorkoutPlan.estimatedDistance / 1000
+                        ).toFixed(1)} km`
+                      : `${currentWorkoutPlan.estimatedDistance} m`}
                   </Text>
                 </View>
                 <View style={styles.workoutPlanStat}>
-                  <MaterialCommunityIcons name="format-list-numbered" size={14} color="#FFFFFF" />
+                  <MaterialCommunityIcons
+                    name="format-list-numbered"
+                    size={14}
+                    color="#FFFFFF"
+                  />
                   <Text style={styles.workoutPlanStatText}>
                     {currentWorkoutPlan.steps.length} pasos
                   </Text>
@@ -154,7 +181,11 @@ export function RunningSessionComponent({
                   onPress={() => setCurrentWorkoutPlan(null)}
                   style={styles.removeWorkoutPlanBtn}
                 >
-                  <MaterialCommunityIcons name="close" size={16} color="#FFFFFF" />
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={16}
+                    color="#FFFFFF"
+                  />
                   <Text style={styles.removeWorkoutPlanText}>Quitar Plan</Text>
                 </Pressable>
               )}
@@ -164,19 +195,23 @@ export function RunningSessionComponent({
 
         {/* ===== CONSTRUCTOR AVANZADO (ÚNICO BOTÓN) ===== */}
         {!isCompleted && (
-          <Pressable 
-            onPress={() => setShowWorkoutBuilder(true)} 
+          <Pressable
+            onPress={() => setShowWorkoutBuilder(true)}
             style={styles.advancedBuilderBtn}
           >
-            <LinearGradient 
-              colors={["#4ECDC4", "#26C6DA"]} 
+            <LinearGradient
+              colors={["#4ECDC4", "#26C6DA"]}
               style={styles.advancedBuilderGradient}
             >
               <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
               <Text style={styles.advancedBuilderText}>
                 Crear Entrenamiento de Running
               </Text>
-              <MaterialCommunityIcons name="arrow-right" size={16} color="#FFFFFF" />
+              <MaterialCommunityIcons
+                name="arrow-right"
+                size={16}
+                color="#FFFFFF"
+              />
             </LinearGradient>
           </Pressable>
         )}
@@ -185,29 +220,29 @@ export function RunningSessionComponent({
         {(session.plannedDuration || session.plannedDistance) && !currentWorkoutPlan && (
           <View style={styles.currentSessionInfo}>
             <LinearGradient
-              colors={["rgba(78, 205, 196, 0.15)", "rgba(78, 205, 196, 0.08)"]}
+              colors={["#4ECDC4", "#26C6DA"]}
               style={styles.currentSessionGradient}
             >
               <Text style={styles.currentSessionTitle}>Sesión Configurada</Text>
               <View style={styles.currentSessionDetails}>
                 {session.plannedDuration && (
                   <Text style={styles.currentSessionDetail}>
-                    ⏱️ Duración: {Math.round(session.plannedDuration / 60)} minutos
+                    {`⏱️ Duración: ${Math.round(session.plannedDuration / 60)} minutos`}
                   </Text>
                 )}
                 {session.plannedDistance && (
                   <Text style={styles.currentSessionDetail}>
-                    📏 Distancia: {session.plannedDistance >= 1000 
+                    {`📏 Distancia: ${session.plannedDistance >= 1000 
                       ? `${(session.plannedDistance / 1000).toFixed(1)} km`
                       : `${session.plannedDistance} m`
-                    }
+                    }`}
                   </Text>
                 )}
                 <Text style={styles.currentSessionDetail}>
-                  🏃‍♂️ Tipo: {session.type === 'long_run' ? 'Tirada Larga' :
+                  {`🏃‍♂️ Tipo: ${session.type === 'long_run' ? 'Tirada Larga' :
                            session.type === 'intervals' ? 'Intervalos' :
                            session.type === 'tempo' ? 'Tempo Run' :
-                           session.type === 'recovery' ? 'Recuperación' : 'Carrera'}
+                           session.type === 'recovery' ? 'Recuperación' : 'Carrera'}`}
                 </Text>
               </View>
             </LinearGradient>
@@ -216,25 +251,31 @@ export function RunningSessionComponent({
 
         {/* ===== BOTÓN COMPLETAR ===== */}
         {!isCompleted && (
-          <Pressable 
-            onPress={() => onCompleteWorkout?.()} 
+          <Pressable
+            onPress={() => onCompleteWorkout?.()}
             style={[
               styles.completeWorkoutBtn,
-              !isReadyToComplete() && styles.completeWorkoutBtnDisabled
+              !isReadyToComplete() && styles.completeWorkoutBtnDisabled,
             ]}
             disabled={!isReadyToComplete()}
           >
             <LinearGradient
-              colors={isReadyToComplete() ? ["#4ECDC4", "#26C6DA"] : ["#6B7280", "#4B5563"]}
+              colors={
+                isReadyToComplete()
+                  ? ["#4ECDC4", "#26C6DA"]
+                  : ["#6B7280", "#4B5563"]
+              }
               style={styles.completeWorkoutGradient}
             >
-              <MaterialCommunityIcons 
-                name={isReadyToComplete() ? "check-circle" : "alert-circle"} 
-                size={20} 
-                color="#FFFFFF" 
+              <MaterialCommunityIcons
+                name={isReadyToComplete() ? "check-circle" : "alert-circle"}
+                size={20}
+                color="#FFFFFF"
               />
               <Text style={styles.completeWorkoutText}>
-                {isReadyToComplete() ? "Completar Running" : "Crea tu entrenamiento arriba"}
+                {isReadyToComplete()
+                  ? "Completar Running"
+                  : "Crea tu entrenamiento arriba"}
               </Text>
             </LinearGradient>
           </Pressable>
