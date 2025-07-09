@@ -1,4 +1,5 @@
 // components/sport/sports.ts - Tipos y interfaces completos para el sistema de entrenamientos
+// ACTUALIZACIÓN MÍNIMA: Solo campos necesarios para BD de ejercicios
 
 /**
  * Tipos de deportes soportados
@@ -49,6 +50,7 @@ export interface GymSet {
 
 /**
  * Interfaz para un ejercicio de gimnasio
+ * ACTUALIZADO: Campos adicionales para integración con BD de ejercicios
  */
 export interface GymExercise {
   id: string;             // ID único del ejercicio en la sesión
@@ -58,6 +60,13 @@ export interface GymExercise {
   restTime?: string;      // Tiempo de descanso por defecto entre series (en segundos)
   notes?: string;         // Notas del ejercicio
   targetMuscle?: string;  // Grupo muscular objetivo
+  
+  // === CAMPOS NUEVOS PARA BD DE EJERCICIOS ===
+  muscleGroup?: string;        // grupo_muscular_principal de la BD
+  specificMuscle?: string;     // grupo_muscular_secundario de la BD
+  equipment?: string;          // equipamiento de la BD
+  difficulty?: string;         // dificultad de la BD
+  description?: string;        // descripcion de la BD
 }
 
 // ===== INTERFACES PARA DEPORTES ESPECÍFICOS =====
@@ -293,8 +302,9 @@ export interface WorkoutLoop {
 
 /**
  * Tipos de superseries
+ * ACTUALIZADO: Agregado 'megacircuit' para soporte completo de circuitos
  */
-export type SupersetType = 'superset' | 'circuit' | 'triset';
+export type SupersetType = 'superset' | 'circuit' | 'triset' | 'megacircuit';
 
 /**
  * Interfaz para superseries de gimnasio
@@ -360,6 +370,36 @@ export interface UserWorkoutSettings {
     time: string;               // Hora en formato HH:MM
     days: number[];             // Días de la semana (0=Domingo)
   };
+}
+
+// ===== INTERFACES ADICIONALES PARA BD DE EJERCICIOS =====
+
+/**
+ * Interfaz para ejercicio manual del selector (integración con BD)
+ */
+export interface ManualExercise {
+  id: string;
+  name: string;
+  muscleGroup?: string;
+  specificMuscle?: string;
+  equipment?: string;
+  difficulty?: string;
+  maxWeight?: number;
+  description?: string;
+  recordType?: string;
+}
+
+/**
+ * Interfaz para ejercicio de la base de datos
+ */
+export interface ExerciseFromDB {
+  id_ejercicio: number;
+  nombre_ejercicio: string;
+  grupo_muscular_principal: string;
+  grupo_muscular_secundario: string | null;
+  equipamiento: string;
+  dificultad: 'Principiante' | 'Intermedio' | 'Avanzado';
+  descripcion: string;
 }
 
 // ===== EXPORTACIONES ADICIONALES =====
@@ -477,3 +517,17 @@ export const WEEK_DAY_NAMES = {
   'S': 'Sábado',
   'D': 'Domingo'
 } as const;
+
+// ===== CONSTANTES PARA BD DE EJERCICIOS =====
+
+export const MUSCLE_GROUPS = [
+  'pectoral', 'dorsal', 'espalda', 'hombro', 'biceps', 'triceps', 'antebrazos',
+  'cuadriceps', 'gluteo', 'isquiotibial', 'gemelo', 'soleo', 'abdominal', 'abductor', 'cuerpo completo'
+] as const;
+
+export const EQUIPMENT_TYPES = [
+  'Peso corporal', 'Banda elástica', 'Mancuernas', 'Barra', 'Cable', 'Máquina',
+  'TRX', 'Balón medicinal', 'Battle ropes', 'Rueda abdominal', 'Kettlebell', 'Fitball', 'Bosu'
+] as const;
+
+export const DIFFICULTY_LEVELS = ['Principiante', 'Intermedio', 'Avanzado'] as const;

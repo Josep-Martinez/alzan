@@ -1,4 +1,4 @@
-// components/sport/SupersetBuilder.tsx - Constructor de superseries con UI mejorada
+// components/sport/SupersetBuilder.tsx - Constructor de superseries con UI mejorada y mejor soporte para circuitos
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -11,42 +11,57 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { GymExercise } from './sports';
+// Importar tipos de tu estructura existente
+import { GymExercise, SupersetType } from './sports';
 
 /**
- * Tipos de superseries disponibles
- * DATOS BD: Enum values para superset_type en tabla supersets
+ * Tipos de superseries disponibles con mejor soporte para circuitos
+ * ACTUALIZADO: Usando tu SupersetType existente + megacircuit
  */
 const SUPERSET_TYPES = [
   {
-    type: 'superset',
+    type: 'superset' as SupersetType,
     name: 'Superserie',
-    description: '2 ejercicios sin descanso',
+    description: '2 ejercicios consecutivos sin descanso',
     icon: 'lightning-bolt',
     color: '#FF6B6B',
     minExercises: 2,
     maxExercises: 2,
-    benefits: ['Ahorra tiempo', 'Aumenta intensidad', 'Músculos antagonistas']
+    benefits: ['Ahorra tiempo', 'Aumenta intensidad', 'Músculos antagonistas'],
+    example: 'Ej: Press banca + Dominadas'
   },
   {
-    type: 'triset',
+    type: 'triset' as SupersetType,
     name: 'Triserie',
-    description: '3 ejercicios consecutivos',
+    description: '3 ejercicios consecutivos sin descanso',
     icon: 'flash',
     color: '#FFB84D',
     minExercises: 3,
     maxExercises: 3,
-    benefits: ['Mayor volumen', 'Trabajo específico', 'Fatiga controlada']
+    benefits: ['Mayor volumen', 'Trabajo específico', 'Fatiga controlada'],
+    example: 'Ej: Sentadilla + Prensa + Extensiones'
   },
   {
-    type: 'circuit',
+    type: 'circuit' as SupersetType,
     name: 'Circuito',
-    description: '4+ ejercicios en secuencia',
+    description: '4-8 ejercicios en secuencia continua',
     icon: 'refresh-circle',
     color: '#4ECDC4',
     minExercises: 4,
     maxExercises: 8,
-    benefits: ['Trabajo cardiovascular', 'Tiempo eficiente', 'Variedad']
+    benefits: ['Trabajo cardiovascular', 'Quema de grasa', 'Tiempo eficiente', 'Cuerpo completo'],
+    example: 'Ej: Burpees + Sentadillas + Flexiones + Plancha'
+  },
+  {
+    type: 'megacircuit' as SupersetType,
+    name: 'Mega Circuito',
+    description: '9-12 ejercicios para entrenamientos intensos',
+    icon: 'fire',
+    color: '#E91E63',
+    minExercises: 9,
+    maxExercises: 12,
+    benefits: ['Máximo cardiovascular', 'Entrenamiento completo', 'Desafío extremo', 'Resistencia'],
+    example: 'Ej: Entrenamiento militar completo'
   }
 ] as const;
 
@@ -59,7 +74,7 @@ interface SupersetBuilderProps {
   onClose: () => void;
   onCreateSuperset: (data: {
     name: string;
-    type: 'superset' | 'circuit' | 'triset';
+    type: SupersetType;
     exercises: GymExercise[];
     rounds: number;
     restTime: string;
@@ -68,12 +83,12 @@ interface SupersetBuilderProps {
 
 /**
  * Componente constructor de superseries
- * Permite crear superseries, triseries y circuitos con interfaz intuitiva
+ * Permite crear superseries, triseries, circuitos y mega circuitos con interfaz intuitiva
  * 
  * DATOS BD: Crea registros en tabla supersets con relaciones a exercises
  * - superset_id (PRIMARY KEY)
  * - superset_name (VARCHAR)
- * - superset_type (ENUM: superset/triset/circuit)
+ * - superset_type (ENUM: superset/triset/circuit/megacircuit)
  * - rounds_count (INTEGER)
  * - rest_time_seconds (INTEGER)
  * - created_at (TIMESTAMP)
@@ -86,7 +101,7 @@ export default function SupersetBuilder({
 }: SupersetBuilderProps) {
   // ===== ESTADOS =====
   const [currentStep, setCurrentStep] = useState<'type' | 'exercises' | 'config'>('type');
-  const [selectedType, setSelectedType] = useState<'superset' | 'circuit' | 'triset'>('superset');
+  const [selectedType, setSelectedType] = useState<SupersetType>('superset');
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [supersetName, setSupersetName] = useState('');
   const [rounds, setRounds] = useState(3);
@@ -126,6 +141,19 @@ export default function SupersetBuilder({
     if (currentStep === 'type') {
       setCurrentStep('exercises');
       setSupersetName(`${getSelectedTypeConfig().name} ${new Date().getHours()}:${new Date().getMinutes().toString().padStart(2, '0')}`);
+      
+      // Ajustar configuración por defecto según el tipo
+      const typeConfig = getSelectedTypeConfig();
+      if (typeConfig.type === 'circuit') {
+        setRounds(3);
+        setRestTime('120'); // Más descanso para circuitos
+      } else if (typeConfig.type === 'megacircuit') {
+        setRounds(2);
+        setRestTime('180'); // Mucho más descanso para mega circuitos
+      } else {
+        setRounds(3);
+        setRestTime('90');
+      }
     } else if (currentStep === 'exercises') {
       setCurrentStep('config');
     }
@@ -171,6 +199,47 @@ export default function SupersetBuilder({
   };
 
   /**
+   * Selecciona automáticamente ejercicios para un circuito completo
+   */
+  const autoSelectCircuitExercises = () => {
+    const typeConfig = getSelectedTypeConfig();
+    if (typeConfig.type !== 'circuit' && typeConfig.type !== 'megacircuit') return;
+    
+    // Seleccionar ejercicios variados para un circuito completo
+    const availableExercises = exercises.filter(ex => !selectedExercises.includes(ex.id));
+    const targetCount = typeConfig.type === 'circuit' ? 6 : 10;
+    
+    // Priorizar ejercicios de diferentes grupos musculares
+    const muscleGroups = ['pectoral', 'dorsal', 'cuadriceps', 'gluteo', 'hombro', 'abdominal', 'triceps', 'biceps'];
+    const selectedForCircuit: string[] = [];
+    
+    // Intentar tomar un ejercicio de cada grupo muscular
+    muscleGroups.forEach(muscle => {
+      if (selectedForCircuit.length < targetCount) {
+        const exerciseFromGroup = availableExercises.find(ex => 
+          ex.name.toLowerCase().includes(muscle) || 
+          ex.exerciseId.toLowerCase().includes(muscle)
+        );
+        if (exerciseFromGroup && !selectedForCircuit.includes(exerciseFromGroup.id)) {
+          selectedForCircuit.push(exerciseFromGroup.id);
+        }
+      }
+    });
+    
+    // Completar con ejercicios restantes si es necesario
+    while (selectedForCircuit.length < targetCount && selectedForCircuit.length < availableExercises.length) {
+      const remaining = availableExercises.find(ex => !selectedForCircuit.includes(ex.id));
+      if (remaining) {
+        selectedForCircuit.push(remaining.id);
+      } else {
+        break;
+      }
+    }
+    
+    setSelectedExercises(selectedForCircuit);
+  };
+
+  /**
    * Verifica si se puede continuar al siguiente paso
    */
   const canProceed = () => {
@@ -207,6 +276,42 @@ export default function SupersetBuilder({
     });
 
     resetBuilder();
+  };
+
+  /**
+   * Obtiene el número de rondas recomendado según el tipo
+   */
+  const getRecommendedRounds = () => {
+    const typeConfig = getSelectedTypeConfig();
+    switch (typeConfig.type) {
+      case 'superset':
+      case 'triset':
+        return [2, 3, 4, 5];
+      case 'circuit':
+        return [2, 3, 4];
+      case 'megacircuit':
+        return [1, 2, 3];
+      default:
+        return [1, 2, 3, 4, 5];
+    }
+  };
+
+  /**
+   * Obtiene el tiempo de descanso recomendado
+   */
+  const getRecommendedRestTime = () => {
+    const typeConfig = getSelectedTypeConfig();
+    switch (typeConfig.type) {
+      case 'superset':
+      case 'triset':
+        return '90';
+      case 'circuit':
+        return '120';
+      case 'megacircuit':
+        return '180';
+      default:
+        return '90';
+    }
   };
 
   const typeConfig = getSelectedTypeConfig();
@@ -336,7 +441,7 @@ export default function SupersetBuilder({
                       <View style={styles.typeOptionHeader}>
                         <MaterialCommunityIcons
                           name={type.icon as any}
-                          size={32}
+                          size={36}
                           color={
                             selectedType === type.type ? "#FFFFFF" : type.color
                           }
@@ -363,6 +468,28 @@ export default function SupersetBuilder({
                         </View>
                       </View>
 
+                      {/* Ejemplo */}
+                      <View style={styles.typeOptionExample}>
+                        <Text
+                          style={[
+                            styles.exampleTitle,
+                            selectedType === type.type &&
+                              styles.exampleTitleSelected,
+                          ]}
+                        >
+                          Ejemplo:
+                        </Text>
+                        <Text
+                          style={[
+                            styles.exampleText,
+                            selectedType === type.type &&
+                              styles.exampleTextSelected,
+                          ]}
+                        >
+                          {type.example}
+                        </Text>
+                      </View>
+
                       <View style={styles.typeOptionBenefits}>
                         <Text
                           style={[
@@ -373,18 +500,21 @@ export default function SupersetBuilder({
                         >
                           Beneficios:
                         </Text>
-                        {type.benefits.map((benefit, index) => (
-                          <Text
-                            key={index}
-                            style={[
-                              styles.benefitText,
-                              selectedType === type.type &&
-                                styles.benefitTextSelected,
-                            ]}
-                          >
-                            • {benefit}
-                          </Text>
-                        ))}
+                        <View style={styles.benefitsGrid}>
+                          {type.benefits.map((benefit, index) => (
+                            <View key={index} style={styles.benefitTag}>
+                              <Text
+                                style={[
+                                  styles.benefitText,
+                                  selectedType === type.type &&
+                                    styles.benefitTextSelected,
+                                ]}
+                              >
+                                {benefit}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                       </View>
 
                       <View style={styles.typeOptionFooter}>
@@ -429,6 +559,30 @@ export default function SupersetBuilder({
                 ejercicios
               </Text>
 
+              {/* Botón de selección automática para circuitos */}
+              {(typeConfig.type === 'circuit' || typeConfig.type === 'megacircuit') && (
+                <View style={styles.autoSelectSection}>
+                  <Pressable
+                    onPress={autoSelectCircuitExercises}
+                    style={styles.autoSelectBtn}
+                  >
+                    <LinearGradient
+                      colors={[typeConfig.color + '30', typeConfig.color + '20']}
+                      style={styles.autoSelectGradient}
+                    >
+                      <MaterialCommunityIcons
+                        name="auto-fix"
+                        size={20}
+                        color={typeConfig.color}
+                      />
+                      <Text style={[styles.autoSelectText, { color: typeConfig.color }]}>
+                        Selección automática de {typeConfig.type === 'circuit' ? '6' : '10'} ejercicios variados
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+              )}
+
               {/* Ejercicios seleccionados (orden) */}
               {selectedExercises.length > 0 && (
                 <View style={styles.selectedExercisesSection}>
@@ -462,7 +616,7 @@ export default function SupersetBuilder({
                                 ]}
                               >
                                 <Text style={styles.exerciseOrderText}>
-                                  {String.fromCharCode(65 + index)}
+                                  {index + 1}
                                 </Text>
                               </View>
 
@@ -511,7 +665,9 @@ export default function SupersetBuilder({
 
               {/* Lista de ejercicios disponibles */}
               <View style={styles.availableExercisesSection}>
-                <Text style={styles.sectionTitle}>Ejercicios Disponibles</Text>
+                <Text style={styles.sectionTitle}>
+                  Ejercicios Disponibles ({exercises.length})
+                </Text>
 
                 <View style={styles.exercisesList}>
                   {exercises.map((exercise) => {
@@ -560,9 +716,7 @@ export default function SupersetBuilder({
                             ]}
                           >
                             <Text style={styles.exerciseSelectedBadgeText}>
-                              {String.fromCharCode(
-                                65 + selectedExercises.indexOf(exercise.id)
-                              )}
+                              {selectedExercises.indexOf(exercise.id) + 1}
                             </Text>
                           </View>
                         )}
@@ -597,7 +751,7 @@ export default function SupersetBuilder({
                       color={typeConfig.color}
                     />
                     <Text style={styles.configSummaryTitle}>
-                      Ejercicios Seleccionados
+                      {selectedExercises.length} Ejercicios Seleccionados
                     </Text>
                   </View>
 
@@ -611,7 +765,7 @@ export default function SupersetBuilder({
                           key={exerciseId}
                           style={styles.configSummaryExercise}
                         >
-                          {String.fromCharCode(65 + index)}. {exercise.name}
+                          {index + 1}. {exercise.name}
                         </Text>
                       );
                     })}
@@ -636,9 +790,14 @@ export default function SupersetBuilder({
 
               {/* Número de rondas */}
               <View style={styles.configField}>
-                <Text style={styles.configLabel}>Número de Rondas</Text>
+                <Text style={styles.configLabel}>
+                  Número de Rondas
+                  {typeConfig.type === 'megacircuit' && (
+                    <Text style={styles.configHint}> (Recomendado: 1-2 para mega circuitos)</Text>
+                  )}
+                </Text>
                 <View style={styles.roundsSelector}>
-                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                  {getRecommendedRounds().map((num) => (
                     <Pressable
                       key={num}
                       onPress={() => setRounds(num)}
@@ -663,14 +822,23 @@ export default function SupersetBuilder({
 
               {/* Tiempo de descanso */}
               <View style={styles.configField}>
-                <Text style={styles.configLabel}>Descanso entre rondas</Text>
+                <Text style={styles.configLabel}>
+                  Descanso entre rondas
+                  <Text style={styles.configHint}> (Recomendado: {getRecommendedRestTime()}s)</Text>
+                </Text>
                 <View style={styles.restTimeContainer}>
+                  <Pressable
+                    onPress={() => setRestTime(getRecommendedRestTime())}
+                    style={styles.recommendedBtn}
+                  >
+                    <Text style={styles.recommendedBtnText}>Recomendado</Text>
+                  </Pressable>
                   <TextInput
                     value={restTime}
                     onChangeText={setRestTime}
                     style={styles.restTimeInput}
                     keyboardType="numeric"
-                    placeholder="90"
+                    placeholder={getRecommendedRestTime()}
                     placeholderTextColor="#6B7280"
                     maxLength={3}
                   />
@@ -700,13 +868,33 @@ export default function SupersetBuilder({
                   <Text style={styles.finalPreviewSubtext}>
                     Descanso de {restTime}s entre rondas • Tiempo estimado: ~
                     {Math.round(
-                      ((selectedExercises.length * 60 +
+                      ((selectedExercises.length * 
+                        (typeConfig.type === 'megacircuit' ? 45 : 
+                         typeConfig.type === 'circuit' ? 30 : 60) +
                         parseInt(restTime || "90")) *
                         rounds) /
                         60
                     )}{" "}
                     minutos
                   </Text>
+
+                  {/* Información adicional según el tipo */}
+                  {typeConfig.type === 'circuit' && (
+                    <View style={styles.typeInfo}>
+                      <MaterialCommunityIcons name="information-outline" size={12} color={typeConfig.color} />
+                      <Text style={[styles.typeInfoText, { color: typeConfig.color }]}>
+                        Ideal para trabajo cardiovascular y quema de grasa
+                      </Text>
+                    </View>
+                  )}
+                  {typeConfig.type === 'megacircuit' && (
+                    <View style={styles.typeInfo}>
+                      <MaterialCommunityIcons name="fire" size={12} color={typeConfig.color} />
+                      <Text style={[styles.typeInfoText, { color: typeConfig.color }]}>
+                        Entrenamiento de alta intensidad - Hidratación y calentamiento esenciales
+                      </Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </View>
             </View>
@@ -715,7 +903,7 @@ export default function SupersetBuilder({
 
         {/* ===== BOTONES DE ACCIÓN SIMPLIFICADOS ===== */}
         <View style={styles.actions}>
-          {/* Botón Atrás - Mismo color que omitir (naranaja/amarillo) */}
+          {/* Botón Atrás */}
           <Pressable onPress={prevStep} style={styles.backBtn}>
             <Text style={styles.backText}>
               {currentStep === "type" ? "Cancelar" : "Atrás"}
@@ -871,27 +1059,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginHorizontal: 8,
   },
-  // Reemplaza los estilos existentes con estos:
-exerciseCountContainer: {
-  backgroundColor: 'rgba(255, 184, 77, 0.2)',
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 8,
-},
-
-exerciseCountContainerSelected: {
-  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-},
-
-exerciseCountText: {
-  fontSize: 12,
-  fontWeight: '600',
-  color: '#FFB84D',
-},
-
-exerciseCountTextSelected: {
-  color: '#FFFFFF',
-},
 
   progressLineCompleted: {
     backgroundColor: '#00D4AA',
@@ -961,7 +1128,7 @@ exerciseCountTextSelected: {
   typeOptionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     gap: 16,
   },
 
@@ -970,7 +1137,7 @@ exerciseCountTextSelected: {
   },
 
   typeOptionName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 4,
@@ -989,25 +1156,63 @@ exerciseCountTextSelected: {
     color: 'rgba(255, 255, 255, 0.8)',
   },
 
+  typeOptionExample: {
+    marginBottom: 16,
+  },
+
+  exampleTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 4,
+  },
+
+  exampleTitleSelected: {
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+
+  exampleText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+
+  exampleTextSelected: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+
   typeOptionBenefits: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
 
   benefitsTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#B0B0C4',
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
   benefitsTitleSelected: {
     color: 'rgba(255, 255, 255, 0.9)',
   },
 
+  benefitsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+
+  benefitTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
   benefitText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
-    marginBottom: 2,
+    fontWeight: '500',
   },
 
   benefitTextSelected: {
@@ -1018,23 +1223,51 @@ exerciseCountTextSelected: {
     alignItems: 'center',
   },
 
-// En SupersetBuilder.tsx
-exerciseCount: {
-  fontSize: 12,
-  fontWeight: '600',
-  color: '#FFB84D',
-  backgroundColor: 'rgba(255, 184, 77, 0.2)', // Línea problemática
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 8,
-},
+  exerciseCountContainer: {
+    backgroundColor: 'rgba(255, 184, 77, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
 
-  exerciseCountSelected: {
-    color: '#FFFFFF',
+  exerciseCountContainerSelected: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
 
+  exerciseCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFB84D',
+  },
+
+  exerciseCountTextSelected: {
+    color: '#FFFFFF',
+  },
+
   // ===== PASO 2: EJERCICIOS =====
+  autoSelectSection: {
+    marginBottom: 24,
+  },
+
+  autoSelectBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  autoSelectGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+
+  autoSelectText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
   selectedExercisesSection: {
     marginBottom: 24,
   },
@@ -1201,6 +1434,12 @@ exerciseCount: {
     marginBottom: 8,
   },
 
+  configHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '400',
+  },
+
   configInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
@@ -1250,6 +1489,19 @@ exerciseCount: {
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
+    gap: 8,
+  },
+
+  recommendedBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 184, 77, 0.2)',
+  },
+
+  recommendedBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFB84D',
   },
 
   restTimeInput: {
@@ -1305,6 +1557,20 @@ exerciseCount: {
     fontSize: 12,
     color: '#B0B0C4',
     fontStyle: 'italic',
+    marginBottom: 8,
+  },
+
+  typeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+
+  typeInfoText: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
   },
 
   // ===== BOTONES SIMPLIFICADOS =====
@@ -1317,7 +1583,6 @@ exerciseCount: {
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
 
-  // Botón Atrás - Mismo color que omitir (naranaja/amarillo)
   backBtn: {
     flex: 1,
     backgroundColor: 'rgba(255, 184, 77, 0.2)',

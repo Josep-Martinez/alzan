@@ -1,4 +1,4 @@
-// components/sport/AdvancedWorkoutBuilder.tsx - Constructor avanzado inspirado en Suunto/Garmin
+// components/sport/AdvancedWorkoutBuilder.tsx - Constructor avanzado con ruedas realistas
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
@@ -14,45 +14,42 @@ import {
 
 /**
  * Tipos de pasos de entrenamiento siguiendo el patrón de Garmin/Suunto
- * DATOS BD: Estructura para tabla workout_steps
  */
 interface WorkoutStep {
-  id: string; // BD: step_id (PRIMARY KEY)
-  name: string; // BD: step_name
-  stepType: 'warmup' | 'interval' | 'recovery' | 'cooldown'; // BD: step_type (ENUM)
-  durationType: 'time' | 'distance' | 'lap_button' | 'heart_rate'; // BD: duration_type (ENUM)
-  duration?: number; // BD: duration_seconds (tiempo en segundos)
-  distance?: number; // BD: distance_meters (distancia en metros)
-  targetType?: 'pace' | 'heart_rate' | 'power' | 'none'; // BD: target_type (ENUM)
-  targetMin?: number; // BD: target_min_value
-  targetMax?: number; // BD: target_max_value
-  color: string; // BD: step_color (para UI)
+  id: string;
+  name: string;
+  stepType: 'warmup' | 'interval' | 'recovery' | 'cooldown';
+  durationType: 'time' | 'distance' | 'lap_button';
+  duration?: number;
+  distance?: number;
+  targetType?: 'pace' | 'heart_rate' | 'power' | 'velocity' | 'none';
+  targetMin?: number;
+  targetMax?: number;
+  color: string;
 }
 
 /**
- * Estructura de loops/repeticiones como en Garmin Connect
- * DATOS BD: Tabla workout_loops con foreign key a workout_plans
+ * Estructura de loops/repeticiones
  */
 interface WorkoutLoop {
-  id: string; // BD: loop_id (PRIMARY KEY)
-  name: string; // BD: loop_name
-  repetitions: number; // BD: repetition_count
-  steps: WorkoutStep[]; // BD: Relación con workout_steps
-  color: string; // BD: loop_color
+  id: string;
+  name: string;
+  repetitions: number;
+  steps: WorkoutStep[];
+  color: string;
 }
 
 /**
  * Plan de entrenamiento completo
- * DATOS BD: Tabla workout_plans
  */
 interface WorkoutPlan {
-  id: string; // BD: plan_id (PRIMARY KEY)
-  name: string; // BD: plan_name
-  sport: 'running' | 'cycling' | 'swimming'; // BD: sport_type
-  steps: (WorkoutStep | WorkoutLoop)[]; // BD: Estructura JSON o relaciones
-  estimatedDuration: number; // BD: estimated_duration_seconds
-  estimatedDistance: number; // BD: estimated_distance_meters
-  createdAt: string; // BD: created_at
+  id: string;
+  name: string;
+  sport: 'running' | 'cycling' | 'swimming';
+  steps: (WorkoutStep | WorkoutLoop)[];
+  estimatedDuration: number;
+  estimatedDistance: number;
+  createdAt: string;
 }
 
 /**
@@ -66,8 +63,7 @@ interface AdvancedWorkoutBuilderProps {
 }
 
 /**
- * Plantillas predefinidas mejoradas (movidas desde OtherSportsSessions)
- * DATOS BD: Tabla workout_templates con datos predefinidos
+ * Plantillas predefinidas con valores realistas
  */
 const WORKOUT_TEMPLATES = {
   running: [
@@ -82,10 +78,10 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '1', 
           name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
+          stepType: 'warmup' as const, 
+          durationType: 'time' as const, 
           duration: 600, 
-          targetType: 'heart_rate', 
+          targetType: 'heart_rate' as const, 
           targetMin: 120, 
           targetMax: 140, 
           color: '#4CAF50' 
@@ -93,163 +89,21 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '2', 
           name: 'Rodaje Suave', 
-          stepType: 'interval', 
-          durationType: 'time', 
+          stepType: 'interval' as const, 
+          durationType: 'time' as const, 
           duration: 2400, 
-          targetType: 'pace', 
-          targetMin: 300, 
-          targetMax: 330, 
+          targetType: 'pace' as const, 
+          targetMin: 330, // 5:30 min/km
+          targetMax: 390, // 6:30 min/km
           color: '#00BCD4' 
         },
         { 
           id: '3', 
           name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
+          stepType: 'cooldown' as const, 
+          durationType: 'time' as const, 
           duration: 300, 
-          targetType: 'none', 
-          color: '#9C27B0' 
-        },
-      ]
-    },
-    {
-      id: 'intervals_400m',
-      name: 'Intervalos 400m',
-      description: 'Series de velocidad con descanso',
-      icon: 'speedometer',
-      color: '#FF5722',
-      estimatedTime: 40,
-      steps: [
-        { 
-          id: '1', 
-          name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'heart_rate', 
-          targetMin: 120, 
-          targetMax: 140, 
-          color: '#4CAF50' 
-        },
-        {
-          id: 'loop1',
-          name: 'Serie de Intervalos',
-          repetitions: 8,
-          steps: [
-            { 
-              id: '2', 
-              name: 'Intervalo 400m', 
-              stepType: 'interval', 
-              durationType: 'distance', 
-              distance: 400, 
-              targetType: 'pace', 
-              targetMin: 240, 
-              targetMax: 270, 
-              color: '#FF5722' 
-            },
-            { 
-              id: '3', 
-              name: 'Recuperación', 
-              stepType: 'recovery', 
-              durationType: 'time', 
-              duration: 90, 
-              targetType: 'heart_rate', 
-              targetMin: 110, 
-              targetMax: 130, 
-              color: '#2196F3' 
-            },
-          ],
-          color: '#FF9800'
-        },
-        { 
-          id: '4', 
-          name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'none', 
-          color: '#9C27B0' 
-        },
-      ]
-    },
-    {
-      id: 'tempo_20min',
-      name: 'Tempo 20 min',
-      description: '20 min a ritmo de umbral',
-      icon: 'timer',
-      color: '#FF9800',
-      estimatedTime: 35,
-      steps: [
-        { 
-          id: '1', 
-          name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
-          duration: 900, 
-          targetType: 'heart_rate', 
-          targetMin: 120, 
-          targetMax: 140, 
-          color: '#4CAF50' 
-        },
-        { 
-          id: '2', 
-          name: 'Tempo', 
-          stepType: 'interval', 
-          durationType: 'time', 
-          duration: 1200, 
-          targetType: 'pace', 
-          targetMin: 270, 
-          targetMax: 300, 
-          color: '#FF9800' 
-        },
-        { 
-          id: '3', 
-          name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'none', 
-          color: '#9C27B0' 
-        },
-      ]
-    },
-    {
-      id: 'long_run',
-      name: 'Tirada Larga 10K',
-      description: 'Carrera continua de resistencia',
-      icon: 'map-marker-distance',
-      color: '#00BCD4',
-      estimatedTime: 60,
-      steps: [
-        { 
-          id: '1', 
-          name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'heart_rate', 
-          targetMin: 120, 
-          targetMax: 140, 
-          color: '#4CAF50' 
-        },
-        { 
-          id: '2', 
-          name: 'Carrera Base', 
-          stepType: 'interval', 
-          durationType: 'distance', 
-          distance: 10000, 
-          targetType: 'heart_rate', 
-          targetMin: 130, 
-          targetMax: 150, 
-          color: '#00BCD4' 
-        },
-        { 
-          id: '3', 
-          name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
-          duration: 300, 
-          targetType: 'none', 
+          targetType: 'none' as const, 
           color: '#9C27B0' 
         },
       ]
@@ -267,10 +121,10 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '1', 
           name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
+          stepType: 'warmup' as const, 
+          durationType: 'time' as const, 
           duration: 900, 
-          targetType: 'power', 
+          targetType: 'power' as const, 
           targetMin: 120, 
           targetMax: 150, 
           color: '#4CAF50' 
@@ -278,10 +132,10 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '2', 
           name: 'Zona Aeróbica', 
-          stepType: 'interval', 
-          durationType: 'distance', 
+          stepType: 'interval' as const, 
+          durationType: 'distance' as const, 
           distance: 60000, 
-          targetType: 'power', 
+          targetType: 'power' as const, 
           targetMin: 180, 
           targetMax: 220, 
           color: '#00BCD4' 
@@ -289,72 +143,10 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '3', 
           name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
+          stepType: 'cooldown' as const, 
+          durationType: 'time' as const, 
           duration: 600, 
-          targetType: 'power', 
-          targetMin: 100, 
-          targetMax: 130, 
-          color: '#9C27B0' 
-        },
-      ]
-    },
-    {
-      id: 'power_intervals',
-      name: 'Intervalos de Potencia',
-      description: 'Series de potencia con recuperación',
-      icon: 'speedometer',
-      color: '#FF5722',
-      estimatedTime: 75,
-      steps: [
-        { 
-          id: '1', 
-          name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'time', 
-          duration: 900, 
-          targetType: 'power', 
-          targetMin: 120, 
-          targetMax: 150, 
-          color: '#4CAF50' 
-        },
-        {
-          id: 'loop1',
-          name: 'Serie de Potencia',
-          repetitions: 5,
-          steps: [
-            { 
-              id: '2', 
-              name: 'Trabajo', 
-              stepType: 'interval', 
-              durationType: 'time', 
-              duration: 240, 
-              targetType: 'power', 
-              targetMin: 300, 
-              targetMax: 350, 
-              color: '#FF5722' 
-            },
-            { 
-              id: '3', 
-              name: 'Recuperación', 
-              stepType: 'recovery', 
-              durationType: 'time', 
-              duration: 180, 
-              targetType: 'power', 
-              targetMin: 120, 
-              targetMax: 150, 
-              color: '#2196F3' 
-            },
-          ],
-          color: '#FF9800'
-        },
-        { 
-          id: '4', 
-          name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'time', 
-          duration: 600, 
-          targetType: 'power', 
+          targetType: 'power' as const, 
           targetMin: 100, 
           targetMax: 130, 
           color: '#9C27B0' 
@@ -374,54 +166,32 @@ const WORKOUT_TEMPLATES = {
         { 
           id: '1', 
           name: 'Calentamiento', 
-          stepType: 'warmup', 
-          durationType: 'distance', 
+          stepType: 'warmup' as const, 
+          durationType: 'distance' as const, 
           distance: 400, 
-          targetType: 'none', 
+          targetType: 'pace' as const, 
+          targetMin: 150, // 2:30 min/100m
+          targetMax: 180, // 3:00 min/100m
           color: '#4CAF50' 
-        },
-        {
-          id: 'loop1',
-          name: 'Serie de Técnica',
-          repetitions: 4,
-          steps: [
-            { 
-              id: '2', 
-              name: 'Técnica', 
-              stepType: 'interval', 
-              durationType: 'distance', 
-              distance: 200, 
-              targetType: 'none', 
-              color: '#FF9800' 
-            },
-            { 
-              id: '3', 
-              name: 'Descanso', 
-              stepType: 'recovery', 
-              durationType: 'time', 
-              duration: 30, 
-              targetType: 'none', 
-              color: '#2196F3' 
-            },
-          ],
-          color: '#FFB84D'
         },
         { 
           id: '4', 
           name: 'Serie Principal', 
-          stepType: 'interval', 
-          durationType: 'distance', 
+          stepType: 'interval' as const, 
+          durationType: 'distance' as const, 
           distance: 800, 
-          targetType: 'none', 
+          targetType: 'heart_rate' as const, 
+          targetMin: 140, 
+          targetMax: 160, 
           color: '#00BCD4' 
         },
         { 
           id: '5', 
           name: 'Enfriamiento', 
-          stepType: 'cooldown', 
-          durationType: 'distance', 
+          stepType: 'cooldown' as const, 
+          durationType: 'distance' as const, 
           distance: 200, 
-          targetType: 'none', 
+          targetType: 'none' as const, 
           color: '#9C27B0' 
         },
       ]
@@ -431,8 +201,6 @@ const WORKOUT_TEMPLATES = {
 
 /**
  * Componente principal del constructor avanzado
- * Implementa patrones de UX de Garmin Connect y Suunto App
- * DATOS BD: Crea planes en workout_plans y relaciona con workout_steps/workout_loops
  */
 export default function AdvancedWorkoutBuilder({
   sport,
@@ -443,10 +211,8 @@ export default function AdvancedWorkoutBuilder({
   // ===== ESTADOS =====
   const [workoutName, setWorkoutName] = useState('');
   const [steps, setSteps] = useState<(WorkoutStep | WorkoutLoop)[]>([]);
-  const [editingItem, setEditingItem] = useState<WorkoutStep | WorkoutLoop | null>(null);
+  const [editingItem, setEditingItem] = useState<WorkoutStep | null>(null);
   const [showItemEditor, setShowItemEditor] = useState(false);
-  const [showLoopBuilder, setShowLoopBuilder] = useState(false);
-  const [selectedStepsForLoop, setSelectedStepsForLoop] = useState<string[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
 
   /**
@@ -460,10 +226,9 @@ export default function AdvancedWorkoutBuilder({
           color: '#4ECDC4',
           icon: 'run',
           targetTypes: [
-            { value: 'pace', label: 'Ritmo', unit: 'min/km', inputType: 'pace' },
-            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm', inputType: 'bpm' },
-            { value: 'power', label: 'Potencia', unit: 'W', inputType: 'power' },
-            { value: 'velocity', label: 'Velocidad', unit: 'km/h', inputType: 'velocity' },
+            { value: 'pace', label: 'Ritmo', unit: 'min/km' },
+            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
+            { value: 'velocity', label: 'Velocidad', unit: 'km/h' },
             { value: 'none', label: 'Sin Objetivo', unit: '' }
           ],
           durationTypes: [
@@ -472,17 +237,17 @@ export default function AdvancedWorkoutBuilder({
             { value: 'lap_button', label: 'Botón de vuelta', unit: '' }
           ]
         };
-        case 'cycling':
-          return {
-            name: 'Ciclismo',
-            color: '#45B7D1',
-            icon: 'bike',
-            targetTypes: [
-              { value: 'power', label: 'Potencia', unit: 'W', inputType: 'power' },
-              { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm', inputType: 'bpm' },
-              { value: 'velocity', label: 'Velocidad', unit: 'km/h', inputType: 'velocity' },
-              { value: 'none', label: 'Sin Objetivo', unit: '' }
-            ],
+      case 'cycling':
+        return {
+          name: 'Ciclismo',
+          color: '#45B7D1',
+          icon: 'bike',
+          targetTypes: [
+            { value: 'power', label: 'Potencia', unit: 'W' },
+            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
+            { value: 'velocity', label: 'Velocidad', unit: 'km/h' },
+            { value: 'none', label: 'Sin Objetivo', unit: '' }
+          ],
           durationTypes: [
             { value: 'time', label: 'Tiempo', unit: 'min' },
             { value: 'distance', label: 'Distancia', unit: 'km' },
@@ -495,6 +260,8 @@ export default function AdvancedWorkoutBuilder({
           color: '#96CEB4',
           icon: 'swim',
           targetTypes: [
+            { value: 'pace', label: 'Ritmo', unit: 'min/100m' },
+            { value: 'heart_rate', label: 'Frecuencia Cardíaca', unit: 'ppm' },
             { value: 'none', label: 'Sin Objetivo', unit: '' }
           ],
           durationTypes: [
@@ -521,7 +288,6 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Carga una plantilla predefinida
-   * DATOS BD: Clona datos de workout_templates a nuevo workout_plan
    */
   const loadTemplate = (template: any) => {
     setWorkoutName(template.name);
@@ -533,7 +299,6 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Añade un nuevo paso individual
-   * DATOS BD: Nuevo registro en workout_steps
    */
   const addStep = (stepType: WorkoutStep['stepType']) => {
     const newStep: WorkoutStep = {
@@ -550,15 +315,17 @@ export default function AdvancedWorkoutBuilder({
   };
 
   /**
-   * Edita un paso o loop - NUEVA FUNCIONALIDAD
+   * Edita un paso
    */
   const editItem = (item: WorkoutStep | WorkoutLoop) => {
-    setEditingItem(item);
-    setShowItemEditor(true);
+    if ('stepType' in item) {
+      setEditingItem(item);
+      setShowItemEditor(true);
+    }
   };
 
   /**
-   * Guarda cambios en un paso - NUEVA FUNCIONALIDAD MEJORADA
+   * Guarda cambios en un paso
    */
   const saveStep = (updatedStep: WorkoutStep) => {
     setSteps(steps.map(item => 
@@ -566,49 +333,6 @@ export default function AdvancedWorkoutBuilder({
     ));
     setShowItemEditor(false);
     setEditingItem(null);
-  };
-
-  /**
-   * Crea un loop con los pasos seleccionados
-   * DATOS BD: Nuevo registro en workout_loops con relaciones a workout_steps
-   */
-  const createLoop = (repetitions: number) => {
-    if (selectedStepsForLoop.length < 2) return;
-
-    // Obtener pasos en el orden seleccionado (orden importa para ejecución)
-    const selectedSteps = selectedStepsForLoop.map(stepId => 
-      steps.find(item => 'stepType' in item && item.id === stepId)
-    ).filter(Boolean) as WorkoutStep[];
-
-    const newLoop: WorkoutLoop = {
-      id: `loop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: `Repetir ${repetitions}x`,
-      repetitions,
-      steps: selectedSteps.map(step => ({
-        ...step,
-        id: `${step.id}_loop_${Date.now()}`
-      })),
-      color: '#FF9800'
-    };
-
-    // Remover pasos individuales y añadir loop
-    const remainingSteps = steps.filter(item => 
-      !('stepType' in item) || !selectedStepsForLoop.includes(item.id)
-    );
-    
-    setSteps([...remainingSteps, newLoop]);
-    setSelectedStepsForLoop([]);
-    setShowLoopBuilder(false);
-  };
-
-  /**
-   * Reordena los ejercicios seleccionados para el loop
-   */
-  const reorderSelectedStep = (fromIndex: number, toIndex: number) => {
-    const newOrder = [...selectedStepsForLoop];
-    const [movedItem] = newOrder.splice(fromIndex, 1);
-    newOrder.splice(toIndex, 0, movedItem);
-    setSelectedStepsForLoop(newOrder);
   };
 
   /**
@@ -625,7 +349,7 @@ export default function AdvancedWorkoutBuilder({
   };
 
   /**
-   * Obtiene el color del tipo de paso siguiendo el patrón de Garmin
+   * Obtiene el color del tipo de paso
    */
   const getStepColor = (stepType: WorkoutStep['stepType']) => {
     const colors = {
@@ -663,15 +387,20 @@ export default function AdvancedWorkoutBuilder({
    * Formatea el objetivo de intensidad
    */
   const formatTarget = (item: WorkoutStep) => {
-    if (item.targetType === 'none') return '';
+    if (item.targetType === 'none' || !item.targetMin || !item.targetMax) return '';
+    
     if (item.targetType === 'pace') {
-      const minTime = Math.floor(item.targetMin! / 60);
-      const minSecs = item.targetMin! % 60;
-      const maxTime = Math.floor(item.targetMax! / 60);
-      const maxSecs = item.targetMax! % 60;
-      return `${minTime}:${minSecs.toString().padStart(2, '0')} - ${maxTime}:${maxSecs.toString().padStart(2, '0')} min/km`;
+      const minTime = Math.floor(item.targetMin / 60);
+      const minSecs = item.targetMin % 60;
+      const maxTime = Math.floor(item.targetMax / 60);
+      const maxSecs = item.targetMax % 60;
+      
+      const unit = sport === 'swimming' ? 'min/100m' : 'min/km';
+      return `${minTime}:${minSecs.toString().padStart(2, '0')} - ${maxTime}:${maxSecs.toString().padStart(2, '0')} ${unit}`;
     }
-    return `${item.targetMin} - ${item.targetMax} ${config.targetTypes.find(t => t.value === item.targetType)?.unit}`;
+    
+    const targetType = config.targetTypes.find(t => t.value === item.targetType);
+    return `${item.targetMin} - ${item.targetMax} ${targetType?.unit || ''}`;
   };
 
   /**
@@ -683,13 +412,11 @@ export default function AdvancedWorkoutBuilder({
     
     steps.forEach(item => {
       if ('repetitions' in item) {
-        // Es un loop
         item.steps.forEach(step => {
           totalTime += (step.duration || 0) * item.repetitions;
           totalDistance += (step.distance || 0) * item.repetitions;
         });
       } else {
-        // Es un paso individual
         totalTime += item.duration || 0;
         totalDistance += item.distance || 0;
       }
@@ -702,7 +429,6 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Elimina un paso o loop
-   * DATOS BD: DELETE de workout_steps o workout_loops
    */
   const deleteItem = (itemId: string) => {
     setSteps(steps.filter(item => item.id !== itemId));
@@ -710,7 +436,6 @@ export default function AdvancedWorkoutBuilder({
 
   /**
    * Guarda el plan de entrenamiento
-   * DATOS BD: INSERT en workout_plans con todas las relaciones
    */
   const saveWorkout = () => {
     const workoutPlan: WorkoutPlan = {
@@ -755,26 +480,9 @@ export default function AdvancedWorkoutBuilder({
               <Text style={styles.workoutItemName}>{item.name}</Text>
               
               {isLoop ? (
-                <View style={styles.loopInfo}>
-                  <Text style={styles.workoutItemDetails}>
-                    {item.repetitions} repeticiones • {item.steps.length} pasos
-                  </Text>
-                  
-                  {/* Pasos dentro del loop */}
-                  <View style={styles.loopSteps}>
-                    {item.steps.map((step, stepIdx) => (
-                      <View key={step.id} style={styles.loopStepItem}>
-                        <View style={[styles.loopStepIndicator, { backgroundColor: step.color }]} />
-                        <Text style={styles.loopStepText}>
-                          {String.fromCharCode(65 + stepIdx)}. {step.name}
-                          {step.durationType === 'time' && step.duration ? ` ${formatTime(step.duration)}` : ''}
-                          {step.durationType === 'distance' && step.distance ? ` ${formatDistance(step.distance)}` : ''}
-                          {formatTarget(step) && ` • ${formatTarget(step)}`}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+                <Text style={styles.workoutItemDetails}>
+                  {item.repetitions} repeticiones • {item.steps.length} pasos
+                </Text>
               ) : (
                 <Text style={styles.workoutItemDetails}>
                   {item.durationType === 'time' && item.duration ? formatTime(item.duration) : ''}
@@ -789,29 +497,6 @@ export default function AdvancedWorkoutBuilder({
               <MaterialCommunityIcons name="trash-can" size={18} color="#FF6B6B" />
             </Pressable>
           </View>
-          
-          {/* Checkbox para seleccionar para loop */}
-          {!isLoop && (
-            <Pressable
-              onPress={() => {
-                if (selectedStepsForLoop.includes(item.id)) {
-                  setSelectedStepsForLoop(prev => prev.filter(id => id !== item.id));
-                } else {
-                  setSelectedStepsForLoop(prev => [...prev, item.id]);
-                }
-              }}
-              style={styles.stepSelector}
-            >
-              <MaterialCommunityIcons
-                name={selectedStepsForLoop.includes(item.id) ? "checkbox-marked" : "checkbox-blank-outline"}
-                size={20}
-                color={selectedStepsForLoop.includes(item.id) ? "#00D4AA" : "#B0B0C4"}
-              />
-              <Text style={styles.stepSelectorText}>
-                {selectedStepsForLoop.includes(item.id) ? "Seleccionado para loop" : "Seleccionar para loop"}
-              </Text>
-            </Pressable>
-          )}
         </LinearGradient>
       </Pressable>
     );
@@ -846,7 +531,7 @@ export default function AdvancedWorkoutBuilder({
             />
           </View>
 
-          {/* ===== PLANTILLAS RÁPIDAS (MINIMIZABLES) ===== */}
+          {/* ===== PLANTILLAS RÁPIDAS ===== */}
           <View style={styles.templatesSection}>
             <Pressable 
               onPress={() => setShowTemplates(!showTemplates)}
@@ -909,27 +594,6 @@ export default function AdvancedWorkoutBuilder({
             </View>
           </View>
 
-          {/* ===== CREAR LOOP ===== */}
-          {selectedStepsForLoop.length >= 2 && (
-            <View style={styles.loopBuilderSection}>
-              <LinearGradient
-                colors={["#FF9800", "#F57C00"]}
-                style={styles.loopBuilderGradient}
-              >
-                <MaterialCommunityIcons name="repeat" size={20} color="#FFFFFF" />
-                <Text style={styles.loopBuilderText}>
-                  Crear Loop con {selectedStepsForLoop.length} pasos
-                </Text>
-                <Pressable
-                  onPress={() => setShowLoopBuilder(true)}
-                  style={styles.loopBuilderBtn}
-                >
-                  <Text style={styles.loopBuilderBtnText}>Crear</Text>
-                </Pressable>
-              </LinearGradient>
-            </View>
-          )}
-
           {/* ===== ESTRUCTURA DEL ENTRENAMIENTO ===== */}
           <View style={styles.workoutStructure}>
             <Text style={styles.sectionTitle}>Estructura del Entrenamiento ({steps.length})</Text>
@@ -988,91 +652,14 @@ export default function AdvancedWorkoutBuilder({
           </Pressable>
         </View>
 
-        {/* ===== MODAL CONSTRUCTOR DE LOOPS CON REORDENAMIENTO ===== */}
-        <Modal
-          visible={showLoopBuilder}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={() => setShowLoopBuilder(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <LinearGradient
-              colors={['#0F0F23', '#1A1A3A', '#2D2D5F']}
-              style={styles.loopBuilderModal}
-            >
-              <Text style={styles.loopBuilderModalTitle}>Crear Loop de Repetición</Text>
-              
-              <Text style={styles.loopBuilderModalText}>
-                Orden de ejecución (el primero se ejecuta primero):
-              </Text>
-              
-              <View style={styles.selectedStepsList}>
-                {selectedStepsForLoop.map((stepId, index) => {
-                  const step = steps.find(s => s.id === stepId) as WorkoutStep;
-                  return (
-                    <View key={stepId} style={styles.selectedStepItem}>
-                      <View style={[styles.selectedStepIndicator, { backgroundColor: step.color }]} />
-                      <Text style={styles.selectedStepText}>
-                        {index + 1}. {step.name}
-                      </Text>
-                      
-                      {/* Botones de reordenamiento */}
-                      <View style={styles.reorderButtons}>
-                        {index > 0 && (
-                          <Pressable
-                            onPress={() => reorderSelectedStep(index, index - 1)}
-                            style={styles.reorderBtn}
-                          >
-                            <MaterialCommunityIcons name="arrow-up" size={16} color="#00D4AA" />
-                          </Pressable>
-                        )}
-                        {index < selectedStepsForLoop.length - 1 && (
-                          <Pressable
-                            onPress={() => reorderSelectedStep(index, index + 1)}
-                            style={styles.reorderBtn}
-                          >
-                            <MaterialCommunityIcons name="arrow-down" size={16} color="#00D4AA" />
-                          </Pressable>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-              
-              <View style={styles.repetitionsInput}>
-                <Text style={styles.repetitionsLabel}>Número de repeticiones:</Text>
-                <View style={styles.repetitionsButtons}>
-                  {[2, 3, 4, 5, 8, 10].map((num) => (
-                    <Pressable
-                      key={num}
-                      onPress={() => createLoop(num)}
-                      style={styles.repetitionBtn}
-                    >
-                      <Text style={styles.repetitionBtnText}>{num}x</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              
-              <Pressable
-                onPress={() => setShowLoopBuilder(false)}
-                style={styles.loopBuilderCancelBtn}
-              >
-                <Text style={styles.loopBuilderCancelText}>Cancelar</Text>
-              </Pressable>
-            </LinearGradient>
-          </View>
-        </Modal>
-
-        {/* ===== MODAL EDITOR DE PASOS ESTILO GARMIN ===== */}
+        {/* ===== MODAL EDITOR DE PASOS CON RUEDAS ===== */}
         <Modal
           visible={showItemEditor}
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={() => setShowItemEditor(false)}
         >
-          {editingItem && 'stepType' in editingItem && (
+          {editingItem && (
             <StepEditor
               step={editingItem}
               sport={sport}
@@ -1088,7 +675,7 @@ export default function AdvancedWorkoutBuilder({
 }
 
 /**
- * Componente Editor de Pasos estilo Garmin/Suunto
+ * Componente Editor de Pasos con ruedas realistas
  */
 interface StepEditorProps {
   step: WorkoutStep;
@@ -1109,25 +696,291 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
     onSave(editedStep);
   };
 
-  const formatDurationValue = () => {
-    if (editedStep.durationType === 'time' && editedStep.duration) {
-      return Math.floor(editedStep.duration / 60).toString();
+  /**
+   * Genera rangos realistas para cada tipo de objetivo según el deporte
+   */
+  const getTargetRanges = () => {
+    switch (sport) {
+      case 'running':
+        return {
+          pace: {
+            minMinutes: [3, 4, 5, 6, 7, 8, 9, 10],
+            minSeconds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+            maxMinutes: [3, 4, 5, 6, 7, 8, 9, 10],
+            maxSeconds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+            unit: 'min/km'
+          },
+          heart_rate: {
+            min: Array.from({length: 101}, (_, i) => i + 100),
+            max: Array.from({length: 101}, (_, i) => i + 100),
+            unit: 'ppm'
+          },
+          velocity: {
+            min: Array.from({length: 26}, (_, i) => (i + 7.5).toFixed(1)),
+            max: Array.from({length: 26}, (_, i) => (i + 7.5).toFixed(1)),
+            unit: 'km/h'
+          }
+        };
+      case 'cycling':
+        return {
+          power: {
+            min: Array.from({length: 301}, (_, i) => i + 100),
+            max: Array.from({length: 301}, (_, i) => i + 100),
+            unit: 'W'
+          },
+          heart_rate: {
+            min: Array.from({length: 101}, (_, i) => i + 100),
+            max: Array.from({length: 101}, (_, i) => i + 100),
+            unit: 'ppm'
+          },
+          velocity: {
+            min: Array.from({length: 36}, (_, i) => i + 15),
+            max: Array.from({length: 36}, (_, i) => i + 15),
+            unit: 'km/h'
+          }
+        };
+      case 'swimming':
+        return {
+          heart_rate: {
+            min: Array.from({length: 81}, (_, i) => i + 100),
+            max: Array.from({length: 81}, (_, i) => i + 100),
+            unit: 'ppm'
+          },
+          pace: {
+            minMinutes: [1, 2, 3, 4, 5],
+            minSeconds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+            maxMinutes: [1, 2, 3, 4, 5],
+            maxSeconds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+            unit: 'min/100m'
+          }
+        };
+      default:
+        return {};
     }
-    if (editedStep.durationType === 'distance' && editedStep.distance) {
-      return sport === 'swimming' 
-        ? editedStep.distance.toString()
-        : (editedStep.distance / 1000).toString();
-    }
-    return '';
   };
 
-  const handleDurationValueChange = (value: string) => {
-    const numValue = parseFloat(value) || 0;
-    if (editedStep.durationType === 'time') {
-      updateStep('duration', numValue * 60);
-    } else if (editedStep.durationType === 'distance') {
-      const meters = sport === 'swimming' ? numValue : numValue * 1000;
-      updateStep('distance', meters);
+  /**
+   * Formatea el valor del objetivo para mostrar
+   */
+  const formatTargetValue = (value: number, type: string) => {
+    if (type === 'pace') {
+      const minutes = Math.floor(value / 60);
+      const seconds = value % 60;
+      const unit = sport === 'swimming' ? '/100m' : '/km';
+      return `${minutes}:${seconds.toString().padStart(2, '0')}${unit}`;
+    }
+    const ranges = getTargetRanges();
+    const targetRange = ranges[type as keyof typeof ranges] as any;
+    return `${value} ${targetRange?.unit || ''}`;
+  };
+
+  const targetRanges = getTargetRanges();
+
+  /**
+   * Componente Picker personalizado estilo iOS
+   */
+  const TargetPicker = ({ targetType }: { targetType: string }) => {
+    const ranges = targetRanges[targetType as keyof typeof targetRanges] as any;
+    if (!ranges) return null;
+
+    if (targetType === 'pace') {
+      const currentMinValue = editedStep.targetMin || 0;
+      const currentMaxValue = editedStep.targetMax || 0;
+      
+      const minMinutes = Math.floor(currentMinValue / 60);
+      const minSeconds = currentMinValue % 60;
+      const maxMinutes = Math.floor(currentMaxValue / 60);
+      const maxSeconds = currentMaxValue % 60;
+
+      return (
+        <View style={styles.pacePicker}>
+          <Text style={styles.pacePickerTitle}>Rango de Ritmo</Text>
+          
+          <View style={styles.paceRow}>
+            <Text style={styles.paceLabel}>Mínimo:</Text>
+            <View style={styles.paceInputs}>
+              <View style={styles.paceColumn}>
+                <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                  {ranges.minMinutes.map((min: number) => (
+                    <Pressable
+                      key={min}
+                      onPress={() => {
+                        const newValue = min * 60 + minSeconds;
+                        updateStep('targetMin', newValue);
+                      }}
+                      style={[
+                        styles.pickerItem,
+                        minMinutes === min && styles.pickerItemSelected
+                      ]}
+                    >
+                      <Text style={[
+                        styles.pickerText,
+                        minMinutes === min && styles.pickerTextSelected
+                      ]}>
+                        {min}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Text style={styles.pickerUnit}>min</Text>
+              </View>
+              
+              <Text style={styles.paceSeparator}>:</Text>
+              
+              <View style={styles.paceColumn}>
+                <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                  {ranges.minSeconds.map((sec: number) => (
+                    <Pressable
+                      key={sec}
+                      onPress={() => {
+                        const newValue = minMinutes * 60 + sec;
+                        updateStep('targetMin', newValue);
+                      }}
+                      style={[
+                        styles.pickerItem,
+                        minSeconds === sec && styles.pickerItemSelected
+                      ]}
+                    >
+                      <Text style={[
+                        styles.pickerText,
+                        minSeconds === sec && styles.pickerTextSelected
+                      ]}>
+                        {sec.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Text style={styles.pickerUnit}>seg</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.rangeSeparator}>-</Text>
+
+          <View style={styles.paceRow}>
+            <Text style={styles.paceLabel}>Máximo:</Text>
+            <View style={styles.paceInputs}>
+              <View style={styles.paceColumn}>
+                <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                  {ranges.maxMinutes.map((min: number) => (
+                    <Pressable
+                      key={min}
+                      onPress={() => {
+                        const newValue = min * 60 + maxSeconds;
+                        updateStep('targetMax', newValue);
+                      }}
+                      style={[
+                        styles.pickerItem,
+                        maxMinutes === min && styles.pickerItemSelected
+                      ]}
+                    >
+                      <Text style={[
+                        styles.pickerText,
+                        maxMinutes === min && styles.pickerTextSelected
+                      ]}>
+                        {min}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Text style={styles.pickerUnit}>min</Text>
+              </View>
+              
+              <Text style={styles.paceSeparator}>:</Text>
+              
+              <View style={styles.paceColumn}>
+                <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                  {ranges.maxSeconds.map((sec: number) => (
+                    <Pressable
+                      key={sec}
+                      onPress={() => {
+                        const newValue = maxMinutes * 60 + sec;
+                        updateStep('targetMax', newValue);
+                      }}
+                      style={[
+                        styles.pickerItem,
+                        maxSeconds === sec && styles.pickerItemSelected
+                      ]}
+                    >
+                      <Text style={[
+                        styles.pickerText,
+                        maxSeconds === sec && styles.pickerTextSelected
+                      ]}>
+                        {sec.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Text style={styles.pickerUnit}>seg</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.targetPreview}>
+            Objetivo: {formatTargetValue(editedStep.targetMin || 0, 'pace')} - {formatTargetValue(editedStep.targetMax || 0, 'pace')}
+          </Text>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.simplePicker}>
+          <Text style={styles.simplePickerTitle}>Rango de {config.targetTypes.find((t: any) => t.value === targetType)?.label}</Text>
+          
+          <View style={styles.simplePickerRow}>
+            <View style={styles.simplePickerColumn}>
+              <Text style={styles.simplePickerLabel}>Mínimo</Text>
+              <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                {ranges.min.map((value: any) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => updateStep('targetMin', parseFloat(value))}
+                    style={[
+                      styles.pickerItem,
+                      editedStep.targetMin === parseFloat(value) && styles.pickerItemSelected
+                    ]}
+                  >
+                    <Text style={[
+                      styles.pickerText,
+                      editedStep.targetMin === parseFloat(value) && styles.pickerTextSelected
+                    ]}>
+                      {value}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            <Text style={styles.rangeSeparator}>-</Text>
+
+            <View style={styles.simplePickerColumn}>
+              <Text style={styles.simplePickerLabel}>Máximo</Text>
+              <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+                {ranges.max.map((value: any) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => updateStep('targetMax', parseFloat(value))}
+                    style={[
+                      styles.pickerItem,
+                      editedStep.targetMax === parseFloat(value) && styles.pickerItemSelected
+                    ]}
+                  >
+                    <Text style={[
+                      styles.pickerText,
+                      editedStep.targetMax === parseFloat(value) && styles.pickerTextSelected
+                    ]}>
+                      {value}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+
+          <Text style={styles.targetPreview}>
+            Objetivo: {editedStep.targetMin || 0} - {editedStep.targetMax || 0} {ranges.unit}
+          </Text>
+        </View>
+      );
     }
   };
 
@@ -1154,7 +1007,7 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
               <Pressable
                 key={phase.type}
                 onPress={() => {
-                  updateStep('stepType', phase.type);
+                  updateStep('stepType', phase.type as WorkoutStep['stepType']);
                   updateStep('color', phase.color);
                 }}
                 style={[
@@ -1191,7 +1044,6 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
         <View style={styles.editorSection}>
           <Text style={styles.editorLabel}>Duración</Text>
           
-          {/* Selector de tipo de duración */}
           <View style={styles.durationTypeSelector}>
             {config.durationTypes.map((durationType: any) => (
               <Pressable
@@ -1212,12 +1064,26 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
             ))}
           </View>
 
-          {/* Input de valor */}
           {editedStep.durationType !== 'lap_button' && (
             <View style={styles.durationValueContainer}>
               <TextInput
-                value={formatDurationValue()}
-                onChangeText={handleDurationValueChange}
+                value={editedStep.durationType === 'time' 
+                  ? Math.floor((editedStep.duration || 0) / 60).toString()
+                  : editedStep.durationType === 'distance' 
+                    ? (sport === 'swimming' 
+                        ? (editedStep.distance || 0).toString()
+                        : ((editedStep.distance || 0) / 1000).toString())
+                    : ''
+                }
+                onChangeText={(value) => {
+                  const numValue = parseFloat(value) || 0;
+                  if (editedStep.durationType === 'time') {
+                    updateStep('duration', numValue * 60);
+                  } else if (editedStep.durationType === 'distance') {
+                    const meters = sport === 'swimming' ? numValue : numValue * 1000;
+                    updateStep('distance', meters);
+                  }
+                }}
                 style={styles.durationValueInput}
                 keyboardType="numeric"
                 placeholder="0"
@@ -1235,7 +1101,6 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
         <View style={styles.editorSection}>
           <Text style={styles.editorLabel}>Objetivo</Text>
           
-          {/* Selector de tipo de objetivo */}
           <View style={styles.targetTypeSelector}>
             {config.targetTypes.map((targetType: any) => (
               <Pressable
@@ -1256,39 +1121,8 @@ function StepEditor({ step, sport, config, onSave, onClose }: StepEditorProps) {
             ))}
           </View>
 
-          {/* Inputs de rango de objetivo */}
-          {editedStep.targetType !== 'none' && (
-            <View style={styles.targetRangeContainer}>
-              <View style={styles.targetRangeInputGroup}>
-                <Text style={styles.targetRangeLabel}>Mínimo</Text>
-                <TextInput
-                  value={editedStep.targetMin?.toString() || ''}
-                  onChangeText={(text) => updateStep('targetMin', parseInt(text) || 0)}
-                  style={styles.targetRangeInput}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#6B7280"
-                />
-              </View>
-              
-              <Text style={styles.targetRangeSeparator}>-</Text>
-              
-              <View style={styles.targetRangeInputGroup}>
-                <Text style={styles.targetRangeLabel}>Máximo</Text>
-                <TextInput
-                  value={editedStep.targetMax?.toString() || ''}
-                  onChangeText={(text) => updateStep('targetMax', parseInt(text) || 0)}
-                  style={styles.targetRangeInput}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#6B7280"
-                />
-              </View>
-
-              <Text style={styles.targetRangeUnit}>
-                {config.targetTypes.find((t: any) => t.value === editedStep.targetType)?.unit || ''}
-              </Text>
-            </View>
+          {editedStep.targetType !== 'none' && editedStep.targetType && (
+            <TargetPicker targetType={editedStep.targetType} />
           )}
         </View>
       </ScrollView>
@@ -1447,39 +1281,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  loopBuilderSection: {
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  loopBuilderGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 8,
-  },
-
-  loopBuilderText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-
-  loopBuilderBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-
-  loopBuilderBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
   workoutStructure: {
     marginBottom: 20,
   },
@@ -1525,53 +1326,10 @@ const styles = StyleSheet.create({
     color: '#B0B0C4',
   },
 
-  loopInfo: {
-    marginTop: 4,
-  },
-
-  loopSteps: {
-    marginTop: 8,
-    marginLeft: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: 'rgba(255, 255, 255, 0.2)',
-    paddingLeft: 8,
-  },
-
-  loopStepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 8,
-  },
-
-  loopStepIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-
-  loopStepText: {
-    fontSize: 11,
-    color: '#B0B0C4',
-    flex: 1,
-  },
-
   deleteItemBtn: {
     padding: 8,
     backgroundColor: 'rgba(255, 107, 107, 0.2)',
     borderRadius: 8,
-  },
-
-  stepSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-
-  stepSelectorText: {
-    fontSize: 12,
-    color: '#B0B0C4',
   },
 
   summarySection: {
@@ -1647,120 +1405,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Loop Builder Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-
-  loopBuilderModal: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 24,
-  },
-
-  loopBuilderModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-
-  loopBuilderModalText: {
-    fontSize: 14,
-    color: '#B0B0C4',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-
-  selectedStepsList: {
-    marginBottom: 20,
-  },
-
-  selectedStepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 12,
-    borderRadius: 8,
-  },
-
-  selectedStepIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-
-  selectedStepText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  reorderButtons: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-
-  reorderBtn: {
-    padding: 4,
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
-    borderRadius: 4,
-  },
-
-  repetitionsInput: {
-    marginBottom: 20,
-  },
-
-  repetitionsLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-
-  repetitionsButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
-  },
-
-  repetitionBtn: {
-    backgroundColor: '#00D4AA',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-
-  repetitionBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
-  loopBuilderCancelBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-
-  loopBuilderCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#B0B0C4',
-  },
-
   // ===== STEP EDITOR STYLES =====
   stepEditorContainer: {
     flex: 1,
@@ -1803,7 +1447,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Fase selector
   phaseSelector: {
     gap: 8,
   },
@@ -1835,7 +1478,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Nombre del paso
   stepNameInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
@@ -1847,7 +1489,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 
-  // Duración
   durationTypeSelector: {
     flexDirection: 'row',
     gap: 8,
@@ -1905,7 +1546,6 @@ const styles = StyleSheet.create({
     color: '#B0B0C4',
   },
 
-  // Objetivo
   targetTypeSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1936,51 +1576,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  targetRangeContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-
-  targetRangeInputGroup: {
-    flex: 1,
-  },
-
-  targetRangeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 4,
-  },
-
-  targetRangeInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-
-  targetRangeSeparator: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    paddingBottom: 8,
-  },
-
-  targetRangeUnit: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    paddingBottom: 8,
-  },
-
-  // Botones de acción
   stepEditorActions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -2020,5 +1615,140 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  // ===== PICKER STYLES =====
+  pacePicker: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+  },
+
+  pacePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  paceRow: {
+    marginBottom: 12,
+  },
+
+  paceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 8,
+  },
+
+  paceInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+
+  paceColumn: {
+    alignItems: 'center',
+  },
+
+  paceSeparator: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginHorizontal: 8,
+  },
+
+  simplePicker: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+  },
+
+  simplePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  simplePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+
+  simplePickerColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  simplePickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+    marginBottom: 8,
+  },
+
+  pickerScroll: {
+    height: 120,
+    width: 80,
+  },
+
+  pickerItem: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+
+  pickerItemSelected: {
+    backgroundColor: '#00D4AA',
+  },
+
+  pickerText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#B0B0C4',
+  },
+
+  pickerTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
+  pickerUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFB84D',
+    marginTop: 8,
+  },
+
+  rangeSeparator: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+
+  targetPreview: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#00D4AA',
+    textAlign: 'center',
+    marginTop: 12,
+    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
 });

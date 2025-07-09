@@ -1,4 +1,4 @@
-// components/sport/GymSession.tsx - Versión mejorada sin tips y botón mejorado
+// components/sport/GymSession.tsx - Versión corregida y mejorada
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import ExerciseSelector from './ExerciseSelector';
 import SupersetBuilder from './SupersetBuilder';
-import { GymExercise, GymSet } from './sports';
+import { GymExercise, GymSet, SupersetType } from './sports';
 
 /**
  * Interfaz para ejercicio manual
@@ -19,6 +19,9 @@ import { GymExercise, GymSet } from './sports';
 interface ManualExercise {
   id: string;
   name: string;
+  muscleGroup?: string;
+  equipment?: string;
+  difficulty?: string;
 }
 
 /**
@@ -29,7 +32,7 @@ interface SuperSet {
   name: string;
   exercises: GymExercise[];
   restTime: string;
-  type: 'superset' | 'circuit' | 'triset';
+  type: SupersetType;
   currentRound: number;
   totalRounds: number;
   roundCompleted: boolean[];
@@ -47,8 +50,37 @@ interface GymSessionProps {
 }
 
 /**
+ * Funciones utilitarias para superseries (movidas al principio)
+ */
+const getSupersetTypeName = (type: SupersetType): string => {
+  switch (type) {
+    case 'superset': return 'Superserie';
+    case 'triset': return 'Triserie';
+    case 'circuit': return 'Circuito';
+    default: return 'Superserie';
+  }
+};
+
+const getSupersetIcon = (type: SupersetType): string => {
+  switch (type) {
+    case 'superset': return 'lightning-bolt';
+    case 'triset': return 'flash';
+    case 'circuit': return 'refresh-circle';
+    default: return 'lightning-bolt';
+  }
+};
+
+const getSupersetColor = (type: SupersetType): string => {
+  switch (type) {
+    case 'superset': return '#FF6B6B';
+    case 'triset': return '#FFB84D';
+    case 'circuit': return '#4ECDC4';
+    default: return '#FF6B6B';
+  }
+};
+
+/**
  * Componente principal para entrenamientos de gimnasio
- * Maneja ejercicios individuales y superseries con UI mejorada
  */
 export default function GymSession({ 
   exercises, 
@@ -71,11 +103,15 @@ export default function GymSession({
     
     const newGymExercise: GymExercise = {
       id: `gym_ex_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      exerciseId: exercise.id,
+      exerciseId: exercise.id, // ID del ejercicio de la base de datos
       name: exercise.name,
       sets: [],
       restTime: '60',
-      notes: ''
+      notes: '',
+      // Campos adicionales de la BD
+      muscleGroup: exercise.muscleGroup,
+      equipment: exercise.equipment,
+      difficulty: exercise.difficulty
     };
     onUpdateExercises([...exercises, newGymExercise]);
   };
@@ -85,7 +121,7 @@ export default function GymSession({
    */
   const createSuperset = (supersetData: {
     name: string;
-    type: 'superset' | 'circuit' | 'triset';
+    type: SupersetType;
     exercises: GymExercise[];
     rounds: number;
     restTime: string;
@@ -95,7 +131,10 @@ export default function GymSession({
     const newSuperset: SuperSet = {
       id: `superset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: supersetData.name,
-      exercises: supersetData.exercises,
+      exercises: supersetData.exercises.map(ex => ({
+        ...ex,
+        sets: ex.sets.length > 0 ? ex.sets : [{ reps: '', weight: '', completed: false }]
+      })),
       restTime: supersetData.restTime,
       type: supersetData.type,
       currentRound: 1,
@@ -122,21 +161,30 @@ export default function GymSession({
     if (isCompleted) return;
     
     const superset = superSets[supersetIdx];
-    const currentRound = superset.currentRound - 1; // Array es 0-indexed
+    if (!superset) return;
+    
+    const currentRoundIndex = superset.currentRound - 1; // Array es 0-indexed
     
     // Verificar que todos los ejercicios tienen configuración mínima
     const allExercisesConfigured = superset.exercises.every(ex => 
-      ex.sets.length > 0 && ex.sets[0].reps && ex.sets[0].weight
+      ex.sets.length > 0 && 
+      ex.sets[0].reps.trim() !== '' && 
+      ex.sets[0].weight.trim() !== ''
     );
     
     if (!allExercisesConfigured) {
       return; // No completar si faltan datos
     }
     
+    // Verificar que no se haya completado ya esta ronda
+    if (superset.roundCompleted[currentRoundIndex]) {
+      return;
+    }
+    
     const updatedSuperSets = superSets.map((ss, i) => {
       if (i === supersetIdx) {
         const newRoundCompleted = [...ss.roundCompleted];
-        newRoundCompleted[currentRound] = true;
+        newRoundCompleted[currentRoundIndex] = true;
         
         const nextRound = ss.currentRound < ss.totalRounds ? ss.currentRound + 1 : ss.currentRound;
         
@@ -177,6 +225,7 @@ export default function GymSession({
     if (isCompleted) return;
     
     const superset = superSets[supersetIdx];
+    if (!superset) return;
     
     // Devolver ejercicios a la lista individual
     onUpdateExercises([...exercises, ...superset.exercises]);
@@ -228,8 +277,10 @@ export default function GymSession({
     // Iniciar timer de descanso al completar serie
     if (field === 'completed' && val === true && !isCompleted) {
       const exercise = exercises[exIdx];
-      const restTime = parseInt(exercise.restTime || '60');
-      onStartRestTimer(restTime);
+      if (exercise) {
+        const restTime = parseInt(exercise.restTime || '60');
+        onStartRestTimer(restTime);
+      }
     }
   };
 
@@ -262,7 +313,7 @@ export default function GymSession({
   /**
    * Verifica si el entrenamiento está listo para completar
    */
-  const isWorkoutReadyToComplete = () => {
+  const isWorkoutReadyToComplete = (): boolean => {
     // Verificar ejercicios individuales
     const exercisesReady = exercises.length === 0 || exercises.every(ex => 
       ex.sets.length > 0 && ex.sets.every(set => 
@@ -271,13 +322,19 @@ export default function GymSession({
     );
     
     // Verificar superseries
-    const supersetsReady = superSets.length === 0 || superSets.every(ss =>
-      ss.exercises.every(ex => 
+    const supersetsReady = superSets.length === 0 || superSets.every(ss => {
+      // Verificar que todos los ejercicios de la superserie estén configurados
+      const exercisesConfigured = ss.exercises.every(ex => 
         ex.sets.length > 0 && ex.sets.every(set => 
           set.reps.trim() !== '' && set.weight.trim() !== ''
         )
-      )
-    );
+      );
+      
+      // Verificar que todas las rondas estén completadas
+      const allRoundsCompleted = ss.roundCompleted.every(completed => completed);
+      
+      return exercisesConfigured && allRoundsCompleted;
+    });
     
     return exercisesReady && supersetsReady && (exercises.length > 0 || superSets.length > 0);
   };
@@ -370,227 +427,235 @@ export default function GymSession({
       )}
 
       {/* ===== SUPERSERIES ===== */}
-      {superSets.map((superset, ssIdx) => (
-        <View key={superset.id} style={styles.supersetCard}>
-          <LinearGradient
-            colors={[
-              getSupersetColor(superset.type) + '33',
-              getSupersetColor(superset.type) + '1A'
-            ]}
-            style={styles.supersetGradient}
-          >
-            {/* Header de la superserie */}
-            <View style={styles.supersetHeader}>
-              <View style={styles.supersetInfo}>
-                <MaterialCommunityIcons
-                  name={getSupersetIcon(superset.type) as any}
-                  size={20}
-                  color={getSupersetColor(superset.type)}
-                />
-                <Text style={styles.supersetName}>{superset.name}</Text>
-                <View style={styles.supersetBadge}>
-                  <Text style={styles.supersetBadgeText}>
-                    Ronda {superset.currentRound}/{superset.totalRounds}
-                  </Text>
-                </View>
-              </View>
-              {!isCompleted && (
-                <Pressable
-                  onPress={() => deleteSuperset(ssIdx)}
-                  style={styles.deleteBtn}
-                >
-                  <MaterialCommunityIcons name="trash-can" size={20} color="#FF6B6B" />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Progreso de rondas */}
-            <View style={styles.roundProgress}>
-              {superset.roundCompleted.map((completed, roundIdx) => (
-                <View 
-                  key={roundIdx}
-                  style={[
-                    styles.roundIndicator,
-                    completed && styles.roundCompleted,
-                    roundIdx === superset.currentRound - 1 && styles.roundCurrent
-                  ]}
-                >
-                  <Text style={[
-                    styles.roundNumber,
-                    completed && styles.roundNumberCompleted
-                  ]}>
-                    {roundIdx + 1}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Ejercicios de la superserie */}
-            <View style={styles.currentRoundContainer}>
-              <Text style={styles.currentRoundTitle}>
-                Ronda {superset.currentRound}/{superset.totalRounds} - Configura cada ejercicio
-              </Text>
-              
-              {superset.exercises.map((exercise, exIdx) => (
-                <View key={exercise.id} style={styles.supersetExercise}>
-                  <View style={styles.supersetExerciseHeader}>
-                    <Text style={styles.supersetExerciseName}>
-                      {String.fromCharCode(65 + exIdx)}. {exercise.name}
-                    </Text>
-                    <View style={styles.supersetExerciseBadge}>
-                      <Text style={styles.supersetExerciseBadgeText}>
-                        {superset.roundCompleted[superset.currentRound - 1] ? "✓" : `${superset.currentRound}/${superset.totalRounds}`}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Inputs para reps y peso */}
-                  <View style={styles.supersetExerciseInputs}>
-                    <View style={styles.supersetInputGroup}>
-                      <Text style={styles.supersetInputLabel}>Reps</Text>
-                      <TextInput
-                        value={exercise.sets[0]?.reps || ''}
-                        onChangeText={(text) => {
-                          const updatedSuperset = {
-                            ...superset,
-                            exercises: superset.exercises.map((ex, j) =>
-                              j === exIdx ? {
-                                ...ex,
-                                sets: ex.sets.length > 0 
-                                  ? ex.sets.map((set, k) => k === 0 ? { ...set, reps: text } : set)
-                                  : [{ reps: text, weight: '', completed: false }]
-                              } : ex
-                            )
-                          };
-                          updateSuperset(ssIdx, updatedSuperset);
-                        }}
-                        style={[
-                          styles.supersetInput,
-                          isCompleted && styles.inputDisabled
-                        ]}
-                        placeholder="12"
-                        placeholderTextColor="#6B7280"
-                        keyboardType="numeric"
-                        editable={!isCompleted}
-                      />
-                    </View>
-
-                    <View style={styles.supersetInputGroup}>
-                      <Text style={styles.supersetInputLabel}>Peso (kg)</Text>
-                      <TextInput
-                        value={exercise.sets[0]?.weight || ''}
-                        onChangeText={(text) => {
-                          const updatedSuperset = {
-                            ...superset,
-                            exercises: superset.exercises.map((ex, j) =>
-                              j === exIdx ? {
-                                ...ex,
-                                sets: ex.sets.length > 0 
-                                  ? ex.sets.map((set, k) => k === 0 ? { ...set, weight: text } : set)
-                                  : [{ reps: exercise.sets[0]?.reps || '', weight: text, completed: false }]
-                              } : ex
-                            )
-                          };
-                          updateSuperset(ssIdx, updatedSuperset);
-                        }}
-                        style={[
-                          styles.supersetInput,
-                          isCompleted && styles.inputDisabled
-                        ]}
-                        placeholder="20"
-                        placeholderTextColor="#6B7280"
-                        keyboardType="numeric"
-                        editable={!isCompleted}
-                      />
-                    </View>
-
-                    {/* Indicador de completado para este ejercicio */}
-                    <View style={styles.supersetExerciseStatus}>
-                      <MaterialCommunityIcons
-                        name={superset.roundCompleted[superset.currentRound - 1] ? "check-circle" : "circle-outline"}
-                        size={20}
-                        color={superset.roundCompleted[superset.currentRound - 1] ? "#00D4AA" : "#B0B0C4"}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Instrucciones del ejercicio */}
-                  <Text style={styles.supersetExerciseInstruction}>
-                    {exercise.sets[0]?.reps && exercise.sets[0]?.weight 
-                      ? `Hacer ${exercise.sets[0].reps} repeticiones con ${exercise.sets[0].weight}kg`
-                      : 'Configura repeticiones y peso arriba'
-                    }
-                  </Text>
-                </View>
-              ))}
-
-              {/* Instrucciones de la superserie */}
-              <View style={styles.supersetInstructions}>
-                <MaterialCommunityIcons name="information-outline" size={16} color="#FFB84D" />
-                <Text style={styles.supersetInstructionsText}>
-                  Realiza todos los ejercicios seguidos (A → B → C) sin descanso entre ellos. 
-                  Descansa {superset.restTime}s al completar la ronda.
-                </Text>
-              </View>
-
-              {/* Botón para completar ronda */}
-              {!isCompleted && superset.currentRound <= superset.totalRounds && (
-                <Pressable
-                  onPress={() => completeRound(ssIdx)}
-                  style={[
-                    styles.completeRoundBtn,
-                    superset.roundCompleted[superset.currentRound - 1] && styles.completeRoundBtnCompleted,
-                    !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0].reps && ex.sets[0].weight) && styles.completeRoundBtnDisabled
-                  ]}
-                  disabled={
-                    superset.roundCompleted[superset.currentRound - 1] ||
-                    !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0].reps && ex.sets[0].weight)
-                  }
-                >
-                  <MaterialCommunityIcons 
-                    name={
-                      superset.roundCompleted[superset.currentRound - 1] 
-                        ? "check-circle" 
-                        : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0].reps && ex.sets[0].weight)
-                        ? "alert-circle"
-                        : "play-circle"
-                    } 
-                    size={20} 
-                    color="#FFFFFF" 
+      {superSets.map((superset, ssIdx) => {
+        const typeConfig = {
+          color: getSupersetColor(superset.type),
+          icon: getSupersetIcon(superset.type),
+          name: getSupersetTypeName(superset.type)
+        };
+        
+        return (
+          <View key={superset.id} style={styles.supersetCard}>
+            <LinearGradient
+              colors={[
+                typeConfig.color + '33',
+                typeConfig.color + '1A'
+              ]}
+              style={styles.supersetGradient}
+            >
+              {/* Header de la superserie */}
+              <View style={styles.supersetHeader}>
+                <View style={styles.supersetInfo}>
+                  <MaterialCommunityIcons
+                    name={typeConfig.icon as any}
+                    size={20}
+                    color={typeConfig.color}
                   />
-                  <Text style={styles.completeRoundText}>
-                    {superset.roundCompleted[superset.currentRound - 1] 
-                      ? "Ronda Completada" 
-                      : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0].reps && ex.sets[0].weight)
-                      ? "Configura todos los ejercicios"
-                      : "Completar Ronda"}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
+                  <Text style={styles.supersetName}>{superset.name}</Text>
+                  <View style={styles.supersetBadge}>
+                    <Text style={styles.supersetBadgeText}>
+                      Ronda {superset.currentRound}/{superset.totalRounds}
+                    </Text>
+                  </View>
+                </View>
+                {!isCompleted && (
+                  <Pressable
+                    onPress={() => deleteSuperset(ssIdx)}
+                    style={styles.deleteBtn}
+                  >
+                    <MaterialCommunityIcons name="trash-can" size={20} color="#FF6B6B" />
+                  </Pressable>
+                )}
+              </View>
 
-            {/* Tiempo de descanso */}
-            <View style={styles.supersetRestTime}>
-              <MaterialCommunityIcons name="timer" size={16} color="#FFB84D" />
-              <Text style={styles.restTimeLabel}>Descanso entre rondas:</Text>
-              <TextInput
-                value={superset.restTime}
-                onChangeText={(val) => {
-                  const updatedSuperset = { ...superset, restTime: val };
-                  updateSuperset(ssIdx, updatedSuperset);
-                }}
-                keyboardType="numeric"
-                style={[
-                  styles.restTimeInput,
-                  isCompleted && styles.inputDisabled
-                ]}
-                editable={!isCompleted}
-              />
-              <Text style={styles.restTimeUnit}>seg</Text>
-            </View>
-          </LinearGradient>
-        </View>
-      ))}
+              {/* Progreso de rondas */}
+              <View style={styles.roundProgress}>
+                {superset.roundCompleted.map((completed, roundIdx) => (
+                  <View 
+                    key={roundIdx}
+                    style={[
+                      styles.roundIndicator,
+                      completed && styles.roundCompleted,
+                      roundIdx === superset.currentRound - 1 && styles.roundCurrent
+                    ]}
+                  >
+                    <Text style={[
+                      styles.roundNumber,
+                      completed && styles.roundNumberCompleted
+                    ]}>
+                      {roundIdx + 1}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Ejercicios de la superserie */}
+              <View style={styles.currentRoundContainer}>
+                <Text style={styles.currentRoundTitle}>
+                  Ronda {superset.currentRound}/{superset.totalRounds} - Configura cada ejercicio
+                </Text>
+                
+                {superset.exercises.map((exercise, exIdx) => (
+                  <View key={exercise.id} style={styles.supersetExercise}>
+                    <View style={styles.supersetExerciseHeader}>
+                      <Text style={styles.supersetExerciseName}>
+                        {String.fromCharCode(65 + exIdx)}. {exercise.name}
+                      </Text>
+                      <View style={styles.supersetExerciseBadge}>
+                        <Text style={styles.supersetExerciseBadgeText}>
+                          {superset.roundCompleted[superset.currentRound - 1] ? "✓" : `${superset.currentRound}/${superset.totalRounds}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Inputs para reps y peso */}
+                    <View style={styles.supersetExerciseInputs}>
+                      <View style={styles.supersetInputGroup}>
+                        <Text style={styles.supersetInputLabel}>Reps</Text>
+                        <TextInput
+                          value={exercise.sets[0]?.reps || ''}
+                          onChangeText={(text) => {
+                            const updatedSuperset = {
+                              ...superset,
+                              exercises: superset.exercises.map((ex, j) =>
+                                j === exIdx ? {
+                                  ...ex,
+                                  sets: ex.sets.length > 0 
+                                    ? ex.sets.map((set, k) => k === 0 ? { ...set, reps: text } : set)
+                                    : [{ reps: text, weight: '', completed: false }]
+                                } : ex
+                              )
+                            };
+                            updateSuperset(ssIdx, updatedSuperset);
+                          }}
+                          style={[
+                            styles.supersetInput,
+                            isCompleted && styles.inputDisabled
+                          ]}
+                          placeholder="12"
+                          placeholderTextColor="#6B7280"
+                          keyboardType="numeric"
+                          editable={!isCompleted}
+                        />
+                      </View>
+
+                      <View style={styles.supersetInputGroup}>
+                        <Text style={styles.supersetInputLabel}>Peso (kg)</Text>
+                        <TextInput
+                          value={exercise.sets[0]?.weight || ''}
+                          onChangeText={(text) => {
+                            const updatedSuperset = {
+                              ...superset,
+                              exercises: superset.exercises.map((ex, j) =>
+                                j === exIdx ? {
+                                  ...ex,
+                                  sets: ex.sets.length > 0 
+                                    ? ex.sets.map((set, k) => k === 0 ? { ...set, weight: text } : set)
+                                    : [{ reps: exercise.sets[0]?.reps || '', weight: text, completed: false }]
+                                } : ex
+                              )
+                            };
+                            updateSuperset(ssIdx, updatedSuperset);
+                          }}
+                          style={[
+                            styles.supersetInput,
+                            isCompleted && styles.inputDisabled
+                          ]}
+                          placeholder="20"
+                          placeholderTextColor="#6B7280"
+                          keyboardType="numeric"
+                          editable={!isCompleted}
+                        />
+                      </View>
+
+                      {/* Indicador de completado para este ejercicio */}
+                      <View style={styles.supersetExerciseStatus}>
+                        <MaterialCommunityIcons
+                          name={superset.roundCompleted[superset.currentRound - 1] ? "check-circle" : "circle-outline"}
+                          size={20}
+                          color={superset.roundCompleted[superset.currentRound - 1] ? "#00D4AA" : "#B0B0C4"}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Instrucciones del ejercicio */}
+                    <Text style={styles.supersetExerciseInstruction}>
+                      {exercise.sets[0]?.reps && exercise.sets[0]?.weight 
+                        ? `Hacer ${exercise.sets[0].reps} repeticiones con ${exercise.sets[0].weight}kg`
+                        : 'Configura repeticiones y peso arriba'
+                      }
+                    </Text>
+                  </View>
+                ))}
+
+                {/* Instrucciones de la superserie */}
+                <View style={styles.supersetInstructions}>
+                  <MaterialCommunityIcons name="information-outline" size={16} color="#FFB84D" />
+                  <Text style={styles.supersetInstructionsText}>
+                    Realiza todos los ejercicios seguidos (A → B → C) sin descanso entre ellos. 
+                    Descansa {superset.restTime}s al completar la ronda.
+                  </Text>
+                </View>
+
+                {/* Botón para completar ronda */}
+                {!isCompleted && superset.currentRound <= superset.totalRounds && (
+                  <Pressable
+                    onPress={() => completeRound(ssIdx)}
+                    style={[
+                      styles.completeRoundBtn,
+                      superset.roundCompleted[superset.currentRound - 1] && styles.completeRoundBtnCompleted,
+                      !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight) && styles.completeRoundBtnDisabled
+                    ]}
+                    disabled={
+                      superset.roundCompleted[superset.currentRound - 1] ||
+                      !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
+                    }
+                  >
+                    <MaterialCommunityIcons 
+                      name={
+                        superset.roundCompleted[superset.currentRound - 1] 
+                          ? "check-circle" 
+                          : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
+                          ? "alert-circle"
+                          : "play-circle"
+                      } 
+                      size={20} 
+                      color="#FFFFFF" 
+                    />
+                    <Text style={styles.completeRoundText}>
+                      {superset.roundCompleted[superset.currentRound - 1] 
+                        ? "Ronda Completada" 
+                        : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
+                        ? "Configura todos los ejercicios"
+                        : "Completar Ronda"}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Tiempo de descanso */}
+              <View style={styles.supersetRestTime}>
+                <MaterialCommunityIcons name="timer" size={16} color="#FFB84D" />
+                <Text style={styles.restTimeLabel}>Descanso entre rondas:</Text>
+                <TextInput
+                  value={superset.restTime}
+                  onChangeText={(val) => {
+                    const updatedSuperset = { ...superset, restTime: val };
+                    updateSuperset(ssIdx, updatedSuperset);
+                  }}
+                  keyboardType="numeric"
+                  style={[
+                    styles.restTimeInput,
+                    isCompleted && styles.inputDisabled
+                  ]}
+                  editable={!isCompleted}
+                />
+                <Text style={styles.restTimeUnit}>seg</Text>
+              </View>
+            </LinearGradient>
+          </View>
+        );
+      })}
 
       {/* ===== EJERCICIOS INDIVIDUALES ===== */}
       {exercises.map((ex, idx) => (
@@ -620,11 +685,30 @@ export default function GymSession({
                       <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />
                     )}
                   </View>
-                  <Text style={styles.exerciseStats}>
-                    {ex.sets.length} {ex.sets.length === 1 ? "serie" : "series"}
-                    {ex.sets.length > 0 &&
-                      ` • ${ex.sets.filter((s) => s.completed).length} completadas`}
-                  </Text>
+                  
+                  <View style={styles.exerciseMetadata}>
+                    <Text style={styles.exerciseStats}>
+                      {ex.sets.length} {ex.sets.length === 1 ? "serie" : "series"}
+                      {ex.sets.length > 0 &&
+                        ` • ${ex.sets.filter((s) => s.completed).length} completadas`}
+                    </Text>
+                    
+                    {/* Mostrar información de músculos */}
+                    {(ex.muscleGroup || ex.specificMuscle) && (
+                      <View style={styles.muscleInfo}>
+                        {ex.muscleGroup && (
+                          <Text style={styles.primaryMuscleTag}>
+                            {ex.muscleGroup}
+                          </Text>
+                        )}
+                        {ex.specificMuscle && (
+                          <Text style={styles.secondaryMuscleTag}>
+                            {ex.specificMuscle}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 <View style={styles.exerciseActions}>
@@ -767,7 +851,7 @@ export default function GymSession({
       {/* ===== BOTONES DE ACCIÓN ===== */}
       {!isCompleted && (
         <View style={styles.actionButtons}>
-          {/* Botón añadir ejercicio - DISEÑO NUEVO Y DIFERENTE */}
+          {/* Botón añadir ejercicio */}
           <Pressable 
             onPress={() => setShowExerciseSelector(true)} 
             style={styles.addExerciseBtn}
@@ -885,36 +969,6 @@ export default function GymSession({
     </View>
   );
 }
-
-/**
- * Funciones utilitarias para superseries
- */
-const getSupersetTypeName = (type: 'superset' | 'circuit' | 'triset') => {
-  switch (type) {
-    case 'superset': return 'Superserie';
-    case 'triset': return 'Triserie';
-    case 'circuit': return 'Circuito';
-    default: return 'Superserie';
-  }
-};
-
-const getSupersetIcon = (type: 'superset' | 'circuit' | 'triset') => {
-  switch (type) {
-    case 'superset': return 'lightning-bolt';
-    case 'triset': return 'flash';
-    case 'circuit': return 'refresh-circle';
-    default: return 'lightning-bolt';
-  }
-};
-
-const getSupersetColor = (type: 'superset' | 'circuit' | 'triset') => {
-  switch (type) {
-    case 'superset': return '#FF6B6B';
-    case 'triset': return '#FFB84D';
-    case 'circuit': return '#4ECDC4';
-    default: return '#FF6B6B';
-  }
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -1275,9 +1329,40 @@ const styles = StyleSheet.create({
     color: '#00D4AA',
   },
 
+  exerciseMetadata: {
+    gap: 8,
+  },
+
   exerciseStats: {
     fontSize: 14,
     color: '#B0B0C4',
+  },
+
+  muscleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+
+  primaryMuscleTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00D4AA',
+    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+
+  secondaryMuscleTag: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#4ECDC4',
+    backgroundColor: 'rgba(78, 205, 196, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
 
   exerciseActions: {
@@ -1438,7 +1523,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  // NUEVO DISEÑO DEL BOTÓN AÑADIR EJERCICIO
   addExerciseBtn: {
     flex: 1,
     backgroundColor: 'rgba(255, 184, 77, 0.1)',
