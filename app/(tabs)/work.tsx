@@ -463,6 +463,7 @@ export default function MainTrainingScreen() {
             onStartRestTimer={isCompleted ? () => {} : startRestTimer}
             onCompleteWorkout={isCompleted ? undefined : () => startCompleteWorkout(workout.id)}
             isCompleted={isCompleted}
+            workoutName={workout.name || `Entrenamiento de ${SPORT_TRANSLATIONS[workout.sport]}`}
           />
         );
       

@@ -1,4 +1,4 @@
-// components/sport/SupersetBuilder.tsx - Constructor de superseries con UI mejorada y mejor soporte para circuitos
+// components/sport/SupersetBuilder.tsx - Constructor mejorado con configuración completa
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -12,56 +12,55 @@ import {
   View
 } from 'react-native';
 // Importar tipos de tu estructura existente
-import { GymExercise, SupersetType } from './sports';
+import { GymExercise, GymSet, SupersetType, createEmptySet } from './sports';
 
 /**
- * Tipos de superseries disponibles con mejor soporte para circuitos
- * ACTUALIZADO: Usando tu SupersetType existente + megacircuit
+ * Tipos de superseries disponibles con diferenciación entre superseries y circuitos
  */
 const SUPERSET_TYPES = [
   {
     type: 'superset' as SupersetType,
     name: 'Superserie',
-    description: '2 ejercicios consecutivos sin descanso',
+    description: '2 ejercicios consecutivos sin descanso entre ellos',
     icon: 'lightning-bolt',
     color: '#FF6B6B',
     minExercises: 2,
     maxExercises: 2,
-    benefits: ['Ahorra tiempo', 'Aumenta intensidad', 'Músculos antagonistas'],
-    example: 'Ej: Press banca + Dominadas'
+    hasExerciseRest: false,
+    allowTimedSets: false
   },
   {
     type: 'triset' as SupersetType,
     name: 'Triserie',
-    description: '3 ejercicios consecutivos sin descanso',
+    description: '3 ejercicios consecutivos sin descanso entre ellos',
     icon: 'flash',
     color: '#FFB84D',
     minExercises: 3,
     maxExercises: 3,
-    benefits: ['Mayor volumen', 'Trabajo específico', 'Fatiga controlada'],
-    example: 'Ej: Sentadilla + Prensa + Extensiones'
+    hasExerciseRest: false,
+    allowTimedSets: false
   },
   {
     type: 'circuit' as SupersetType,
     name: 'Circuito',
-    description: '4-8 ejercicios en secuencia continua',
+    description: '3-8 ejercicios con tiempo o reps, descanso opcional entre ejercicios',
     icon: 'refresh-circle',
     color: '#4ECDC4',
-    minExercises: 4,
+    minExercises: 3,
     maxExercises: 8,
-    benefits: ['Trabajo cardiovascular', 'Quema de grasa', 'Tiempo eficiente', 'Cuerpo completo'],
-    example: 'Ej: Burpees + Sentadillas + Flexiones + Plancha'
+    hasExerciseRest: true,
+    allowTimedSets: true
   },
   {
     type: 'megacircuit' as SupersetType,
     name: 'Mega Circuito',
-    description: '9-12 ejercicios para entrenamientos intensos',
+    description: '9-12 ejercicios con tiempo o reps, descanso opcional entre ejercicios',
     icon: 'fire',
     color: '#E91E63',
     minExercises: 9,
     maxExercises: 12,
-    benefits: ['Máximo cardiovascular', 'Entrenamiento completo', 'Desafío extremo', 'Resistencia'],
-    example: 'Ej: Entrenamiento militar completo'
+    hasExerciseRest: true,
+    allowTimedSets: true
   }
 ] as const;
 
@@ -78,20 +77,25 @@ interface SupersetBuilderProps {
     exercises: GymExercise[];
     rounds: number;
     restTime: string;
+    restTimeBetweenExercises?: string;
+    useTimeForAll?: boolean;
+    defaultTime?: string;
   }) => void;
 }
 
 /**
+ * Configuración de ejercicio en superserie
+ */
+interface SupersetExerciseConfig {
+  exercise: GymExercise;
+  sets: GymSet[];
+  useTime: boolean;
+  time?: string;
+}
+
+/**
  * Componente constructor de superseries
- * Permite crear superseries, triseries, circuitos y mega circuitos con interfaz intuitiva
- * 
- * DATOS BD: Crea registros en tabla supersets con relaciones a exercises
- * - superset_id (PRIMARY KEY)
- * - superset_name (VARCHAR)
- * - superset_type (ENUM: superset/triset/circuit/megacircuit)
- * - rounds_count (INTEGER)
- * - rest_time_seconds (INTEGER)
- * - created_at (TIMESTAMP)
+ * Permite crear superseries, triseries, circuitos y mega circuitos con configuración completa
  */
 export default function SupersetBuilder({
   visible,
@@ -100,12 +104,16 @@ export default function SupersetBuilder({
   onCreateSuperset
 }: SupersetBuilderProps) {
   // ===== ESTADOS =====
-  const [currentStep, setCurrentStep] = useState<'type' | 'exercises' | 'config'>('type');
+  const [currentStep, setCurrentStep] = useState<'type' | 'exercises' | 'config' | 'sets'>('type');
   const [selectedType, setSelectedType] = useState<SupersetType>('superset');
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
+  const [exerciseConfigs, setExerciseConfigs] = useState<SupersetExerciseConfig[]>([]);
   const [supersetName, setSupersetName] = useState('');
   const [rounds, setRounds] = useState(3);
   const [restTime, setRestTime] = useState('90');
+  const [restTimeBetweenExercises, setRestTimeBetweenExercises] = useState('20');
+  const [useTimeForAll, setUseTimeForAll] = useState(false);
+  const [defaultTime, setDefaultTime] = useState('45');
 
   /**
    * Reinicia el builder al estado inicial
@@ -114,9 +122,13 @@ export default function SupersetBuilder({
     setCurrentStep('type');
     setSelectedType('superset');
     setSelectedExercises([]);
+    setExerciseConfigs([]);
     setSupersetName('');
     setRounds(3);
     setRestTime('90');
+    setRestTimeBetweenExercises('20');
+    setUseTimeForAll(false);
+    setDefaultTime('45');
   };
 
   /**
@@ -135,7 +147,7 @@ export default function SupersetBuilder({
   };
 
   /**
-   * Continúa al siguiente paso o retrocede al anterior
+   * Continúa al siguiente paso
    */
   const nextStep = () => {
     if (currentStep === 'type') {
@@ -146,29 +158,57 @@ export default function SupersetBuilder({
       const typeConfig = getSelectedTypeConfig();
       if (typeConfig.type === 'circuit') {
         setRounds(3);
-        setRestTime('120'); // Más descanso para circuitos
+        setRestTime('120');
+        setRestTimeBetweenExercises('20');
+        setUseTimeForAll(true); // Por defecto, circuitos usan tiempo
+        setDefaultTime('45');
       } else if (typeConfig.type === 'megacircuit') {
         setRounds(2);
-        setRestTime('180'); // Mucho más descanso para mega circuitos
+        setRestTime('180');
+        setRestTimeBetweenExercises('15');
+        setUseTimeForAll(true);
+        setDefaultTime('30');
       } else {
         setRounds(3);
         setRestTime('90');
+        setRestTimeBetweenExercises('0');
+        setUseTimeForAll(false);
       }
     } else if (currentStep === 'exercises') {
+      // Crear configuraciones iniciales para los ejercicios seleccionados
+      const configs: SupersetExerciseConfig[] = selectedExercises.map(exerciseId => {
+        const exercise = exercises.find(ex => ex.id === exerciseId)!;
+        const typeConfig = getSelectedTypeConfig();
+        
+        return {
+          exercise: {
+            ...exercise,
+            sets: [] // Vacío inicialmente
+          },
+          sets: [createEmptySet(useTimeForAll && typeConfig.allowTimedSets ? 'Tiempo' : exercise.exerciseType || 'Repeticiones')],
+          useTime: useTimeForAll && typeConfig.allowTimedSets,
+          time: useTimeForAll ? defaultTime : undefined
+        };
+      });
+      
+      setExerciseConfigs(configs);
+      setCurrentStep('sets');
+    } else if (currentStep === 'sets') {
       setCurrentStep('config');
     }
   };
 
   /**
-   * Función para retroceder (botón "Atrás")
+   * Retrocede al paso anterior
    */
   const prevStep = () => {
     if (currentStep === 'config') {
+      setCurrentStep('sets');
+    } else if (currentStep === 'sets') {
       setCurrentStep('exercises');
     } else if (currentStep === 'exercises') {
       setCurrentStep('type');
     } else {
-      // Si estamos en el primer paso, cerrar el modal
       handleClose();
     }
   };
@@ -196,47 +236,63 @@ export default function SupersetBuilder({
     const [movedItem] = newOrder.splice(fromIndex, 1);
     newOrder.splice(toIndex, 0, movedItem);
     setSelectedExercises(newOrder);
+
+    // También reordenar las configuraciones si ya existen
+    if (exerciseConfigs.length > 0) {
+      const newConfigs = [...exerciseConfigs];
+      const [movedConfig] = newConfigs.splice(fromIndex, 1);
+      newConfigs.splice(toIndex, 0, movedConfig);
+      setExerciseConfigs(newConfigs);
+    }
   };
 
   /**
-   * Selecciona automáticamente ejercicios para un circuito completo
+   * Actualiza la configuración de un ejercicio
    */
-  const autoSelectCircuitExercises = () => {
-    const typeConfig = getSelectedTypeConfig();
-    if (typeConfig.type !== 'circuit' && typeConfig.type !== 'megacircuit') return;
+  const updateExerciseConfig = (index: number, field: keyof SupersetExerciseConfig, value: any) => {
+    const newConfigs = [...exerciseConfigs];
     
-    // Seleccionar ejercicios variados para un circuito completo
-    const availableExercises = exercises.filter(ex => !selectedExercises.includes(ex.id));
-    const targetCount = typeConfig.type === 'circuit' ? 6 : 10;
-    
-    // Priorizar ejercicios de diferentes grupos musculares
-    const muscleGroups = ['pectoral', 'dorsal', 'cuadriceps', 'gluteo', 'hombro', 'abdominal', 'triceps', 'biceps'];
-    const selectedForCircuit: string[] = [];
-    
-    // Intentar tomar un ejercicio de cada grupo muscular
-    muscleGroups.forEach(muscle => {
-      if (selectedForCircuit.length < targetCount) {
-        const exerciseFromGroup = availableExercises.find(ex => 
-          ex.name.toLowerCase().includes(muscle) || 
-          ex.exerciseId.toLowerCase().includes(muscle)
-        );
-        if (exerciseFromGroup && !selectedForCircuit.includes(exerciseFromGroup.id)) {
-          selectedForCircuit.push(exerciseFromGroup.id);
-        }
-      }
-    });
-    
-    // Completar con ejercicios restantes si es necesario
-    while (selectedForCircuit.length < targetCount && selectedForCircuit.length < availableExercises.length) {
-      const remaining = availableExercises.find(ex => !selectedForCircuit.includes(ex.id));
-      if (remaining) {
-        selectedForCircuit.push(remaining.id);
-      } else {
-        break;
-      }
+    if (field === 'useTime') {
+      // Cambiar el tipo de ejercicio y resetear las series
+      newConfigs[index] = {
+        ...newConfigs[index],
+        useTime: value,
+        sets: [createEmptySet(value ? 'Tiempo' : newConfigs[index].exercise.exerciseType || 'Repeticiones')],
+        time: value ? defaultTime : undefined
+      };
+    } else {
+      newConfigs[index] = {
+        ...newConfigs[index],
+        [field]: value
+      };
     }
     
-    setSelectedExercises(selectedForCircuit);
+    setExerciseConfigs(newConfigs);
+  };
+
+  /**
+   * Actualiza una serie de un ejercicio
+   */
+  const updateExerciseSet = (exerciseIndex: number, setIndex: number, field: keyof GymSet, value: string) => {
+    const newConfigs = [...exerciseConfigs];
+    const config = newConfigs[exerciseIndex];
+    
+    if (config.useTime) {
+      // Para ejercicios por tiempo, actualizar el tiempo global
+      if (field === 'duration') {
+        config.time = value;
+      }
+    } else {
+      // Para ejercicios por repeticiones, actualizar la serie específica
+      const newSets = [...config.sets];
+      newSets[setIndex] = {
+        ...newSets[setIndex],
+        [field]: value
+      };
+      config.sets = newSets;
+    }
+    
+    setExerciseConfigs(newConfigs);
   };
 
   /**
@@ -251,6 +307,15 @@ export default function SupersetBuilder({
       case 'exercises':
         return selectedExercises.length >= typeConfig.minExercises && 
                selectedExercises.length <= typeConfig.maxExercises;
+      case 'sets':
+        // Verificar que todos los ejercicios tengan configuración válida
+        return exerciseConfigs.every(config => {
+          if (config.useTime) {
+            return config.time && parseInt(config.time) > 0;
+          } else {
+            return config.sets.every(set => set.reps && parseInt(set.reps) > 0);
+          }
+        });
       case 'config':
         return supersetName.trim() !== '' && rounds > 0 && restTime.trim() !== '';
       default:
@@ -260,58 +325,45 @@ export default function SupersetBuilder({
 
   /**
    * Crea la superserie
-   * DATOS BD: INSERT en tabla supersets con foreign keys a exercises
    */
   const createSuperset = () => {
-    const selectedExerciseObjects = selectedExercises.map(id => 
-      exercises.find(ex => ex.id === id)!
-    );
+    const typeConfig = getSelectedTypeConfig();
+    
+    // Preparar los ejercicios con sus configuraciones
+    const configuredExercises = exerciseConfigs.map(config => {
+      const exercise = config.exercise;
+      
+      if (config.useTime) {
+        // Para ejercicios por tiempo en circuitos
+        return {
+          ...exercise,
+          exerciseType: 'Tiempo' as const,
+          sets: [{
+            duration: config.time,
+            weight: '',
+            completed: false
+          }]
+        };
+      } else {
+        // Para ejercicios por repeticiones
+        return {
+          ...exercise,
+          sets: config.sets
+        };
+      }
+    });
 
     onCreateSuperset({
-      name: supersetName.trim(), // BD: superset_name
-      type: selectedType, // BD: superset_type
-      exercises: selectedExerciseObjects, // BD: Relación superset_exercises
-      rounds, // BD: rounds_count
-      restTime // BD: rest_time_seconds
+      name: supersetName.trim(),
+      type: selectedType,
+      exercises: configuredExercises,
+      rounds,
+      restTime,
+      restTimeBetweenExercises: typeConfig.hasExerciseRest ? restTimeBetweenExercises : undefined,
+      useTimeForAll: useTimeForAll && typeConfig.allowTimedSets
     });
 
     resetBuilder();
-  };
-
-  /**
-   * Obtiene el número de rondas recomendado según el tipo
-   */
-  const getRecommendedRounds = () => {
-    const typeConfig = getSelectedTypeConfig();
-    switch (typeConfig.type) {
-      case 'superset':
-      case 'triset':
-        return [2, 3, 4, 5];
-      case 'circuit':
-        return [2, 3, 4];
-      case 'megacircuit':
-        return [1, 2, 3];
-      default:
-        return [1, 2, 3, 4, 5];
-    }
-  };
-
-  /**
-   * Obtiene el tiempo de descanso recomendado
-   */
-  const getRecommendedRestTime = () => {
-    const typeConfig = getSelectedTypeConfig();
-    switch (typeConfig.type) {
-      case 'superset':
-      case 'triset':
-        return '90';
-      case 'circuit':
-        return '120';
-      case 'megacircuit':
-        return '180';
-      default:
-        return '90';
-    }
   };
 
   const typeConfig = getSelectedTypeConfig();
@@ -327,7 +379,7 @@ export default function SupersetBuilder({
         colors={["#0F0F23", "#1A1A3A", "#2D2D5F"]}
         style={styles.container}
       >
-        {/* ===== HEADER SIMPLIFICADO ===== */}
+        {/* ===== HEADER ===== */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <MaterialCommunityIcons
@@ -335,7 +387,7 @@ export default function SupersetBuilder({
               size={24}
               color="#FF6B6B"
             />
-            <Text style={styles.title}>Constructor de Superseries</Text>
+            <Text style={styles.title}>Constructor de {typeConfig.name || 'Superseries'}</Text>
           </View>
 
           <Pressable onPress={handleClose} style={styles.closeBtn}>
@@ -346,34 +398,33 @@ export default function SupersetBuilder({
         {/* ===== INDICADOR DE PROGRESO ===== */}
         <View style={styles.progressIndicator}>
           <View style={styles.progressSteps}>
-            {["type", "exercises", "config"].map((step, index) => (
+            {["type", "exercises", "sets", "config"].map((step, index) => (
               <View key={step} style={styles.progressStepContainer}>
                 <View
                   style={[
                     styles.progressStep,
                     currentStep === step && styles.progressStepActive,
-                    ["type", "exercises", "config"].indexOf(currentStep) >
-                      index && styles.progressStepCompleted,
+                    ["type", "exercises", "sets", "config"].indexOf(currentStep) > index && 
+                      styles.progressStepCompleted,
                   ]}
                 >
                   <Text
                     style={[
                       styles.progressStepText,
                       (currentStep === step ||
-                        ["type", "exercises", "config"].indexOf(currentStep) >
-                          index) &&
+                        ["type", "exercises", "sets", "config"].indexOf(currentStep) > index) &&
                         styles.progressStepTextActive,
                     ]}
                   >
                     {index + 1}
                   </Text>
                 </View>
-                {index < 2 && (
+                {index < 3 && (
                   <View
                     style={[
                       styles.progressLine,
-                      ["type", "exercises", "config"].indexOf(currentStep) >
-                        index && styles.progressLineCompleted,
+                      ["type", "exercises", "sets", "config"].indexOf(currentStep) > index && 
+                        styles.progressLineCompleted,
                     ]}
                   />
                 )}
@@ -382,29 +433,17 @@ export default function SupersetBuilder({
           </View>
 
           <View style={styles.progressLabels}>
-            <Text
-              style={[
-                styles.progressLabel,
-                currentStep === "type" && styles.progressLabelActive,
-              ]}
-            >
+            <Text style={[styles.progressLabel, currentStep === "type" && styles.progressLabelActive]}>
               Tipo
             </Text>
-            <Text
-              style={[
-                styles.progressLabel,
-                currentStep === "exercises" && styles.progressLabelActive,
-              ]}
-            >
+            <Text style={[styles.progressLabel, currentStep === "exercises" && styles.progressLabelActive]}>
               Ejercicios
             </Text>
-            <Text
-              style={[
-                styles.progressLabel,
-                currentStep === "config" && styles.progressLabelActive,
-              ]}
-            >
-              Configuración
+            <Text style={[styles.progressLabel, currentStep === "sets" && styles.progressLabelActive]}>
+              Series
+            </Text>
+            <Text style={[styles.progressLabel, currentStep === "config" && styles.progressLabelActive]}>
+              Config
             </Text>
           </View>
         </View>
@@ -468,55 +507,6 @@ export default function SupersetBuilder({
                         </View>
                       </View>
 
-                      {/* Ejemplo */}
-                      <View style={styles.typeOptionExample}>
-                        <Text
-                          style={[
-                            styles.exampleTitle,
-                            selectedType === type.type &&
-                              styles.exampleTitleSelected,
-                          ]}
-                        >
-                          Ejemplo:
-                        </Text>
-                        <Text
-                          style={[
-                            styles.exampleText,
-                            selectedType === type.type &&
-                              styles.exampleTextSelected,
-                          ]}
-                        >
-                          {type.example}
-                        </Text>
-                      </View>
-
-                      <View style={styles.typeOptionBenefits}>
-                        <Text
-                          style={[
-                            styles.benefitsTitle,
-                            selectedType === type.type &&
-                              styles.benefitsTitleSelected,
-                          ]}
-                        >
-                          Beneficios:
-                        </Text>
-                        <View style={styles.benefitsGrid}>
-                          {type.benefits.map((benefit, index) => (
-                            <View key={index} style={styles.benefitTag}>
-                              <Text
-                                style={[
-                                  styles.benefitText,
-                                  selectedType === type.type &&
-                                    styles.benefitTextSelected,
-                                ]}
-                              >
-                                {benefit}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-
                       <View style={styles.typeOptionFooter}>
                         <View
                           style={[
@@ -558,30 +548,6 @@ export default function SupersetBuilder({
                   : `entre ${typeConfig.minExercises} y ${typeConfig.maxExercises}`}{" "}
                 ejercicios
               </Text>
-
-              {/* Botón de selección automática para circuitos */}
-              {(typeConfig.type === 'circuit' || typeConfig.type === 'megacircuit') && (
-                <View style={styles.autoSelectSection}>
-                  <Pressable
-                    onPress={autoSelectCircuitExercises}
-                    style={styles.autoSelectBtn}
-                  >
-                    <LinearGradient
-                      colors={[typeConfig.color + '30', typeConfig.color + '20']}
-                      style={styles.autoSelectGradient}
-                    >
-                      <MaterialCommunityIcons
-                        name="auto-fix"
-                        size={20}
-                        color={typeConfig.color}
-                      />
-                      <Text style={[styles.autoSelectText, { color: typeConfig.color }]}>
-                        Selección automática de {typeConfig.type === 'circuit' ? '6' : '10'} ejercicios variados
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              )}
 
               {/* Ejercicios seleccionados (orden) */}
               {selectedExercises.length > 0 && (
@@ -653,6 +619,18 @@ export default function SupersetBuilder({
                                     />
                                   </Pressable>
                                 )}
+                                <Pressable
+                                  onPress={() => 
+                                    toggleExerciseSelection(exerciseId)
+                                  }
+                                  style={[styles.orderBtn, styles.removeBtn]}
+                                >
+                                  <MaterialCommunityIcons
+                                    name="close"
+                                    size={16}
+                                    color="#FF6B6B"
+                                  />
+                                </Pressable>
                               </View>
                             </View>
                           </LinearGradient>
@@ -728,7 +706,137 @@ export default function SupersetBuilder({
             </View>
           )}
 
-          {/* ===== PASO 3: CONFIGURACIÓN ===== */}
+          {/* ===== PASO 3: CONFIGURACIÓN DE SERIES ===== */}
+          {currentStep === "sets" && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>
+                Configura las series para cada ejercicio
+              </Text>
+              <Text style={styles.stepSubtitle}>
+                Define las repeticiones o tiempo para cada ejercicio
+              </Text>
+
+              {/* Opción global para circuitos */}
+              {typeConfig.allowTimedSets && (
+                <View style={styles.globalTimeOption}>
+                  <Pressable
+                    onPress={() => setUseTimeForAll(!useTimeForAll)}
+                    style={styles.globalTimeToggle}
+                  >
+                    <MaterialCommunityIcons
+                      name={useTimeForAll ? "checkbox-marked" : "checkbox-blank-outline"}
+                      size={24}
+                      color={useTimeForAll ? typeConfig.color : "#B0B0C4"}
+                    />
+                    <Text style={styles.globalTimeText}>
+                      Usar tiempo para todos los ejercicios
+                    </Text>
+                  </Pressable>
+                  
+                  {useTimeForAll && (
+                    <View style={styles.globalTimeInput}>
+                      <Text style={styles.globalTimeLabel}>Tiempo por ejercicio:</Text>
+                      <TextInput
+                        value={defaultTime}
+                        onChangeText={(val) => {
+                          setDefaultTime(val);
+                          // Actualizar todos los ejercicios
+                          const newConfigs = exerciseConfigs.map(config => ({
+                            ...config,
+                            time: val
+                          }));
+                          setExerciseConfigs(newConfigs);
+                        }}
+                        style={styles.timeInput}
+                        keyboardType="numeric"
+                        placeholder="45"
+                      />
+                      <Text style={styles.timeUnit}>seg</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Configuración individual de ejercicios */}
+              <View style={styles.exerciseConfigsList}>
+                {exerciseConfigs.map((config, index) => (
+                  <View key={config.exercise.id} style={styles.exerciseConfigCard}>
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]}
+                      style={styles.exerciseConfigGradient}
+                    >
+                      <View style={styles.exerciseConfigHeader}>
+                        <View style={[styles.exerciseNumber, { backgroundColor: typeConfig.color }]}>
+                          <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+                        </View>
+                        <Text style={styles.exerciseConfigName}>{config.exercise.name}</Text>
+                      </View>
+
+                      {typeConfig.allowTimedSets && !useTimeForAll && (
+                        <View style={styles.exerciseTypeToggle}>
+                          <Pressable
+                            onPress={() => updateExerciseConfig(index, 'useTime', false)}
+                            style={[
+                              styles.typeToggleBtn,
+                              !config.useTime && styles.typeToggleBtnActive
+                            ]}
+                          >
+                            <MaterialCommunityIcons name="numeric" size={16} color={!config.useTime ? "#FFFFFF" : "#B0B0C4"} />
+                            <Text style={[styles.typeToggleText, !config.useTime && styles.typeToggleTextActive]}>
+                              Reps
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => updateExerciseConfig(index, 'useTime', true)}
+                            style={[
+                              styles.typeToggleBtn,
+                              config.useTime && styles.typeToggleBtnActive
+                            ]}
+                          >
+                            <MaterialCommunityIcons name="timer" size={16} color={config.useTime ? "#FFFFFF" : "#B0B0C4"} />
+                            <Text style={[styles.typeToggleText, config.useTime && styles.typeToggleTextActive]}>
+                              Tiempo
+                            </Text>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      <View style={styles.setsConfig}>
+                        {config.useTime ? (
+                          <View style={styles.timeConfig}>
+                            <Text style={styles.configLabel}>Tiempo:</Text>
+                            <View style={styles.timeInputContainer}>
+                              <TextInput
+                                value={config.time}
+                                onChangeText={(val) => updateExerciseConfig(index, 'time', val)}
+                                style={styles.configInput}
+                                keyboardType="numeric"
+                                placeholder="45"
+                              />
+                              <Text style={styles.configUnit}>seg</Text>
+                            </View>
+                          </View>
+                        ) : (
+                          <View style={styles.repsConfig}>
+                            <Text style={styles.configLabel}>Repeticiones:</Text>
+                            <TextInput
+                              value={config.sets[0]?.reps || ''}
+                              onChangeText={(val) => updateExerciseSet(index, 0, 'reps', val)}
+                              style={styles.configInput}
+                              keyboardType="numeric"
+                              placeholder="12"
+                            />
+                          </View>
+                        )}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ===== PASO 4: CONFIGURACIÓN FINAL ===== */}
           {currentStep === "config" && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepTitle}>
@@ -751,24 +859,23 @@ export default function SupersetBuilder({
                       color={typeConfig.color}
                     />
                     <Text style={styles.configSummaryTitle}>
-                      {selectedExercises.length} Ejercicios Seleccionados
+                      {exerciseConfigs.length} Ejercicios Configurados
                     </Text>
                   </View>
 
                   <View style={styles.configSummaryExercises}>
-                    {selectedExercises.map((exerciseId, index) => {
-                      const exercise = exercises.find(
-                        (ex) => ex.id === exerciseId
-                      )!;
-                      return (
-                        <Text
-                          key={exerciseId}
-                          style={styles.configSummaryExercise}
-                        >
-                          {index + 1}. {exercise.name}
-                        </Text>
-                      );
-                    })}
+                    {exerciseConfigs.map((config, index) => (
+                      <Text
+                        key={config.exercise.id}
+                        style={styles.configSummaryExercise}
+                      >
+                        {index + 1}. {config.exercise.name} - {
+                          config.useTime 
+                            ? `${config.time}s` 
+                            : `${config.sets[0]?.reps || '0'} reps`
+                        }
+                      </Text>
+                    ))}
                   </View>
                 </LinearGradient>
               </View>
@@ -792,12 +899,9 @@ export default function SupersetBuilder({
               <View style={styles.configField}>
                 <Text style={styles.configLabel}>
                   Número de Rondas
-                  {typeConfig.type === 'megacircuit' && (
-                    <Text style={styles.configHint}> (Recomendado: 1-2 para mega circuitos)</Text>
-                  )}
                 </Text>
                 <View style={styles.roundsSelector}>
-                  {getRecommendedRounds().map((num) => (
+                  {[1, 2, 3, 4, 5].map((num) => (
                     <Pressable
                       key={num}
                       onPress={() => setRounds(num)}
@@ -820,31 +924,46 @@ export default function SupersetBuilder({
                 </View>
               </View>
 
-              {/* Tiempo de descanso */}
+              {/* Tiempo de descanso entre rondas */}
               <View style={styles.configField}>
                 <Text style={styles.configLabel}>
                   Descanso entre rondas
-                  <Text style={styles.configHint}> (Recomendado: {getRecommendedRestTime()}s)</Text>
                 </Text>
                 <View style={styles.restTimeContainer}>
-                  <Pressable
-                    onPress={() => setRestTime(getRecommendedRestTime())}
-                    style={styles.recommendedBtn}
-                  >
-                    <Text style={styles.recommendedBtnText}>Recomendado</Text>
-                  </Pressable>
                   <TextInput
                     value={restTime}
                     onChangeText={setRestTime}
                     style={styles.restTimeInput}
                     keyboardType="numeric"
-                    placeholder={getRecommendedRestTime()}
+                    placeholder="90"
                     placeholderTextColor="#6B7280"
                     maxLength={3}
                   />
                   <Text style={styles.restTimeUnit}>segundos</Text>
                 </View>
               </View>
+
+              {/* Tiempo de descanso entre ejercicios (solo para circuitos) */}
+              {typeConfig.hasExerciseRest && (
+                <View style={styles.configField}>
+                  <Text style={styles.configLabel}>
+                    Descanso entre ejercicios
+                    <Text style={styles.configHint}> (0 = sin descanso)</Text>
+                  </Text>
+                  <View style={styles.restTimeContainer}>
+                    <TextInput
+                      value={restTimeBetweenExercises}
+                      onChangeText={setRestTimeBetweenExercises}
+                      style={styles.restTimeInput}
+                      keyboardType="numeric"
+                      placeholder="20"
+                      placeholderTextColor="#6B7280"
+                      maxLength={3}
+                    />
+                    <Text style={styles.restTimeUnit}>segundos</Text>
+                  </View>
+                </View>
+              )}
 
               {/* Preview final */}
               <View style={styles.finalPreview}>
@@ -862,55 +981,32 @@ export default function SupersetBuilder({
                   </View>
 
                   <Text style={styles.finalPreviewText}>
-                    &quot;{supersetName}&quot; - {selectedExercises.length}{" "}
-                    ejercicios × {rounds} rondas
+                    &quot;{supersetName}&quot; - {exerciseConfigs.length} ejercicios × {rounds} rondas
                   </Text>
                   <Text style={styles.finalPreviewSubtext}>
-                    Descanso de {restTime}s entre rondas • Tiempo estimado: ~
-                    {Math.round(
-                      ((selectedExercises.length * 
-                        (typeConfig.type === 'megacircuit' ? 45 : 
-                         typeConfig.type === 'circuit' ? 30 : 60) +
-                        parseInt(restTime || "90")) *
-                        rounds) /
-                        60
-                    )}{" "}
-                    minutos
+                    {typeConfig.hasExerciseRest && restTimeBetweenExercises !== '0' ? (
+                      <>
+                        Descanso entre ejercicios: {restTimeBetweenExercises}s • 
+                        Descanso entre rondas: {restTime}s
+                      </>
+                    ) : (
+                      <>Descanso entre rondas: {restTime}s</>
+                    )}
                   </Text>
-
-                  {/* Información adicional según el tipo */}
-                  {typeConfig.type === 'circuit' && (
-                    <View style={styles.typeInfo}>
-                      <MaterialCommunityIcons name="information-outline" size={12} color={typeConfig.color} />
-                      <Text style={[styles.typeInfoText, { color: typeConfig.color }]}>
-                        Ideal para trabajo cardiovascular y quema de grasa
-                      </Text>
-                    </View>
-                  )}
-                  {typeConfig.type === 'megacircuit' && (
-                    <View style={styles.typeInfo}>
-                      <MaterialCommunityIcons name="fire" size={12} color={typeConfig.color} />
-                      <Text style={[styles.typeInfoText, { color: typeConfig.color }]}>
-                        Entrenamiento de alta intensidad - Hidratación y calentamiento esenciales
-                      </Text>
-                    </View>
-                  )}
                 </LinearGradient>
               </View>
             </View>
           )}
         </ScrollView>
 
-        {/* ===== BOTONES DE ACCIÓN SIMPLIFICADOS ===== */}
+        {/* ===== BOTONES DE ACCIÓN ===== */}
         <View style={styles.actions}>
-          {/* Botón Atrás */}
           <Pressable onPress={prevStep} style={styles.backBtn}>
             <Text style={styles.backText}>
               {currentStep === "type" ? "Cancelar" : "Atrás"}
             </Text>
           </Pressable>
 
-          {/* Botón principal */}
           {currentStep === "config" ? (
             <Pressable
               onPress={createSuperset}
@@ -975,7 +1071,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ===== HEADER SIMPLIFICADO =====
+  // ===== HEADER =====
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1123,6 +1219,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: 120,
   },
 
   typeOptionHeader: {
@@ -1156,69 +1253,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
 
-  typeOptionExample: {
-    marginBottom: 16,
-  },
-
-  exampleTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 4,
-  },
-
-  exampleTitleSelected: {
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-
-  exampleText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontStyle: 'italic',
-  },
-
-  exampleTextSelected: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-
-  typeOptionBenefits: {
-    marginBottom: 16,
-  },
-
-  benefitsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 8,
-  },
-
-  benefitsTitleSelected: {
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-
-  benefitsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-
-  benefitTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-
-  benefitText: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-
-  benefitTextSelected: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-
   typeOptionFooter: {
     alignItems: 'center',
   },
@@ -1245,29 +1279,6 @@ const styles = StyleSheet.create({
   },
 
   // ===== PASO 2: EJERCICIOS =====
-  autoSelectSection: {
-    marginBottom: 24,
-  },
-
-  autoSelectBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  autoSelectGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-
-  autoSelectText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   selectedExercisesSection: {
     marginBottom: 24,
   },
@@ -1331,6 +1342,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
 
+  removeBtn: {
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+  },
+
   availableExercisesSection: {
     marginTop: 16,
   },
@@ -1388,7 +1403,175 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // ===== PASO 3: CONFIGURACIÓN =====
+  // ===== PASO 3: SERIES =====
+  globalTimeOption: {
+    backgroundColor: 'rgba(78, 205, 196, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  globalTimeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  globalTimeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  globalTimeInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+
+  globalTimeLabel: {
+    fontSize: 14,
+    color: '#B0B0C4',
+  },
+
+  timeInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    minWidth: 60,
+    textAlign: 'center',
+  },
+
+  timeUnit: {
+    fontSize: 14,
+    color: '#B0B0C4',
+  },
+
+  exerciseConfigsList: {
+    gap: 12,
+  },
+
+  exerciseConfigCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  exerciseConfigGradient: {
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  exerciseConfigHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+
+  exerciseNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  exerciseNumberText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  exerciseConfigName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+
+  exerciseTypeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+
+  typeToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 4,
+  },
+
+  typeToggleBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+
+  typeToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  typeToggleTextActive: {
+    color: '#FFFFFF',
+  },
+
+  setsConfig: {
+    gap: 8,
+  },
+
+  timeConfig: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  repsConfig: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  configLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#B0B0C4',
+  },
+
+  timeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+
+  configInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    minWidth: 60,
+    textAlign: 'center',
+  },
+
+  configUnit: {
+    fontSize: 14,
+    color: '#B0B0C4',
+  },
+
+  // ===== PASO 4: CONFIGURACIÓN =====
   configSummary: {
     marginBottom: 24,
     borderRadius: 16,
@@ -1427,28 +1610,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  configLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#B0B0C4',
-    marginBottom: 8,
-  },
-
   configHint: {
     fontSize: 12,
     color: '#6B7280',
     fontWeight: '400',
-  },
-
-  configInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 
   roundsSelector: {
@@ -1486,28 +1651,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: 8,
-  },
-
-  recommendedBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255, 184, 77, 0.2)',
-  },
-
-  recommendedBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFB84D',
   },
 
   restTimeInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
@@ -1515,9 +1665,6 @@ const styles = StyleSheet.create({
   },
 
   restTimeUnit: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     fontSize: 14,
     fontWeight: '600',
     color: '#B0B0C4',
@@ -1557,23 +1704,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#B0B0C4',
     fontStyle: 'italic',
-    marginBottom: 8,
   },
 
-  typeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-  },
-
-  typeInfoText: {
-    fontSize: 11,
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  // ===== BOTONES SIMPLIFICADOS =====
+  // ===== BOTONES =====
   actions: {
     flexDirection: 'row',
     paddingHorizontal: 20,

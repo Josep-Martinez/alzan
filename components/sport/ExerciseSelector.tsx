@@ -1,7 +1,7 @@
-// components/sport/ExerciseSelector.tsx - Actualizado con nuevas categorías
+// components/sport/ExerciseSelector.tsx - Actualizado con mejor integración
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -16,7 +16,21 @@ import {
 import exercisesData from '../../assets/data/BDD_Gym.json';
 
 // Importar tipos de tu estructura existente
-import { ManualExercise } from './sports';
+import { ExerciseType } from './sports';
+
+/**
+ * Interfaz para ejercicio manual (debe coincidir con GymSession)
+ */
+interface ManualExercise {
+  id: string;
+  name: string;
+  muscleGroup?: string;
+  specificMuscle?: string;
+  equipment?: string;
+  difficulty?: string;
+  exerciseType?: ExerciseType;
+  description?: string;
+}
 
 /**
  * Props del selector de ejercicios
@@ -41,6 +55,18 @@ export default function ExerciseSelector({
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<ManualExercise | null>(null);
+
+  // ===== EFECTO PARA RESETEAR FILTROS AL ABRIR =====
+  useEffect(() => {
+    if (visible) {
+      // Resetear todos los filtros cuando se abre el modal
+      setSearchText('');
+      setSelectedCategory(null);
+      setSelectedEquipment(null);
+      setSelectedDifficulty(null);
+      setSelectedExercise(null);
+    }
+  }, [visible]);
 
   // Categorías principales de grupos musculares ACTUALIZADAS
   const MUSCLE_CATEGORIES = [
@@ -171,7 +197,7 @@ export default function ExerciseSelector({
         equipment: exercise.equipamiento,
         difficulty: exercise.dificultad,
         description: exercise.descripcion,
-        maxWeight: 0 // Se cargaría de la base de datos del usuario
+        exerciseType: exercise.tipo as ExerciseType || 'Repeticiones'
       };
       categorizedExercises.push(newExercise);
     });
@@ -257,8 +283,9 @@ export default function ExerciseSelector({
     const customExercise: ManualExercise = {
       id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: searchText.trim(),
-      equipment: selectedEquipment || 'Peso corporal',
-      difficulty: selectedDifficulty || 'Principiante'
+      equipment: 'Peso corporal',
+      difficulty: 'Principiante',
+      exerciseType: 'Repeticiones'
     };
     
     handleSelectExercise(customExercise);
@@ -312,16 +339,6 @@ export default function ExerciseSelector({
       cat.muscles.includes(muscleGroup?.toLowerCase() || '')
     );
     return category?.name || muscleGroup;
-  };
-
-  /**
-   * Obtiene el nombre de la categoría de equipamiento para mostrar
-   */
-  const getEquipmentDisplayName = (equipment: string) => {
-    const equipmentCategory = EQUIPMENT_CATEGORIES.find(eq => 
-      eq.equipment.includes(equipment || '')
-    );
-    return equipmentCategory?.name || equipment;
   };
 
   const filteredExercises = getFilteredExercises;
@@ -379,6 +396,14 @@ export default function ExerciseSelector({
                   {selectedExercise.difficulty}
                 </Text>
               </View>
+
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="format-list-numbered" size={20} color="#00D4AA" />
+                <Text style={styles.detailLabel}>Tipo:</Text>
+                <Text style={[styles.detailValue, { color: '#00D4AA' }]}>
+                  {selectedExercise.exerciseType === 'Tiempo' ? 'Por tiempo' : 'Por repeticiones'}
+                </Text>
+              </View>
             </View>
             
             <View style={styles.descriptionSection}>
@@ -397,7 +422,7 @@ export default function ExerciseSelector({
                 style={styles.selectExerciseGradient}
               >
                 <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
-                <Text style={styles.selectExerciseText}>Seleccionar ejercicio</Text>
+                <Text style={styles.selectExerciseText}>Añadir ejercicio</Text>
               </LinearGradient>
             </Pressable>
           </LinearGradient>
@@ -429,7 +454,7 @@ export default function ExerciseSelector({
                   ? EQUIPMENT_CATEGORIES.find(eq => eq.id === selectedEquipment)?.name || 'Ejercicios'
                   : selectedDifficulty
                   ? DIFFICULTY_CATEGORIES.find(d => d.id === selectedDifficulty)?.name || 'Ejercicios'
-                  : 'Ejercicios'
+                  : 'Añadir Ejercicio'
                 }
               </Text>
             </View>
@@ -525,25 +550,34 @@ export default function ExerciseSelector({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Grupos Musculares</Text>
               <View style={styles.categoriesGrid}>
-                {MUSCLE_CATEGORIES.map((category) => (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => setSelectedCategory(category.id)}
-                    style={styles.categoryBtn}
-                  >
-                    <LinearGradient
-                      colors={[category.color + '20', category.color + '10']}
-                      style={styles.categoryGradient}
+                {MUSCLE_CATEGORIES.map((category) => {
+                  const exerciseCount = EXERCISE_DATABASE.filter(ex => 
+                    category.muscles.includes(ex.muscleGroup?.toLowerCase() || '')
+                  ).length;
+                  
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setSelectedCategory(category.id)}
+                      style={styles.categoryBtn}
                     >
-                      <MaterialCommunityIcons
-                        name={category.icon as any}
-                        size={28}
-                        color={category.color}
-                      />
-                      <Text style={styles.categoryName}>{category.name}</Text>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
+                      <LinearGradient
+                        colors={[category.color + '20', category.color + '10']}
+                        style={styles.categoryGradient}
+                      >
+                        <MaterialCommunityIcons
+                          name={category.icon as any}
+                          size={28}
+                          color={category.color}
+                        />
+                        <Text style={styles.categoryName}>{category.name}</Text>
+                        <Text style={styles.categoryCount}>
+                          {exerciseCount} ejercicios
+                        </Text>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -551,27 +585,36 @@ export default function ExerciseSelector({
           {/* ===== FILTROS DE EQUIPAMIENTO ===== */}
           {!hasActiveFilters && !searchText && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Filtrar por Equipamiento</Text>
+              <Text style={styles.sectionTitle}>Equipamiento</Text>
               <View style={styles.equipmentGrid}>
-                {EQUIPMENT_CATEGORIES.map((equipment) => (
-                  <Pressable
-                    key={equipment.id}
-                    onPress={() => setSelectedEquipment(equipment.id)}
-                    style={styles.equipmentBtn}
-                  >
-                    <LinearGradient
-                      colors={[equipment.color + '20', equipment.color + '10']}
-                      style={styles.equipmentGradient}
+                {EQUIPMENT_CATEGORIES.map((equipment) => {
+                  const exerciseCount = EXERCISE_DATABASE.filter(ex => 
+                    equipment.equipment.includes(ex.equipment || '')
+                  ).length;
+                  
+                  return (
+                    <Pressable
+                      key={equipment.id}
+                      onPress={() => setSelectedEquipment(equipment.id)}
+                      style={styles.equipmentBtn}
                     >
-                      <MaterialCommunityIcons
-                        name={equipment.icon as any}
-                        size={24}
-                        color={equipment.color}
-                      />
-                      <Text style={styles.equipmentName}>{equipment.name}</Text>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
+                      <LinearGradient
+                        colors={[equipment.color + '20', equipment.color + '10']}
+                        style={styles.equipmentGradient}
+                      >
+                        <MaterialCommunityIcons
+                          name={equipment.icon as any}
+                          size={24}
+                          color={equipment.color}
+                        />
+                        <Text style={styles.equipmentName}>{equipment.name}</Text>
+                        <Text style={styles.equipmentCount}>
+                          {exerciseCount} ejercicios
+                        </Text>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -579,7 +622,7 @@ export default function ExerciseSelector({
           {/* ===== FILTROS DE DIFICULTAD ===== */}
           {!hasActiveFilters && !searchText && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Filtrar por Dificultad</Text>
+              <Text style={styles.sectionTitle}>Dificultad</Text>
               <View style={styles.difficultyGrid}>
                 {DIFFICULTY_CATEGORIES.map((difficulty) => {
                   const exerciseCount = EXERCISE_DATABASE.filter(ex => 
@@ -683,6 +726,17 @@ export default function ExerciseSelector({
                                   {exercise.difficulty}
                                 </Text>
                               </View>
+
+                              <View style={styles.exerciseType}>
+                                <MaterialCommunityIcons 
+                                  name={exercise.exerciseType === 'Tiempo' ? 'timer' : 'numeric'}
+                                  size={12} 
+                                  color="#00D4AA" 
+                                />
+                                <Text style={styles.exerciseTypeText}>
+                                  {exercise.exerciseType === 'Tiempo' ? 'Tiempo' : 'Reps'}
+                                </Text>
+                              </View>
                             </View>
                           </View>
                           
@@ -726,8 +780,8 @@ export default function ExerciseSelector({
             >
               <MaterialCommunityIcons name="information-outline" size={16} color="#FFB84D" />
               <Text style={styles.infoText}>
-                Filtra por grupo muscular, equipamiento o dificultad para encontrar ejercicios específicos. 
-                Toca el ícono de información para ver detalles de cada uno de los más de 450 ejercicios.
+                💡 Explora más de 450 ejercicios organizados por grupo muscular, equipamiento y dificultad. 
+                Toca el ícono de información para ver detalles completos de cada ejercicio.
               </Text>
             </LinearGradient>
           </View>
@@ -750,23 +804,25 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
 
   detailsContainer: {
-    width: '90%',
+    width: '100%',
+    maxWidth: 400,
     maxHeight: '80%',
     borderRadius: 20,
-    padding: 20,
+    padding: 24,
     paddingTop: 40,
   },
 
   closeDetailsBtn: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 16,
+    right: 16,
     padding: 8,
   },
 
@@ -793,15 +849,15 @@ const styles = StyleSheet.create({
   },
 
   detailLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFB84D',
-    minWidth: 140,
+    color: '#B0B0C4',
+    minWidth: 120,
   },
 
   detailValue: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#FFFFFF',
     flex: 1,
   },
@@ -814,16 +870,16 @@ const styles = StyleSheet.create({
   },
 
   descriptionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 10,
   },
 
   descriptionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#E0E0E0',
-    lineHeight: 24,
+    lineHeight: 20,
   },
 
   selectExerciseBtn: {
@@ -841,7 +897,7 @@ const styles = StyleSheet.create({
   },
 
   selectExerciseText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -997,7 +1053,7 @@ const styles = StyleSheet.create({
   },
 
   categoryName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 8,
@@ -1005,7 +1061,7 @@ const styles = StyleSheet.create({
   },
 
   categoryCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     marginTop: 4,
     textAlign: 'center',
@@ -1067,7 +1123,7 @@ const styles = StyleSheet.create({
   },
 
   difficultyName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 8,
@@ -1075,7 +1131,7 @@ const styles = StyleSheet.create({
   },
 
   difficultyCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     marginTop: 4,
     textAlign: 'center',
@@ -1118,22 +1174,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 6,
   },
 
   exerciseMetadata: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexWrap: 'wrap',
   },
 
   primaryMuscle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
   },
 
   secondaryMuscle: {
@@ -1147,11 +1203,11 @@ const styles = StyleSheet.create({
   exerciseEquipment: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
 
   exerciseEquipmentText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#FFB84D',
     fontWeight: '500',
   },
@@ -1159,11 +1215,23 @@ const styles = StyleSheet.create({
   exerciseDifficulty: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
 
   exerciseDifficultyText: {
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: '500',
+  },
+
+  exerciseType: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+
+  exerciseTypeText: {
+    fontSize: 10,
+    color: '#00D4AA',
     fontWeight: '500',
   },
 

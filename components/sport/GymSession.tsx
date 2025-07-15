@@ -1,17 +1,35 @@
-// components/sport/GymSession.tsx - Versión corregida y mejorada
+// components/sport/GymSession.tsx - Versión mejorada con mejor integración de superseries
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+  Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from 'react-native';
+import ActiveWorkoutSession from './ActiveWorkoutSession';
+import ExerciseReorderModal from './ExerciseReorderModal';
 import ExerciseSelector from './ExerciseSelector';
+import {
+  EXERCISE_TYPE_COLORS,
+  EXERCISE_TYPE_ICONS,
+  EXERCISE_TYPE_TRANSLATIONS,
+  ExerciseType,
+  GymExercise,
+  GymSet,
+  SUPERSET_TYPE_CONFIG,
+  SuperSet,
+  SupersetType,
+  createEmptySet,
+  getSupersetProgress,
+  isSetComplete,
+  isSupersetComplete
+} from './sports';
 import SupersetBuilder from './SupersetBuilder';
-import { GymExercise, GymSet, SupersetType } from './sports';
 
 /**
  * Interfaz para ejercicio manual
@@ -20,22 +38,11 @@ interface ManualExercise {
   id: string;
   name: string;
   muscleGroup?: string;
+  specificMuscle?: string;
   equipment?: string;
   difficulty?: string;
-}
-
-/**
- * Interfaz para superseries mejorada
- */
-interface SuperSet {
-  id: string;
-  name: string;
-  exercises: GymExercise[];
-  restTime: string;
-  type: SupersetType;
-  currentRound: number;
-  totalRounds: number;
-  roundCompleted: boolean[];
+  exerciseType?: ExerciseType;
+  description?: string;
 }
 
 /**
@@ -47,53 +54,29 @@ interface GymSessionProps {
   onStartRestTimer: (duration: number) => void;
   onCompleteWorkout?: () => void;
   isCompleted?: boolean;
+  workoutName?: string;
 }
 
 /**
- * Funciones utilitarias para superseries (movidas al principio)
- */
-const getSupersetTypeName = (type: SupersetType): string => {
-  switch (type) {
-    case 'superset': return 'Superserie';
-    case 'triset': return 'Triserie';
-    case 'circuit': return 'Circuito';
-    default: return 'Superserie';
-  }
-};
-
-const getSupersetIcon = (type: SupersetType): string => {
-  switch (type) {
-    case 'superset': return 'lightning-bolt';
-    case 'triset': return 'flash';
-    case 'circuit': return 'refresh-circle';
-    default: return 'lightning-bolt';
-  }
-};
-
-const getSupersetColor = (type: SupersetType): string => {
-  switch (type) {
-    case 'superset': return '#FF6B6B';
-    case 'triset': return '#FFB84D';
-    case 'circuit': return '#4ECDC4';
-    default: return '#FF6B6B';
-  }
-};
-
-/**
- * Componente principal para entrenamientos de gimnasio
+ * Componente principal para entrenamientos de gimnasio mejorado
  */
 export default function GymSession({ 
   exercises, 
   onUpdateExercises, 
   onStartRestTimer,
   onCompleteWorkout,
-  isCompleted = false
+  isCompleted = false,
+  workoutName = 'Entrenamiento de Gimnasio'
 }: GymSessionProps) {
   // ===== ESTADOS PRINCIPALES =====
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [showSupersetBuilder, setShowSupersetBuilder] = useState(false);
   const [openExerciseIdx, setOpenExerciseIdx] = useState<number | null>(null);
   const [superSets, setSuperSets] = useState<SuperSet[]>([]);
+  const [showActiveWorkout, setShowActiveWorkout] = useState(false);
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([]);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [showReorderModal, setShowReorderModal] = useState(false);
 
   /**
    * Añade un nuevo ejercicio individual
@@ -103,15 +86,17 @@ export default function GymSession({
     
     const newGymExercise: GymExercise = {
       id: `gym_ex_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      exerciseId: exercise.id, // ID del ejercicio de la base de datos
+      exerciseId: exercise.id,
       name: exercise.name,
-      sets: [],
+      sets: [createEmptySet(exercise.exerciseType || 'Repeticiones')], // Crear con una serie por defecto
       restTime: '60',
       notes: '',
-      // Campos adicionales de la BD
       muscleGroup: exercise.muscleGroup,
+      specificMuscle: exercise.specificMuscle,
       equipment: exercise.equipment,
-      difficulty: exercise.difficulty
+      difficulty: exercise.difficulty,
+      exerciseType: exercise.exerciseType || 'Repeticiones',
+      description: exercise.description
     };
     onUpdateExercises([...exercises, newGymExercise]);
   };
@@ -125,21 +110,25 @@ export default function GymSession({
     exercises: GymExercise[];
     rounds: number;
     restTime: string;
+    restTimeBetweenExercises?: string;
+    useTimeForAll?: boolean;
+    defaultTime?: string;
   }) => {
     if (isCompleted) return;
     
     const newSuperset: SuperSet = {
       id: `superset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: supersetData.name,
-      exercises: supersetData.exercises.map(ex => ({
-        ...ex,
-        sets: ex.sets.length > 0 ? ex.sets : [{ reps: '', weight: '', completed: false }]
-      })),
-      restTime: supersetData.restTime,
+      exercises: supersetData.exercises,
       type: supersetData.type,
       currentRound: 1,
       totalRounds: supersetData.rounds,
-      roundCompleted: Array(supersetData.rounds).fill(false)
+      roundCompleted: Array(supersetData.rounds).fill(false),
+      restTimeBetweenRounds: supersetData.restTime,
+      restTimeBetweenExercises: supersetData.restTimeBetweenExercises,
+      currentExerciseIndex: 0,
+      useTimeForAll: supersetData.useTimeForAll,
+      defaultTime: supersetData.defaultTime
     };
     
     setSuperSets([...superSets, newSuperset]);
@@ -155,58 +144,6 @@ export default function GymSession({
   };
 
   /**
-   * Completa una ronda de superserie
-   */
-  const completeRound = (supersetIdx: number) => {
-    if (isCompleted) return;
-    
-    const superset = superSets[supersetIdx];
-    if (!superset) return;
-    
-    const currentRoundIndex = superset.currentRound - 1; // Array es 0-indexed
-    
-    // Verificar que todos los ejercicios tienen configuración mínima
-    const allExercisesConfigured = superset.exercises.every(ex => 
-      ex.sets.length > 0 && 
-      ex.sets[0].reps.trim() !== '' && 
-      ex.sets[0].weight.trim() !== ''
-    );
-    
-    if (!allExercisesConfigured) {
-      return; // No completar si faltan datos
-    }
-    
-    // Verificar que no se haya completado ya esta ronda
-    if (superset.roundCompleted[currentRoundIndex]) {
-      return;
-    }
-    
-    const updatedSuperSets = superSets.map((ss, i) => {
-      if (i === supersetIdx) {
-        const newRoundCompleted = [...ss.roundCompleted];
-        newRoundCompleted[currentRoundIndex] = true;
-        
-        const nextRound = ss.currentRound < ss.totalRounds ? ss.currentRound + 1 : ss.currentRound;
-        
-        return {
-          ...ss,
-          roundCompleted: newRoundCompleted,
-          currentRound: nextRound
-        };
-      }
-      return ss;
-    });
-    
-    setSuperSets(updatedSuperSets);
-    
-    // Iniciar timer de descanso si no es la última ronda
-    if (superset.currentRound < superset.totalRounds) {
-      const restTime = parseInt(superset.restTime || '90');
-      onStartRestTimer(restTime);
-    }
-  };
-
-  /**
    * Actualiza una superserie
    */
   const updateSuperset = (supersetIdx: number, updatedSuperset: SuperSet) => {
@@ -219,7 +156,7 @@ export default function GymSession({
   };
 
   /**
-   * Elimina una superserie y devuelve ejercicios a la lista individual
+   * Elimina una superserie y devuelve sus ejercicios
    */
   const deleteSuperset = (supersetIdx: number) => {
     if (isCompleted) return;
@@ -227,11 +164,24 @@ export default function GymSession({
     const superset = superSets[supersetIdx];
     if (!superset) return;
     
-    // Devolver ejercicios a la lista individual
-    onUpdateExercises([...exercises, ...superset.exercises]);
-    
-    // Remover superserie
-    setSuperSets(superSets.filter((_, i) => i !== supersetIdx));
+    Alert.alert(
+      "Eliminar Superserie",
+      `¿Estás seguro de que quieres eliminar "${superset.name}"? Los ejercicios volverán a la lista individual.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Eliminar", 
+          style: "destructive",
+          onPress: () => {
+            // Devolver ejercicios a la lista individual
+            onUpdateExercises([...exercises, ...superset.exercises]);
+            
+            // Remover superserie
+            setSuperSets(superSets.filter((_, i) => i !== supersetIdx));
+          }
+        }
+      ]
+    );
   };
 
   /**
@@ -239,7 +189,54 @@ export default function GymSession({
    */
   const removeExercise = (idx: number) => {
     if (isCompleted) return;
-    onUpdateExercises(exercises.filter((_, i) => i !== idx));
+    
+    const exercise = exercises[idx];
+    Alert.alert(
+      "Eliminar Ejercicio",
+      `¿Estás seguro de que quieres eliminar "${exercise.name}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Eliminar", 
+          style: "destructive",
+          onPress: () => {
+            onUpdateExercises(exercises.filter((_, i) => i !== idx));
+          }
+        }
+      ]
+    );
+  };
+
+  /**
+   * Maneja el reordenamiento de ejercicios desde el modal
+   */
+  const handleReorderExercises = (reorderedExercises: GymExercise[]) => {
+    onUpdateExercises(reorderedExercises);
+    setShowReorderModal(false);
+  };
+
+  /**
+   * Reordena ejercicios
+   */
+  const reorderExercise = (fromIndex: number, toIndex: number) => {
+    if (isCompleted) return;
+    
+    const newExercises = [...exercises];
+    const [movedExercise] = newExercises.splice(fromIndex, 1);
+    newExercises.splice(toIndex, 0, movedExercise);
+    onUpdateExercises(newExercises);
+  };
+
+  /**
+   * Actualiza un ejercicio específico
+   */
+  const updateExercise = (idx: number, updatedExercise: GymExercise) => {
+    if (isCompleted) return;
+    
+    const updatedExercises = exercises.map((ex, i) =>
+      i === idx ? updatedExercise : ex
+    );
+    onUpdateExercises(updatedExercises);
   };
 
   /**
@@ -248,40 +245,37 @@ export default function GymSession({
   const addSet = (idx: number) => {
     if (isCompleted) return;
     
-    const updatedExercises = exercises.map((ex, i) =>
-      i === idx
-        ? { ...ex, sets: [...ex.sets, { reps: '', weight: '', completed: false }] }
-        : ex
-    );
-    onUpdateExercises(updatedExercises);
+    const exercise = exercises[idx];
+    const lastSet = exercise.sets[exercise.sets.length - 1];
+    
+    // Crear nueva serie basada en la anterior o vacía
+    const newSet = lastSet ? {
+      ...createEmptySet(exercise.exerciseType || 'Repeticiones'),
+      reps: lastSet.reps,
+      weight: lastSet.weight,
+      duration: lastSet.duration
+    } : createEmptySet(exercise.exerciseType || 'Repeticiones');
+    
+    const updatedExercise = {
+      ...exercise,
+      sets: [...exercise.sets, newSet]
+    };
+    updateExercise(idx, updatedExercise);
   };
 
   /**
    * Actualiza una serie específica
    */
-  const updateSet = (exIdx: number, setIdx: number, field: keyof GymSet, val: string | boolean) => {
+  const updateSet = (exIdx: number, setIdx: number, field: keyof GymSet, val: string | boolean | number) => {
     if (isCompleted) return;
     
-    const updatedExercises = exercises.map((ex, i) =>
-      i === exIdx
-        ? {
-            ...ex,
-            sets: ex.sets.map((s, j) =>
-              j === setIdx ? { ...s, [field]: val } : s
-            ),
-          }
-        : ex
+    const exercise = exercises[exIdx];
+    const updatedSets = exercise.sets.map((s, j) =>
+      j === setIdx ? { ...s, [field]: val } : s
     );
-    onUpdateExercises(updatedExercises);
-
-    // Iniciar timer de descanso al completar serie
-    if (field === 'completed' && val === true && !isCompleted) {
-      const exercise = exercises[exIdx];
-      if (exercise) {
-        const restTime = parseInt(exercise.restTime || '60');
-        onStartRestTimer(restTime);
-      }
-    }
+    
+    const updatedExercise = { ...exercise, sets: updatedSets };
+    updateExercise(exIdx, updatedExercise);
   };
 
   /**
@@ -290,24 +284,36 @@ export default function GymSession({
   const removeSet = (exIdx: number, setIdx: number) => {
     if (isCompleted) return;
     
-    const updatedExercises = exercises.map((ex, i) =>
-      i === exIdx
-        ? { ...ex, sets: ex.sets.filter((_, j) => j !== setIdx) }
-        : ex
-    );
-    onUpdateExercises(updatedExercises);
+    const exercise = exercises[exIdx];
+    if (exercise.sets.length <= 1) return; // No permitir eliminar la única serie
+    
+    const updatedSets = exercise.sets.filter((_, j) => j !== setIdx);
+    const updatedExercise = { ...exercise, sets: updatedSets };
+    updateExercise(exIdx, updatedExercise);
   };
 
   /**
-   * Actualiza el tiempo de descanso de un ejercicio
+   * Duplica una serie
    */
-  const updateRestTime = (idx: number, restTime: string) => {
+  const duplicateSet = (exIdx: number, setIdx: number) => {
     if (isCompleted) return;
     
-    const updatedExercises = exercises.map((ex, i) =>
-      i === idx ? { ...ex, restTime } : ex
-    );
-    onUpdateExercises(updatedExercises);
+    const exercise = exercises[exIdx];
+    const setToDuplicate = exercise.sets[setIdx];
+    const duplicatedSet = { 
+      ...setToDuplicate, 
+      completed: false,
+      actualDuration: undefined 
+    };
+    
+    const updatedSets = [
+      ...exercise.sets.slice(0, setIdx + 1),
+      duplicatedSet,
+      ...exercise.sets.slice(setIdx + 1)
+    ];
+    
+    const updatedExercise = { ...exercise, sets: updatedSets };
+    updateExercise(exIdx, updatedExercise);
   };
 
   /**
@@ -316,86 +322,102 @@ export default function GymSession({
   const isWorkoutReadyToComplete = (): boolean => {
     // Verificar ejercicios individuales
     const exercisesReady = exercises.length === 0 || exercises.every(ex => 
-      ex.sets.length > 0 && ex.sets.every(set => 
-        set.reps.trim() !== '' && set.weight.trim() !== ''
+      ex.sets.length > 0 && ex.sets.some(set => 
+        isSetComplete(set, ex.exerciseType || 'Repeticiones')
       )
     );
     
     // Verificar superseries
     const supersetsReady = superSets.length === 0 || superSets.every(ss => {
-      // Verificar que todos los ejercicios de la superserie estén configurados
       const exercisesConfigured = ss.exercises.every(ex => 
-        ex.sets.length > 0 && ex.sets.every(set => 
-          set.reps.trim() !== '' && set.weight.trim() !== ''
+        ex.sets.length > 0 && ex.sets.some(set => 
+          isSetComplete(set, ex.exerciseType || 'Repeticiones')
         )
       );
       
-      // Verificar que todas las rondas estén completadas
-      const allRoundsCompleted = ss.roundCompleted.every(completed => completed);
-      
-      return exercisesConfigured && allRoundsCompleted;
+      return exercisesConfigured;
     });
     
     return exercisesReady && supersetsReady && (exercises.length > 0 || superSets.length > 0);
   };
 
   /**
-   * Completa el entrenamiento con validación mejorada
+   * Abre la pantalla de entrenamiento activo
    */
-  const handleCompleteWorkout = () => {
-    if (!isWorkoutReadyToComplete() || isCompleted) return;
-    onCompleteWorkout?.();
+  const startActiveWorkout = () => {
+    if (isCompleted) return;
+    
+    const hasExercisesReady = exercises.some(ex => ex.sets.length > 0) || 
+                             superSets.some(ss => ss.exercises.every(ex => ex.sets.length > 0));
+    
+    if (!hasExercisesReady) {
+      Alert.alert(
+        "Entrenamiento vacío",
+        "Añade ejercicios y configura al menos una serie antes de comenzar el entrenamiento.",
+        [{ text: "Entendido" }]
+      );
+      return;
+    }
+    
+    setShowActiveWorkout(true);
   };
 
-  // ===== CÁLCULOS DE ESTADÍSTICAS =====
-  const totalSets = exercises.reduce((total, ex) => total + ex.sets.length, 0) + 
-                   superSets.reduce((total, ss) => total + ss.totalRounds, 0);
-                   
-  const completedSets = exercises.reduce((total, ex) => 
-    total + ex.sets.filter(set => set.completed).length, 0
-  ) + superSets.reduce((total, ss) => 
-    total + ss.roundCompleted.filter(completed => completed).length, 0
-  );
-  
-  const progressPercentage = totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
+  /**
+   * Calcula estadísticas del entrenamiento
+   */
+  const getWorkoutStats = () => {
+    const individualSets = exercises.reduce((total, ex) => total + ex.sets.length, 0);
+    const supersetSets = superSets.reduce((total, ss) => total + ss.totalRounds, 0);
+    const totalSets = individualSets + supersetSets;
+    
+    const completedIndividualSets = exercises.reduce((total, ex) => 
+      total + ex.sets.filter(set => set.completed).length, 0
+    );
+    const completedSupersetRounds = superSets.reduce((total, ss) => 
+      total + ss.roundCompleted.filter(completed => completed).length, 0
+    );
+    const completedSets = completedIndividualSets + completedSupersetRounds;
+    
+    const progressPercentage = totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
+    
+    return {
+      totalExercises: exercises.length,
+      totalSupersets: superSets.length,
+      totalSets,
+      completedSets,
+      progressPercentage
+    };
+  };
+
+  const stats = getWorkoutStats();
   const workoutReady = isWorkoutReadyToComplete();
 
   return (
     <View style={styles.container}>
-      {/* ===== ESTADÍSTICAS DEL ENTRENAMIENTO ===== */}
+      {/* ===== ESTADÍSTICAS Y BOTÓN INICIAR ===== */}
       {(exercises.length > 0 || superSets.length > 0) && (
-        <View style={styles.statsContainer}>
+        <View style={styles.workoutHeader}>
           <LinearGradient
             colors={
               isCompleted 
                 ? ["rgba(0, 212, 170, 0.2)", "rgba(0, 184, 148, 0.1)"]
                 : ["#2D2D5F", "#3D3D7F"]
             }
-            style={styles.statsGradient}
+            style={styles.workoutHeaderGradient}
           >
-            <View style={styles.statsHeader}>
-              <MaterialCommunityIcons 
-                name={isCompleted ? "trophy" : "chart-line"} 
-                size={20} 
-                color="#00D4AA" 
-              />
-              <Text style={styles.statsTitle}>
-                {isCompleted ? "Entrenamiento Completado" : "Progreso del Entrenamiento"}
-              </Text>
-            </View>
-            
-            <View style={styles.statsContent}>
+            {/* Estadísticas */}
+            <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{exercises.length + superSets.length}</Text>
+                <Text style={styles.statValue}>{stats.totalExercises + stats.totalSupersets}</Text>
                 <Text style={styles.statLabel}>Ejercicios</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{completedSets}/{totalSets}</Text>
+                <Text style={styles.statValue}>{stats.completedSets}/{stats.totalSets}</Text>
                 <Text style={styles.statLabel}>Series</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{Math.round(progressPercentage)}%</Text>
-                <Text style={styles.statLabel}>Completado</Text>
+                <Text style={styles.statValue}>{Math.round(stats.progressPercentage)}%</Text>
+                <Text style={styles.statLabel}>Progreso</Text>
               </View>
             </View>
 
@@ -405,313 +427,229 @@ export default function GymSession({
                 <View 
                   style={[
                     styles.progressBar, 
-                    { 
-                      width: `${progressPercentage}%`,
-                      backgroundColor: isCompleted ? '#00D4AA' : '#00D4AA'
-                    }
+                    { width: `${stats.progressPercentage}%` }
                   ]} 
                 />
               </View>
             </View>
 
+            {/* Botón iniciar entrenamiento */}
+            {!isCompleted && (
+              <Pressable onPress={startActiveWorkout} style={styles.startWorkoutBtn}>
+                <LinearGradient
+                  colors={["#00D4AA", "#00B894"]}
+                  style={styles.startWorkoutGradient}
+                >
+                  <MaterialCommunityIcons name="play-circle" size={24} color="#FFFFFF" />
+                  <Text style={styles.startWorkoutText}>Iniciar Entrenamiento</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </Pressable>
+            )}
+
             {/* Mensaje de completado */}
             {isCompleted && (
-              <View style={styles.completedMessage}>
-                <Text style={styles.completedMessageText}>
-                  ✅ Este entrenamiento ya fue completado. Los datos se muestran en modo solo lectura.
-                </Text>
+              <View style={styles.completedBadge}>
+                <MaterialCommunityIcons name="trophy" size={20} color="#00D4AA" />
+                <Text style={styles.completedText}>Entrenamiento Completado</Text>
               </View>
             )}
           </LinearGradient>
         </View>
       )}
 
-      {/* ===== SUPERSERIES ===== */}
-      {superSets.map((superset, ssIdx) => {
-        const typeConfig = {
-          color: getSupersetColor(superset.type),
-          icon: getSupersetIcon(superset.type),
-          name: getSupersetTypeName(superset.type)
-        };
-        
-        return (
-          <View key={superset.id} style={styles.supersetCard}>
-            <LinearGradient
-              colors={[
-                typeConfig.color + '33',
-                typeConfig.color + '1A'
-              ]}
-              style={styles.supersetGradient}
-            >
-              {/* Header de la superserie */}
-              <View style={styles.supersetHeader}>
-                <View style={styles.supersetInfo}>
-                  <MaterialCommunityIcons
-                    name={typeConfig.icon as any}
-                    size={20}
-                    color={typeConfig.color}
-                  />
-                  <Text style={styles.supersetName}>{superset.name}</Text>
-                  <View style={styles.supersetBadge}>
-                    <Text style={styles.supersetBadgeText}>
-                      Ronda {superset.currentRound}/{superset.totalRounds}
-                    </Text>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* ===== SUPERSERIES Y CIRCUITOS ===== */}
+        {superSets.map((superset, ssIdx) => {
+          const typeConfig = SUPERSET_TYPE_CONFIG[superset.type];
+          const progress = getSupersetProgress(superset);
+          const isComplete = isSupersetComplete(superset);
+          
+          return (
+            <View key={superset.id} style={styles.supersetCard}>
+              <LinearGradient
+                colors={
+                  isCompleted || isComplete
+                    ? [typeConfig.color + '40', typeConfig.color + '20']
+                    : [typeConfig.color + '33', typeConfig.color + '1A']
+                }
+                style={styles.supersetGradient}
+              >
+                {/* Header de la superserie */}
+                <View style={styles.supersetHeader}>
+                  <View style={styles.supersetHeaderLeft}>
+                    <View style={[styles.supersetIcon, { backgroundColor: typeConfig.color }]}>
+                      <MaterialCommunityIcons
+                        name={typeConfig.icon as any}
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                    <View style={styles.supersetInfo}>
+                      <Text style={styles.supersetName}>{superset.name}</Text>
+                      <Text style={styles.supersetType}>{typeConfig.name}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.supersetHeaderRight}>
+                    <View style={styles.supersetStats}>
+                      <Text style={styles.supersetProgress}>{Math.round(progress)}%</Text>
+                      <Text style={styles.supersetProgressLabel}>Progreso</Text>
+                    </View>
+                    {!isCompleted && (
+                      <Pressable
+                        onPress={() => deleteSuperset(ssIdx)}
+                        style={styles.deleteBtn}
+                      >
+                        <MaterialCommunityIcons name="trash-can" size={20} color="#FF6B6B" />
+                      </Pressable>
+                    )}
                   </View>
                 </View>
-                {!isCompleted && (
-                  <Pressable
-                    onPress={() => deleteSuperset(ssIdx)}
-                    style={styles.deleteBtn}
-                  >
-                    <MaterialCommunityIcons name="trash-can" size={20} color="#FF6B6B" />
-                  </Pressable>
-                )}
-              </View>
 
-              {/* Progreso de rondas */}
-              <View style={styles.roundProgress}>
-                {superset.roundCompleted.map((completed, roundIdx) => (
-                  <View 
-                    key={roundIdx}
-                    style={[
-                      styles.roundIndicator,
-                      completed && styles.roundCompleted,
-                      roundIdx === superset.currentRound - 1 && styles.roundCurrent
-                    ]}
-                  >
-                    <Text style={[
-                      styles.roundNumber,
-                      completed && styles.roundNumberCompleted
-                    ]}>
-                      {roundIdx + 1}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Ejercicios de la superserie */}
-              <View style={styles.currentRoundContainer}>
-                <Text style={styles.currentRoundTitle}>
-                  Ronda {superset.currentRound}/{superset.totalRounds} - Configura cada ejercicio
-                </Text>
-                
-                {superset.exercises.map((exercise, exIdx) => (
-                  <View key={exercise.id} style={styles.supersetExercise}>
-                    <View style={styles.supersetExerciseHeader}>
-                      <Text style={styles.supersetExerciseName}>
-                        {String.fromCharCode(65 + exIdx)}. {exercise.name}
-                      </Text>
-                      <View style={styles.supersetExerciseBadge}>
-                        <Text style={styles.supersetExerciseBadgeText}>
-                          {superset.roundCompleted[superset.currentRound - 1] ? "✓" : `${superset.currentRound}/${superset.totalRounds}`}
+                {/* Progreso de rondas */}
+                <View style={styles.roundsProgress}>
+                  <View style={styles.roundsIndicators}>
+                    {Array.from({ length: superset.totalRounds }).map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.roundIndicator,
+                          superset.roundCompleted[idx] && styles.roundIndicatorCompleted,
+                          idx === superset.currentRound - 1 && styles.roundIndicatorCurrent
+                        ]}
+                      >
+                        <Text style={[
+                          styles.roundIndicatorText,
+                          superset.roundCompleted[idx] && styles.roundIndicatorTextCompleted
+                        ]}>
+                          {idx + 1}
                         </Text>
                       </View>
-                    </View>
-
-                    {/* Inputs para reps y peso */}
-                    <View style={styles.supersetExerciseInputs}>
-                      <View style={styles.supersetInputGroup}>
-                        <Text style={styles.supersetInputLabel}>Reps</Text>
-                        <TextInput
-                          value={exercise.sets[0]?.reps || ''}
-                          onChangeText={(text) => {
-                            const updatedSuperset = {
-                              ...superset,
-                              exercises: superset.exercises.map((ex, j) =>
-                                j === exIdx ? {
-                                  ...ex,
-                                  sets: ex.sets.length > 0 
-                                    ? ex.sets.map((set, k) => k === 0 ? { ...set, reps: text } : set)
-                                    : [{ reps: text, weight: '', completed: false }]
-                                } : ex
-                              )
-                            };
-                            updateSuperset(ssIdx, updatedSuperset);
-                          }}
-                          style={[
-                            styles.supersetInput,
-                            isCompleted && styles.inputDisabled
-                          ]}
-                          placeholder="12"
-                          placeholderTextColor="#6B7280"
-                          keyboardType="numeric"
-                          editable={!isCompleted}
-                        />
-                      </View>
-
-                      <View style={styles.supersetInputGroup}>
-                        <Text style={styles.supersetInputLabel}>Peso (kg)</Text>
-                        <TextInput
-                          value={exercise.sets[0]?.weight || ''}
-                          onChangeText={(text) => {
-                            const updatedSuperset = {
-                              ...superset,
-                              exercises: superset.exercises.map((ex, j) =>
-                                j === exIdx ? {
-                                  ...ex,
-                                  sets: ex.sets.length > 0 
-                                    ? ex.sets.map((set, k) => k === 0 ? { ...set, weight: text } : set)
-                                    : [{ reps: exercise.sets[0]?.reps || '', weight: text, completed: false }]
-                                } : ex
-                              )
-                            };
-                            updateSuperset(ssIdx, updatedSuperset);
-                          }}
-                          style={[
-                            styles.supersetInput,
-                            isCompleted && styles.inputDisabled
-                          ]}
-                          placeholder="20"
-                          placeholderTextColor="#6B7280"
-                          keyboardType="numeric"
-                          editable={!isCompleted}
-                        />
-                      </View>
-
-                      {/* Indicador de completado para este ejercicio */}
-                      <View style={styles.supersetExerciseStatus}>
-                        <MaterialCommunityIcons
-                          name={superset.roundCompleted[superset.currentRound - 1] ? "check-circle" : "circle-outline"}
-                          size={20}
-                          color={superset.roundCompleted[superset.currentRound - 1] ? "#00D4AA" : "#B0B0C4"}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Instrucciones del ejercicio */}
-                    <Text style={styles.supersetExerciseInstruction}>
-                      {exercise.sets[0]?.reps && exercise.sets[0]?.weight 
-                        ? `Hacer ${exercise.sets[0].reps} repeticiones con ${exercise.sets[0].weight}kg`
-                        : 'Configura repeticiones y peso arriba'
-                      }
-                    </Text>
+                    ))}
                   </View>
-                ))}
-
-                {/* Instrucciones de la superserie */}
-                <View style={styles.supersetInstructions}>
-                  <MaterialCommunityIcons name="information-outline" size={16} color="#FFB84D" />
-                  <Text style={styles.supersetInstructionsText}>
-                    Realiza todos los ejercicios seguidos (A → B → C) sin descanso entre ellos. 
-                    Descansa {superset.restTime}s al completar la ronda.
+                  <Text style={styles.roundsLabel}>
+                    Ronda {superset.currentRound} de {superset.totalRounds}
                   </Text>
                 </View>
 
-                {/* Botón para completar ronda */}
-                {!isCompleted && superset.currentRound <= superset.totalRounds && (
-                  <Pressable
-                    onPress={() => completeRound(ssIdx)}
-                    style={[
-                      styles.completeRoundBtn,
-                      superset.roundCompleted[superset.currentRound - 1] && styles.completeRoundBtnCompleted,
-                      !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight) && styles.completeRoundBtnDisabled
-                    ]}
-                    disabled={
-                      superset.roundCompleted[superset.currentRound - 1] ||
-                      !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
-                    }
-                  >
-                    <MaterialCommunityIcons 
-                      name={
-                        superset.roundCompleted[superset.currentRound - 1] 
-                          ? "check-circle" 
-                          : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
-                          ? "alert-circle"
-                          : "play-circle"
-                      } 
-                      size={20} 
-                      color="#FFFFFF" 
-                    />
-                    <Text style={styles.completeRoundText}>
-                      {superset.roundCompleted[superset.currentRound - 1] 
-                        ? "Ronda Completada" 
-                        : !superset.exercises.every(ex => ex.sets.length > 0 && ex.sets[0]?.reps && ex.sets[0]?.weight)
-                        ? "Configura todos los ejercicios"
-                        : "Completar Ronda"}
+                {/* Lista de ejercicios */}
+                <View style={styles.supersetExercisesList}>
+                  {superset.exercises.map((exercise, exIdx) => (
+                    <View key={exercise.id} style={styles.supersetExerciseItem}>
+                      <View style={styles.supersetExerciseHeader}>
+                        <Text style={styles.supersetExerciseNumber}>
+                          {String.fromCharCode(65 + exIdx)}.
+                        </Text>
+                        <Text style={styles.supersetExerciseName}>
+                          {exercise.name}
+                        </Text>
+                        <View style={styles.supersetExerciseType}>
+                          <MaterialCommunityIcons 
+                            name={EXERCISE_TYPE_ICONS[exercise.exerciseType || 'Repeticiones'] as any}
+                            size={12} 
+                            color={EXERCISE_TYPE_COLORS[exercise.exerciseType || 'Repeticiones']} 
+                          />
+                          <Text style={[styles.supersetExerciseTypeText, { 
+                            color: EXERCISE_TYPE_COLORS[exercise.exerciseType || 'Repeticiones'] 
+                          }]}>
+                            {EXERCISE_TYPE_TRANSLATIONS[exercise.exerciseType || 'Repeticiones']}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      {/* Configuración del ejercicio */}
+                      <View style={styles.supersetExerciseConfig}>
+                        {exercise.sets.map((set, setIdx) => (
+                          <Text key={setIdx} style={styles.supersetSetConfig}>
+                            {exercise.exerciseType === 'Tiempo' 
+                              ? `⏱️ ${set.duration}s${set.weight ? ` • ${set.weight}kg` : ''}`
+                              : `${set.reps} reps${set.weight ? ` • ${set.weight}kg` : ''}`
+                            }
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Información de descanso */}
+                <View style={styles.supersetRestInfo}>
+                  <View style={styles.restInfoItem}>
+                    <MaterialCommunityIcons name="refresh" size={14} color="#4ECDC4" />
+                    <Text style={styles.restInfoText}>
+                      Entre rondas: {superset.restTimeBetweenRounds}s
                     </Text>
-                  </Pressable>
-                )}
-              </View>
+                  </View>
+                  {superset.restTimeBetweenExercises && parseInt(superset.restTimeBetweenExercises) > 0 && (
+                    <View style={styles.restInfoItem}>
+                      <MaterialCommunityIcons name="timer" size={14} color="#FFB84D" />
+                      <Text style={styles.restInfoText}>
+                        Entre ejercicios: {superset.restTimeBetweenExercises}s
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </LinearGradient>
+            </View>
+          );
+        })}
 
-              {/* Tiempo de descanso */}
-              <View style={styles.supersetRestTime}>
-                <MaterialCommunityIcons name="timer" size={16} color="#FFB84D" />
-                <Text style={styles.restTimeLabel}>Descanso entre rondas:</Text>
-                <TextInput
-                  value={superset.restTime}
-                  onChangeText={(val) => {
-                    const updatedSuperset = { ...superset, restTime: val };
-                    updateSuperset(ssIdx, updatedSuperset);
-                  }}
-                  keyboardType="numeric"
-                  style={[
-                    styles.restTimeInput,
-                    isCompleted && styles.inputDisabled
-                  ]}
-                  editable={!isCompleted}
-                />
-                <Text style={styles.restTimeUnit}>seg</Text>
-              </View>
-            </LinearGradient>
-          </View>
-        );
-      })}
-
-      {/* ===== EJERCICIOS INDIVIDUALES ===== */}
-      {exercises.map((ex, idx) => (
-        <View key={ex.id} style={styles.exerciseCard}>
-          <LinearGradient
-            colors={
-              isCompleted 
-                ? ["rgba(0, 212, 170, 0.15)", "rgba(0, 184, 148, 0.1)"]
-                : ["#2D2D5F", "#3D3D7F"]
-            }
-            style={styles.exerciseGradient}
-          >
-            <View style={styles.exerciseHeader}>
+        {/* ===== EJERCICIOS INDIVIDUALES ===== */}
+        {exercises.map((exercise, idx) => (
+          <View key={exercise.id} style={styles.exerciseCard}>
+            <LinearGradient
+              colors={
+                isCompleted 
+                  ? ["rgba(0, 212, 170, 0.15)", "rgba(0, 184, 148, 0.1)"]
+                  : ["#2D2D5F", "#3D3D7F"]
+              }
+              style={styles.exerciseGradient}
+            >
+              {/* Header del ejercicio */}
               <Pressable
-                style={styles.exerciseHeaderContent}
+                style={styles.exerciseHeader}
                 onPress={() => setOpenExerciseIdx(openExerciseIdx === idx ? null : idx)}
               >
-                <View style={styles.exerciseInfo}>
-                  <View style={styles.exerciseNameContainer}>
-                    <Text style={[
-                      styles.exerciseName,
-                      isCompleted && styles.exerciseNameCompleted
-                    ]}>
-                      {ex.name}
-                    </Text>
-                    {isCompleted && (
-                      <MaterialCommunityIcons name="lock" size={16} color="#00D4AA" />
-                    )}
+                <View style={styles.exerciseHeaderLeft}>
+                  <View style={[styles.exerciseIcon, { 
+                    backgroundColor: EXERCISE_TYPE_COLORS[exercise.exerciseType || 'Repeticiones'] 
+                  }]}>
+                    <MaterialCommunityIcons 
+                      name={EXERCISE_TYPE_ICONS[exercise.exerciseType || 'Repeticiones'] as any}
+                      size={16} 
+                      color="#FFFFFF" 
+                    />
                   </View>
-                  
-                  <View style={styles.exerciseMetadata}>
-                    <Text style={styles.exerciseStats}>
-                      {ex.sets.length} {ex.sets.length === 1 ? "serie" : "series"}
-                      {ex.sets.length > 0 &&
-                        ` • ${ex.sets.filter((s) => s.completed).length} completadas`}
+                  <View style={styles.exerciseInfo}>
+                    <Text style={[styles.exerciseName, isCompleted && styles.exerciseNameCompleted]}>
+                      {exercise.name}
                     </Text>
-                    
-                    {/* Mostrar información de músculos */}
-                    {(ex.muscleGroup || ex.specificMuscle) && (
-                      <View style={styles.muscleInfo}>
-                        {ex.muscleGroup && (
-                          <Text style={styles.primaryMuscleTag}>
-                            {ex.muscleGroup}
-                          </Text>
-                        )}
-                        {ex.specificMuscle && (
-                          <Text style={styles.secondaryMuscleTag}>
-                            {ex.specificMuscle}
-                          </Text>
-                        )}
-                      </View>
-                    )}
+                    <View style={styles.exerciseMetadata}>
+                      <Text style={styles.exerciseStats}>
+                        {exercise.sets.length} {exercise.sets.length === 1 ? "serie" : "series"}
+                        {exercise.sets.length > 0 &&
+                          ` • ${exercise.sets.filter((s) => s.completed).length} completadas`}
+                      </Text>
+                      {(exercise.muscleGroup || exercise.specificMuscle) && (
+                        <View style={styles.muscleInfo}>
+                          {exercise.muscleGroup && (
+                            <Text style={styles.primaryMuscleTag}>
+                              {exercise.muscleGroup}
+                            </Text>
+                          )}
+                          {exercise.specificMuscle && (
+                            <Text style={styles.secondaryMuscleTag}>
+                              {exercise.specificMuscle}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 </View>
 
-                <View style={styles.exerciseActions}>
+                <View style={styles.exerciseHeaderRight}>
                   {!isCompleted && (
                     <Pressable
                       onPress={() => removeExercise(idx)}
@@ -720,6 +658,7 @@ export default function GymSession({
                       <MaterialCommunityIcons name="trash-can" size={20} color="#FF6B6B" />
                     </Pressable>
                   )}
+                  
                   <MaterialCommunityIcons
                     name={openExerciseIdx === idx ? "chevron-up" : "chevron-down"}
                     size={24}
@@ -727,224 +666,211 @@ export default function GymSession({
                   />
                 </View>
               </Pressable>
-            </View>
 
-            {openExerciseIdx === idx && (
-              <View style={styles.exerciseBody}>
-                {/* Tiempo de descanso */}
-                <View style={styles.restTimeContainer}>
-                  <MaterialCommunityIcons name="timer" size={16} color="#FFB84D" />
-                  <Text style={styles.restTimeLabel}>Descanso:</Text>
-                  <TextInput
-                    value={ex.restTime || "60"}
-                    onChangeText={(val) => updateRestTime(idx, val)}
-                    keyboardType="numeric"
-                    style={[
-                      styles.restTimeInput,
-                      isCompleted && styles.inputDisabled
-                    ]}
-                    editable={!isCompleted}
-                  />
-                  <Text style={styles.restTimeUnit}>seg</Text>
-                </View>
-
-                {/* Series */}
-                {ex.sets.map((s, sIdx) => (
-                  <View key={sIdx} style={styles.setContainer}>
-                    <LinearGradient
-                      colors={
-                        s.completed
-                          ? ["#00D4AA", "#00B894"]
-                          : isCompleted
-                          ? ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.01)"]
-                          : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]
-                      }
-                      style={styles.setGradient}
-                    >
-                      <View style={styles.setHeader}>
-                        <Text style={[styles.setNumber, s.completed && styles.setNumberCompleted]}>
-                          Serie {sIdx + 1}
-                        </Text>
-                        {!isCompleted && (
-                          <Pressable
-                            onPress={() => removeSet(idx, sIdx)}
-                            style={styles.removeSetBtn}
-                          >
-                            <MaterialCommunityIcons name="close" size={16} color="#FF6B6B" />
-                          </Pressable>
-                        )}
-                      </View>
-
-                      <View style={styles.setInputs}>
-                        <View style={styles.inputGroup}>
-                          <Text style={[styles.inputLabel, s.completed && styles.inputLabelCompleted]}>
-                            Repeticiones
-                          </Text>
-                          <TextInput
-                            value={s.reps}
-                            onChangeText={(v) => updateSet(idx, sIdx, "reps", v)}
-                            keyboardType="numeric"
-                            style={[
-                              styles.setInput,
-                              s.completed && styles.setInputCompleted,
-                              isCompleted && styles.inputDisabled
-                            ]}
-                            editable={!isCompleted}
-                          />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                          <Text style={[styles.inputLabel, s.completed && styles.inputLabelCompleted]}>
-                            Peso (kg)
-                          </Text>
-                          <TextInput
-                            value={s.weight}
-                            onChangeText={(v) => updateSet(idx, sIdx, "weight", v)}
-                            keyboardType="numeric"
-                            style={[
-                              styles.setInput,
-                              s.completed && styles.setInputCompleted,
-                              isCompleted && styles.inputDisabled
-                            ]}
-                            editable={!isCompleted}
-                          />
-                        </View>
-
-                        <Pressable
-                          onPress={() => updateSet(idx, sIdx, "completed", !s.completed)}
-                          style={[
-                            styles.completeBtn,
-                            s.completed && styles.completeBtnActive,
-                            isCompleted && styles.buttonDisabled
-                          ]}
-                          disabled={isCompleted}
-                        >
-                          <MaterialCommunityIcons
-                            name={s.completed ? "check-circle" : "circle-outline"}
-                            size={24}
-                            color={s.completed ? "#FFFFFF" : "#B0B0C4"}
-                          />
-                        </Pressable>
-                      </View>
-                    </LinearGradient>
+              {/* Contenido expandido del ejercicio */}
+              {openExerciseIdx === idx && (
+                <View style={styles.exerciseBody}>
+                  {/* Tiempo de descanso */}
+                  <View style={styles.restTimeContainer}>
+                    <MaterialCommunityIcons name="timer" size={16} color="#FFB84D" />
+                    <Text style={styles.restTimeLabel}>Descanso:</Text>
+                    <TextInput
+                      value={exercise.restTime || "60"}
+                      onChangeText={(val) => {
+                        const updatedExercise = { ...exercise, restTime: val };
+                        updateExercise(idx, updatedExercise);
+                      }}
+                      keyboardType="numeric"
+                      style={[styles.restTimeInput, isCompleted && styles.inputDisabled]}
+                      editable={!isCompleted}
+                    />
+                    <Text style={styles.restTimeUnit}>seg</Text>
                   </View>
-                ))}
 
-                {/* Botón añadir serie */}
-                {!isCompleted && (
-                  <Pressable onPress={() => addSet(idx)} style={styles.addSetBtn}>
-                    <LinearGradient
-                      colors={["rgba(0, 212, 170, 0.2)", "rgba(0, 184, 148, 0.2)"]}
-                      style={styles.addSetGradient}
-                    >
-                      <MaterialCommunityIcons name="plus" size={20} color="#00D4AA" />
-                      <Text style={styles.addSetText}>Añadir Serie</Text>
-                    </LinearGradient>
-                  </Pressable>
-                )}
-              </View>
-            )}
-          </LinearGradient>
-        </View>
-      ))}
+                  {/* Series */}
+                  <View style={styles.setsContainer}>
+                    <Text style={styles.setsTitle}>Series</Text>
+                    {exercise.sets.map((set, setIdx) => (
+                      <View key={setIdx} style={styles.setRow}>
+                        <LinearGradient
+                          colors={
+                            set.completed
+                              ? ["rgba(0, 212, 170, 0.3)", "rgba(0, 184, 148, 0.2)"]
+                              : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)"]
+                          }
+                          style={styles.setRowGradient}
+                        >
+                          <View style={styles.setHeader}>
+                            <Text style={[styles.setNumber, set.completed && styles.setNumberCompleted]}>
+                              {setIdx + 1}
+                            </Text>
+                            {set.completed && (
+                              <MaterialCommunityIcons name="check-circle" size={16} color="#00D4AA" />
+                            )}
+                          </View>
 
-      {/* ===== BOTONES DE ACCIÓN ===== */}
-      {!isCompleted && (
-        <View style={styles.actionButtons}>
-          {/* Botón añadir ejercicio */}
-          <Pressable 
-            onPress={() => setShowExerciseSelector(true)} 
-            style={styles.addExerciseBtn}
-          >
-            <View style={styles.addExerciseBtnContent}>
-              <View style={styles.addExerciseIcon}>
-                <MaterialCommunityIcons name="plus" size={20} color="#FFB84D" />
-              </View>
-              <Text style={styles.addExerciseText}>Añadir Ejercicio</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#FFB84D" />
-            </View>
-          </Pressable>
+                          <View style={styles.setInputs}>
+                            {exercise.exerciseType === 'Tiempo' ? (
+                              <>
+                                <View style={styles.inputGroup}>
+                                  <Text style={styles.inputLabel}>Tiempo</Text>
+                                  <TextInput
+                                    value={set.duration || ''}
+                                    onChangeText={(v) => updateSet(idx, setIdx, "duration", v)}
+                                    keyboardType="numeric"
+                                    style={[styles.setInput, isCompleted && styles.inputDisabled]}
+                                    editable={!isCompleted}
+                                    placeholder="45"
+                                  />
+                                  <Text style={styles.inputUnit}>s</Text>
+                                </View>
+                                
+                                <View style={styles.inputGroup}>
+                                  <Text style={styles.inputLabel}>Peso</Text>
+                                  <TextInput
+                                    value={set.weight || ''}
+                                    onChangeText={(v) => updateSet(idx, setIdx, "weight", v)}
+                                    keyboardType="numeric"
+                                    style={[styles.setInput, isCompleted && styles.inputDisabled]}
+                                    editable={!isCompleted}
+                                    placeholder="0"
+                                  />
+                                  <Text style={styles.inputUnit}>kg</Text>
+                                </View>
+                              </>
+                            ) : (
+                              <>
+                                <View style={styles.inputGroup}>
+                                  <Text style={styles.inputLabel}>Reps</Text>
+                                  <TextInput
+                                    value={set.reps || ''}
+                                    onChangeText={(v) => updateSet(idx, setIdx, "reps", v)}
+                                    keyboardType="numeric"
+                                    style={[styles.setInput, isCompleted && styles.inputDisabled]}
+                                    editable={!isCompleted}
+                                    placeholder="12"
+                                  />
+                                </View>
 
-          {/* Botón crear superserie */}
-          {exercises.length >= 2 && (
-            <Pressable 
-              onPress={() => setShowSupersetBuilder(true)} 
-              style={styles.createSupersetBtn}
-            >
-              <LinearGradient
-                colors={["#FF6B6B", "#FF5252"]}
-                style={styles.createSupersetGradient}
+                                <View style={styles.inputGroup}>
+                                  <Text style={styles.inputLabel}>Peso</Text>
+                                  <TextInput
+                                    value={set.weight || ''}
+                                    onChangeText={(v) => updateSet(idx, setIdx, "weight", v)}
+                                    keyboardType="numeric"
+                                    style={[styles.setInput, isCompleted && styles.inputDisabled]}
+                                    editable={!isCompleted}
+                                    placeholder="20"
+                                  />
+                                  <Text style={styles.inputUnit}>kg</Text>
+                                </View>
+                              </>
+                            )}
+                          </View>
+
+                          {!isCompleted && (
+                            <View style={styles.setActions}>
+                              <Pressable
+                                onPress={() => duplicateSet(idx, setIdx)}
+                                style={styles.setActionBtn}
+                              >
+                                <MaterialCommunityIcons name="content-copy" size={16} color="#4ECDC4" />
+                              </Pressable>
+                              {exercise.sets.length > 1 && (
+                                <Pressable
+                                  onPress={() => removeSet(idx, setIdx)}
+                                  style={styles.setActionBtn}
+                                >
+                                  <MaterialCommunityIcons name="close" size={16} color="#FF6B6B" />
+                                </Pressable>
+                              )}
+                            </View>
+                          )}
+                        </LinearGradient>
+                      </View>
+                    ))}
+
+                    {/* Botón añadir serie */}
+                    {!isCompleted && (
+                      <Pressable onPress={() => addSet(idx)} style={styles.addSetBtn}>
+                        <MaterialCommunityIcons name="plus" size={16} color="#00D4AA" />
+                        <Text style={styles.addSetText}>Añadir Serie</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              )}
+            </LinearGradient>
+          </View>
+        ))}
+
+        {/* ===== BOTONES DE ACCIÓN ===== */}
+        {!isCompleted && (
+          <View style={styles.actionButtons}>
+            {/* Botón reordenar ejercicios */}
+            {exercises.length > 1 && (
+              <Pressable 
+                onPress={() => setShowReorderModal(true)}
+                style={styles.actionBtn}
               >
-                <MaterialCommunityIcons name="lightning-bolt" size={20} color="#FFFFFF" />
-                <Text style={styles.createSupersetText}>Crear Superserie</Text>
-              </LinearGradient>
+                <MaterialCommunityIcons 
+                  name="sort" 
+                  size={20} 
+                  color="#FFB84D" 
+                />
+                <Text style={styles.actionBtnText}>Reordenar</Text>
+              </Pressable>
+            )}
+            
+            <Pressable 
+              onPress={() => setShowExerciseSelector(true)} 
+              style={styles.actionBtn}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#FFB84D" />
+              <Text style={styles.actionBtnText}>Añadir Ejercicio</Text>
             </Pressable>
-          )}
-        </View>
-      )}
 
-      {/* ===== COMPLETAR ENTRENAMIENTO ===== */}
-      {!isCompleted && (exercises.length > 0 || superSets.length > 0) && (
-        <Pressable 
-          onPress={handleCompleteWorkout}
-          style={[
-            styles.completeWorkoutBtn,
-            !workoutReady && styles.completeWorkoutBtnDisabled
-          ]}
-          disabled={!workoutReady}
-        >
-          <LinearGradient
-            colors={
-              workoutReady 
-                ? progressPercentage === 100 ? ["#00D4AA", "#00B894"] : ["#FF9800", "#F57C00"]
-                : ["#6B7280", "#4B5563"]
-            }
-            style={styles.completeWorkoutGradient}
-          >
-            <MaterialCommunityIcons 
-              name={
-                !workoutReady ? "alert-circle" :
-                progressPercentage === 100 ? "trophy" : "check-circle"
-              } 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.completeWorkoutText}>
-              {!workoutReady ? "Completa la configuración de series" :
-               progressPercentage === 100 ? "¡Entrenamiento Perfecto!" : "Finalizar Entrenamiento"}
-            </Text>
-          </LinearGradient>
-        </Pressable>
-      )}
+            {exercises.length >= 2 && (
+              <Pressable 
+                onPress={() => setShowSupersetBuilder(true)} 
+                style={styles.actionBtn}
+              >
+                <MaterialCommunityIcons name="lightning-bolt" size={20} color="#FF6B6B" />
+                <Text style={styles.actionBtnText}>Crear Superserie</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
 
-      {/* ===== ESTADO VACÍO ===== */}
-      {exercises.length === 0 && superSets.length === 0 && (
-        <View style={styles.emptyState}>
-          <LinearGradient
-            colors={
-              isCompleted 
-                ? ["rgba(0, 212, 170, 0.2)", "rgba(0, 184, 148, 0.1)"]
-                : ["#2D2D5F", "#3D3D7F"]
-            }
-            style={styles.emptyStateGradient}
-          >
-            <MaterialCommunityIcons
-              name={isCompleted ? "check-circle" : "dumbbell"}
-              size={48}
-              color={isCompleted ? "#00D4AA" : "#B0B0C4"}
-            />
-            <Text style={styles.emptyTitle}>
-              {isCompleted ? "Entrenamiento Vacío Completado" : "Sin ejercicios"}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {isCompleted 
-                ? "Este entrenamiento se completó sin ejercicios añadidos."
-                : "¡Añade ejercicios individuales o crea superseries!"
+        {/* ===== ESTADO VACÍO ===== */}
+        {exercises.length === 0 && superSets.length === 0 && (
+          <View style={styles.emptyState}>
+            <LinearGradient
+              colors={
+                isCompleted 
+                  ? ["rgba(0, 212, 170, 0.2)", "rgba(0, 184, 148, 0.1)"]
+                  : ["#2D2D5F", "#3D3D7F"]
               }
-            </Text>
-          </LinearGradient>
-        </View>
-      )}
+              style={styles.emptyStateGradient}
+            >
+              <MaterialCommunityIcons
+                name={isCompleted ? "check-circle" : "dumbbell"}
+                size={48}
+                color={isCompleted ? "#00D4AA" : "#B0B0C4"}
+              />
+              <Text style={styles.emptyTitle}>
+                {isCompleted ? "Entrenamiento Vacío" : "¡Comienza tu entrenamiento!"}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {isCompleted 
+                  ? "Este entrenamiento se completó sin ejercicios."
+                  : "Añade ejercicios individuales o crea superseries/circuitos"
+                }
+              </Text>
+            </LinearGradient>
+          </View>
+        )}
+      </ScrollView>
 
       {/* ===== MODALES ===== */}
       
@@ -966,6 +892,34 @@ export default function GymSession({
           onCreateSuperset={createSuperset}
         />
       )}
+
+      {/* Modal de reordenamiento de ejercicios */}
+      {!isCompleted && (
+        <ExerciseReorderModal
+          visible={showReorderModal}
+          exercises={exercises}
+          onClose={() => setShowReorderModal(false)}
+          onReorder={handleReorderExercises}
+          title="Reordenar Ejercicios"
+        />
+      )}
+
+      {/* Pantalla de entrenamiento activo */}
+      {!isCompleted && (
+        <ActiveWorkoutSession
+          visible={showActiveWorkout}
+          exercises={exercises}
+          supersets={superSets}
+          workoutName={workoutName}
+          onUpdateExercises={onUpdateExercises}
+          onUpdateSuperset={updateSuperset}
+          onCompleteWorkout={() => {
+            setShowActiveWorkout(false);
+            onCompleteWorkout?.();
+          }}
+          onClose={() => setShowActiveWorkout(false)}
+        />
+      )}
     </View>
   );
 }
@@ -973,39 +927,30 @@ export default function GymSession({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 12,
-    marginHorizontal: 20,
   },
 
-  // ===== ESTADÍSTICAS =====
-  statsContainer: {
-    marginBottom: 8,
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
+  // ===== HEADER DEL ENTRENAMIENTO =====
+  workoutHeader: {
+    marginHorizontal: 20,
+    marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
   },
 
-  statsGradient: {
-    padding: 16,
+  workoutHeaderGradient: {
+    padding: 20,
     borderRadius: 20,
   },
 
-  statsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-
-  statsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  statsContent: {
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 12,
+    marginBottom: 16,
   },
 
   statItem: {
@@ -1013,47 +958,67 @@ const styles = StyleSheet.create({
   },
 
   statValue: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#00D4AA',
   },
 
   statLabel: {
     fontSize: 12,
     color: '#B0B0C4',
-    marginTop: 2,
+    marginTop: 4,
   },
 
   progressContainer: {
-    marginTop: 8,
+    marginBottom: 16,
   },
 
   progressBackground: {
-    height: 6,
+    height: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
+    borderRadius: 4,
   },
 
   progressBar: {
-    height: 6,
+    height: 8,
     backgroundColor: '#00D4AA',
-    borderRadius: 3,
+    borderRadius: 4,
   },
 
-  completedMessage: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: 'rgba(0, 212, 170, 0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.3)',
+  startWorkoutBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
 
-  completedMessageText: {
-    fontSize: 12,
-    color: '#00D4AA',
+  startWorkoutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 12,
+  },
+
+  startWorkoutText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    flex: 1,
     textAlign: 'center',
-    fontWeight: '600',
+  },
+
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+
+  completedText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#00D4AA',
   },
 
   // ===== SUPERSERIES =====
@@ -1064,7 +1029,7 @@ const styles = StyleSheet.create({
   },
 
   supersetGradient: {
-    padding: 16,
+    padding: 20,
     borderRadius: 20,
   },
 
@@ -1075,10 +1040,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  supersetInfo: {
+  supersetHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    flex: 1,
+  },
+
+  supersetIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  supersetInfo: {
     flex: 1,
   },
 
@@ -1086,87 +1063,107 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
+    marginBottom: 2,
   },
 
-  supersetBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  supersetBadgeText: {
-    fontSize: 10,
-    color: '#FFFFFF',
+  supersetType: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '600',
   },
 
-  roundProgress: {
+  supersetHeaderRight: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  supersetStats: {
+    alignItems: 'center',
+  },
+
+  supersetProgress: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#00D4AA',
+  },
+
+  supersetProgressLabel: {
+    fontSize: 10,
+    color: '#B0B0C4',
+  },
+
+  roundsProgress: {
+    alignItems: 'center',
     marginBottom: 16,
-    gap: 6,
+  },
+
+  roundsIndicators: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
   },
 
   roundIndicator: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 
-  roundCompleted: {
+  roundIndicatorCompleted: {
     backgroundColor: '#00D4AA',
     borderColor: '#00D4AA',
   },
 
-  roundCurrent: {
+  roundIndicatorCurrent: {
+    backgroundColor: '#FFB84D',
     borderColor: '#FFB84D',
-    backgroundColor: 'rgba(255, 184, 77, 0.2)',
   },
 
-  roundNumber: {
-    fontSize: 11,
+  roundIndicatorText: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#B0B0C4',
   },
 
-  roundNumberCompleted: {
+  roundIndicatorTextCompleted: {
     color: '#FFFFFF',
   },
 
-  currentRoundContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-
-  currentRoundTitle: {
-    fontSize: 14,
+  roundsLabel: {
+    fontSize: 12,
+    color: '#B0B0C4',
     fontWeight: '600',
-    color: '#FFB84D',
-    marginBottom: 12,
-    textAlign: 'center',
   },
 
-  supersetExercise: {
+  supersetExercisesList: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  supersetExerciseItem: {
     marginBottom: 12,
-    padding: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
   },
 
   supersetExerciseHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
+  },
+
+  supersetExerciseNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFB84D',
+    minWidth: 24,
   },
 
   supersetExerciseName: {
@@ -1176,114 +1173,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  supersetExerciseBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  supersetExerciseBadgeText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-
-  supersetExerciseInputs: {
+  supersetExerciseType: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginBottom: 8,
-  },
-
-  supersetInputGroup: {
-    flex: 1,
-  },
-
-  supersetInputLabel: {
-    fontSize: 12,
-    color: '#B0B0C4',
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-
-  supersetInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: '600',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-
-  supersetExerciseStatus: {
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
 
-  supersetExerciseInstruction: {
+  supersetExerciseTypeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  supersetExerciseConfig: {
+    marginLeft: 32,
+    gap: 4,
+  },
+
+  supersetSetConfig: {
     fontSize: 12,
     color: '#B0B0C4',
-    fontStyle: 'italic',
-    textAlign: 'center',
+    fontWeight: '500',
   },
 
-  supersetInstructions: {
+  supersetRestInfo: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255, 184, 77, 0.1)',
-    borderRadius: 8,
-    padding: 10,
-    marginVertical: 12,
-    gap: 8,
-  },
-
-  supersetInstructionsText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#FFB84D',
-    lineHeight: 16,
-  },
-
-  completeRoundBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#00D4AA',
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 8,
-    gap: 8,
-  },
-
-  completeRoundBtnCompleted: {
-    backgroundColor: '#6B7280',
-    opacity: 0.7,
-  },
-
-  completeRoundBtnDisabled: {
-    backgroundColor: '#FF6B6B',
-    opacity: 0.8,
-  },
-
-  completeRoundText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
-  supersetRestTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 184, 77, 0.1)',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 12,
-    gap: 8,
+  },
+
+  restInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  restInfoText: {
+    fontSize: 12,
+    color: '#B0B0C4',
+    fontWeight: '600',
   },
 
   // ===== EJERCICIOS INDIVIDUALES =====
@@ -1294,28 +1227,33 @@ const styles = StyleSheet.create({
   },
 
   exerciseGradient: {
-    padding: 16,
     borderRadius: 20,
   },
 
   exerciseHeader: {
-    marginBottom: 12,
-  },
-
-  exerciseHeaderContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+
+  exerciseHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+
+  exerciseIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
     alignItems: 'center',
   },
 
   exerciseInfo: {
     flex: 1,
-  },
-
-  exerciseNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
 
   exerciseName: {
@@ -1365,10 +1303,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  exerciseActions: {
+  exerciseHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
 
   deleteBtn: {
@@ -1376,7 +1314,9 @@ const styles = StyleSheet.create({
   },
 
   exerciseBody: {
-    gap: 12,
+    padding: 16,
+    paddingTop: 0,
+    gap: 16,
   },
 
   restTimeContainer: {
@@ -1410,21 +1350,37 @@ const styles = StyleSheet.create({
     color: '#FFB84D',
   },
 
-  setContainer: {
-    borderRadius: 16,
+  inputDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: '#6B7280',
+  },
+
+  setsContainer: {
+    gap: 8,
+  },
+
+  setsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+
+  setRow: {
+    borderRadius: 12,
     overflow: 'hidden',
   },
 
-  setGradient: {
+  setRowGradient: {
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 12,
   },
 
   setHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
   },
 
   setNumber: {
@@ -1437,14 +1393,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  removeSetBtn: {
-    padding: 4,
-  },
-
   setInputs: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 12,
+    flex: 1,
   },
 
   inputGroup: {
@@ -1458,10 +1411,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  inputLabelCompleted: {
-    color: '#FFFFFF',
-  },
-
   setInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
@@ -1473,41 +1422,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  setInputCompleted: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  inputUnit: {
+    fontSize: 12,
+    color: '#B0B0C4',
+    marginTop: 4,
+    textAlign: 'center',
   },
 
-  inputDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    color: '#6B7280',
+  setActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 12,
   },
 
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-
-  completeBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-
-  completeBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  setActionBtn: {
+    padding: 4,
   },
 
   addSetBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  addSetGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+    borderRadius: 12,
     paddingVertical: 12,
-    borderRadius: 16,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 170, 0.3)',
+    borderStyle: 'dashed',
   },
 
   addSetText: {
@@ -1519,88 +1462,38 @@ const styles = StyleSheet.create({
   // ===== BOTONES DE ACCIÓN =====
   actionButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
-    marginTop: 8,
+    marginTop: 16,
+    marginBottom: 20,
   },
 
-  addExerciseBtn: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 184, 77, 0.1)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 184, 77, 0.3)',
-  },
-
-  addExerciseBtnContent: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-
-  addExerciseIcon: {
-    width: 32,
-    height: 32,
+    backgroundColor: 'rgba(255, 184, 77, 0.1)',
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 184, 77, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 77, 0.3)',
+    gap: 8,
+    minWidth: 100,
   },
 
-  addExerciseText: {
-    flex: 1,
+  actionBtnActive: {
+    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    borderColor: 'rgba(0, 212, 170, 0.5)',
+  },
+
+  actionBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFB84D',
   },
 
-  createSupersetBtn: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-
-  createSupersetGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
-  },
-
-  createSupersetText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
-  // ===== COMPLETAR ENTRENAMIENTO =====
-  completeWorkoutBtn: {
-    marginTop: 12,
-    marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-
-  completeWorkoutBtnDisabled: {
-    opacity: 0.6,
-  },
-
-  completeWorkoutGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: 20,
-    gap: 8,
-  },
-
-  completeWorkoutText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  actionBtnTextActive: {
+    color: '#00D4AA',
   },
 
   // ===== ESTADO VACÍO =====
