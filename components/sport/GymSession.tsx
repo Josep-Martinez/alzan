@@ -74,8 +74,6 @@ export default function GymSession({
   const [openExerciseIdx, setOpenExerciseIdx] = useState<number | null>(null);
   const [superSets, setSuperSets] = useState<SuperSet[]>([]);
   const [showActiveWorkout, setShowActiveWorkout] = useState(false);
-  const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([]);
-  const [reorderMode, setReorderMode] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
 
   /**
@@ -214,19 +212,6 @@ export default function GymSession({
     onUpdateExercises(reorderedExercises);
     setShowReorderModal(false);
   };
-
-  /**
-   * Reordena ejercicios
-   */
-  const reorderExercise = (fromIndex: number, toIndex: number) => {
-    if (isCompleted) return;
-    
-    const newExercises = [...exercises];
-    const [movedExercise] = newExercises.splice(fromIndex, 1);
-    newExercises.splice(toIndex, 0, movedExercise);
-    onUpdateExercises(newExercises);
-  };
-
   /**
    * Actualiza un ejercicio específico
    */
@@ -317,31 +302,6 @@ export default function GymSession({
   };
 
   /**
-   * Verifica si el entrenamiento está listo para completar
-   */
-  const isWorkoutReadyToComplete = (): boolean => {
-    // Verificar ejercicios individuales
-    const exercisesReady = exercises.length === 0 || exercises.every(ex => 
-      ex.sets.length > 0 && ex.sets.some(set => 
-        isSetComplete(set, ex.exerciseType || 'Repeticiones')
-      )
-    );
-    
-    // Verificar superseries
-    const supersetsReady = superSets.length === 0 || superSets.every(ss => {
-      const exercisesConfigured = ss.exercises.every(ex => 
-        ex.sets.length > 0 && ex.sets.some(set => 
-          isSetComplete(set, ex.exerciseType || 'Repeticiones')
-        )
-      );
-      
-      return exercisesConfigured;
-    });
-    
-    return exercisesReady && supersetsReady && (exercises.length > 0 || superSets.length > 0);
-  };
-
-  /**
    * Abre la pantalla de entrenamiento activo
    */
   const startActiveWorkout = () => {
@@ -390,7 +350,6 @@ export default function GymSession({
   };
 
   const stats = getWorkoutStats();
-  const workoutReady = isWorkoutReadyToComplete();
 
   return (
     <View style={styles.container}>

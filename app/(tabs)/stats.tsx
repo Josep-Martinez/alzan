@@ -60,17 +60,6 @@ export default function StatsScreen() {
     thigh: false, // Ejemplo: no disponible
   };
 
-  // Métricas disponibles para la gráfica
-  const availableChartMetrics = [
-    ...(metricsAvailability.weight ? ['peso'] : []),
-    ...(metricsAvailability.bodyFat ? ['grasa'] : []),
-    ...(metricsAvailability.muscle ? ['musculo'] : []),
-    ...(metricsAvailability.waist ? ['cintura'] : []),
-    ...(metricsAvailability.chest ? ['pecho'] : []),
-    ...(metricsAvailability.arm ? ['brazo'] : []),
-    ...(metricsAvailability.thigh ? ['muslo'] : []),
-  ];
-
   // Datos históricos para diferentes métricas y períodos
   const chartData = {
     peso: {

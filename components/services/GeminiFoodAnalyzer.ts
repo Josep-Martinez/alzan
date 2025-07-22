@@ -121,6 +121,7 @@ export class GeminiFoodAnalyzer {
         reader.readAsDataURL(blob);
       });
     } catch (error) {
+      console.error(error);
       throw new Error('Error al procesar la imagen');
     }
   }

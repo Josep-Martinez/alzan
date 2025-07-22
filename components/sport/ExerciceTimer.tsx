@@ -52,7 +52,7 @@ export default function ExerciseTimer({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, scaleAnim, opacityAnim]);
 
   // Timer principal
   useEffect(() => {

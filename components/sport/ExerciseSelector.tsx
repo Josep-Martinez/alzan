@@ -69,7 +69,7 @@ export default function ExerciseSelector({
   }, [visible]);
 
   // Categorías principales de grupos musculares ACTUALIZADAS
-  const MUSCLE_CATEGORIES = [
+  const MUSCLE_CATEGORIES = useMemo(() => [
     { 
       id: 'pectoral', 
       name: 'Pectoral', 
@@ -126,10 +126,10 @@ export default function ExerciseSelector({
       color: '#FFC107',
       muscles: ['cuerpo completo']
     }
-  ];
+  ], []);
 
   // Categorías de equipamiento ACTUALIZADAS
-  const EQUIPMENT_CATEGORIES = [
+  const EQUIPMENT_CATEGORIES = useMemo(() => [
     { 
       id: 'mancuernas', 
       name: 'Mancuernas', 
@@ -172,7 +172,7 @@ export default function ExerciseSelector({
       color: '#795548',
       equipment: ['Banda elástica', 'TRX', 'Balón medicinal', 'Battle ropes', 'Rueda abdominal', 'Kettlebell', 'Fitball', 'Bosu']
     }
-  ];
+  ], []);
 
   // Categorías de dificultad (sin cambios)
   const DIFFICULTY_CATEGORIES = [
@@ -250,7 +250,7 @@ export default function ExerciseSelector({
     }
 
     return filteredExercises;
-  }, [selectedCategory, selectedEquipment, selectedDifficulty, searchText, EXERCISE_DATABASE]);
+  }, [selectedCategory, selectedEquipment, selectedDifficulty, searchText, EXERCISE_DATABASE, MUSCLE_CATEGORIES, EQUIPMENT_CATEGORIES]);
 
   /**
    * Maneja la selección de un ejercicio

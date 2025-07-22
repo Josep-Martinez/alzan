@@ -109,7 +109,6 @@ export default function MainTrainingScreen() {
   const [workoutToDelete, setWorkoutToDelete] = useState<string | null>(null);
 
   const todaysWorkouts = weeklyPlan[selectedDay] || [];
-  const activeWorkout = todaysWorkouts.find(w => w.id === activeWorkoutId);
 
   /**
    * Genera las fechas de la semana actual para el selector de días

@@ -11,9 +11,7 @@ import {
 import AdvancedWorkoutBuilder from './AdvancedWorkoutBuilder';
 import {
   CyclingSession,
-  GenericSportSession,
   RunningSession,
-  SportType,
   SwimmingSession
 } from './sports';
 
@@ -68,10 +66,9 @@ export function RunningSessionComponent({
     // Actualizar sesión con datos del plan
     onUpdateSession({
       ...session,
-      type: 'intervals', // Determinar tipo basado en los pasos del plan
+      type: 'interval', // Determinar tipo basado en los pasos del plan
       plannedDuration: workoutPlan.estimatedDuration, // BD: planned_duration_seconds
       plannedDistance: workoutPlan.estimatedDistance, // BD: planned_distance_meters
-      workoutPlan: workoutPlan // BD: workout_plan_reference (JSON o FOREIGN KEY)
     });
     
     setShowWorkoutBuilder(false);
@@ -240,7 +237,7 @@ export function RunningSessionComponent({
                 )}
                 <Text style={styles.currentSessionDetail}>
                   {`🏃‍♂️ Tipo: ${session.type === 'long_run' ? 'Tirada Larga' :
-                           session.type === 'intervals' ? 'Intervalos' :
+                           session.type === 'interval' ? 'Intervalos' :
                            session.type === 'tempo' ? 'Tempo Run' :
                            session.type === 'recovery' ? 'Recuperación' : 'Carrera'}`}
                 </Text>
@@ -318,10 +315,9 @@ export function CyclingSessionComponent({
     setCurrentWorkoutPlan(workoutPlan);
     onUpdateSession({
       ...session,
-      type: 'intervals',
+      type: 'interval',
       plannedDuration: workoutPlan.estimatedDuration,
-      plannedDistance: workoutPlan.estimatedDistance,
-      workoutPlan: workoutPlan
+      plannedDistance: workoutPlan.estimatedDistance
     });
     setShowWorkoutBuilder(false);
   };
@@ -485,8 +481,7 @@ export function SwimmingSessionComponent({
     onUpdateSession({
       ...session,
       type: 'technique',
-      plannedDistance: workoutPlan.estimatedDistance,
-      workoutPlan: workoutPlan
+      plannedDistance: workoutPlan.estimatedDistance
     });
     setShowWorkoutBuilder(false);
   };
@@ -623,16 +618,6 @@ export function SwimmingSessionComponent({
     </View>
   );
 }
-
-// ===== GENERIC SPORTS COMPONENT =====
-interface GenericSportSessionProps {
-  session: GenericSportSession;
-  sport: SportType;
-  onUpdateSession: (session: GenericSportSession) => void;
-  onCompleteWorkout?: () => void;
-  isCompleted?: boolean;
-}
-
 /**
  * Exportar el componente genérico desde el archivo separado
  * Ya está implementado en GenericSportSessionComponent.tsx (actualizado)

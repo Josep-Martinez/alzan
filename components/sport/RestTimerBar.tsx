@@ -54,7 +54,7 @@ export default function RestTimerBar({ duration, onComplete, onCancel }: RestTim
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [duration]);
+  }, [duration, onComplete, scaleAnim, opacityAnim]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

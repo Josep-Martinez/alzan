@@ -69,7 +69,6 @@ export default function ActiveWorkoutSession({
   
   // ===== ANIMACIONES =====
   const [scaleAnim] = useState(new Animated.Value(1));
-  const [opacityAnim] = useState(new Animated.Value(1));
 
   // ===== ESTADOS DE EDICIÓN =====
   const [editingWeight, setEditingWeight] = useState(false);

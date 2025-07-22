@@ -90,8 +90,8 @@ export async function analyzeText(originalText: string): Promise<NutritionData> 
   if (parsed) return parsed;
 
   // 2) Si falla y el idioma del sistema es español, probamos traducir a inglés
-  const locale = Localization.locale.split('-')[0]; // ej: "es"
-  if (locale === 'es') {
+  const localeShort = Localization.getLocales()[0].languageCode; // ej: "es"
+  if (localeShort === 'es') {
     const translated = await translateToEnglish(text);
     const parsedEn   = await tryParseWithSpoonacular(translated);
     if (parsedEn) return parsedEn;
