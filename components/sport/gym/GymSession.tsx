@@ -11,9 +11,7 @@ import {
   TextInput,
   View
 } from 'react-native';
-import ActiveWorkoutSession from './ActiveWorkoutSession';
-import ExerciseReorderModal from './ExerciseReorderModal';
-import ExerciseSelector from './ExerciseSelector';
+import ExerciseReorderModal from '../ExerciseReorderModal';
 import {
   EXERCISE_TYPE_COLORS,
   EXERCISE_TYPE_ICONS,
@@ -26,9 +24,10 @@ import {
   SupersetType,
   createEmptySet,
   getSupersetProgress,
-  isSetComplete,
   isSupersetComplete
-} from './sports';
+} from '../common/sports';
+import ActiveWorkoutSession from './ActiveWorkoutSession';
+import ExerciseSelector from './ExerciseSelector';
 import SupersetBuilder from './SupersetBuilder';
 
 /**

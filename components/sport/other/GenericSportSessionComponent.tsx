@@ -9,7 +9,7 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { GenericSportSession, SportType } from './sports';
+import { GenericSportSession, SportType } from './common/sports';
 
 /**
  * Props del componente de deportes genéricos

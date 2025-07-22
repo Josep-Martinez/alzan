@@ -15,15 +15,15 @@ import {
   Vibration,
   View
 } from 'react-native';
-import ExerciseTimer from './ExerciceTimer';
-import RestTimerBar from './RestTimerBar';
+import RestTimerBar from '../common/RestTimerBar';
 import {
   GymExercise,
   GymSet,
   isSetComplete,
   SuperSet,
   SupersetType
-} from './sports';
+} from '../common/sports';
+import ExerciseTimer from './ExerciseTimer';
 
 /**
  * Props del componente ActiveWorkoutSession

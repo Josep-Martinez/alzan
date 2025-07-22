@@ -12,15 +12,8 @@ import {
   TextInput,
   View
 } from 'react-native';
-import GymSession from '../../components/sport/GymSession';
-import {
-  CyclingSessionComponent,
-  GenericSportSessionComponent,
-  RunningSessionComponent,
-  SwimmingSessionComponent
-} from '../../components/sport/OtherSportsSessions';
-import PostWorkoutIntensity from '../../components/sport/PostWorkoutIntensity';
-import RestTimerBar from '../../components/sport/RestTimerBar';
+import PostWorkoutIntensity from '../../components/sport/common/PostWorkoutIntensity';
+import RestTimerBar from '../../components/sport/common/RestTimerBar';
 import {
   CyclingSession,
   GenericSportSession,
@@ -32,8 +25,15 @@ import {
   SwimmingSession,
   WeeklyPlan,
   Workout
-} from '../../components/sport/sports';
-import SportSelector from '../../components/sport/SportSelector';
+} from '../../components/sport/common/sports';
+import SportSelector from '../../components/sport/common/SportSelector';
+import GymSession from '../../components/sport/gym/GymSession';
+import {
+  CyclingSessionComponent,
+  GenericSportSessionComponent,
+  RunningSessionComponent,
+  SwimmingSessionComponent
+} from '../../components/sport/other/OtherSportsSessions';
 
 /**
  * Configuración de días de la semana

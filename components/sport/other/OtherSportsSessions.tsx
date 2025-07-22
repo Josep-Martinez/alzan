@@ -8,12 +8,12 @@ import {
   Text,
   View
 } from 'react-native';
-import AdvancedWorkoutBuilder from './AdvancedWorkoutBuilder';
 import {
   CyclingSession,
   RunningSession,
   SwimmingSession
-} from './sports';
+} from '../common/sports';
+import AdvancedWorkoutBuilder from './AdvancedWorkoutBuilder';
 
 /**
  * Interfaz para plan de entrenamiento estructurado
