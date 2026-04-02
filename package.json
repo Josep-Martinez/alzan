@@ -3,24 +3,27 @@
   "private": true,
   "packageManager": "pnpm@10.26.1",
   "scripts": {
-    "dev:be": "pnpm --prefix alzan-be start:dev",
-    "dev:fe": "pnpm --prefix alzan-fe start",
-
+    "env:sync": "node scripts/sync-env.js",
+    "start": "pnpm env:sync && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe\"",
+    "start:web": "pnpm env:sync && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe:web\"",
+    "start:be": "pnpm --prefix alzan-be start:dev",
+    "start:fe": "pnpm --prefix alzan-fe start",
+    "start:fe:web": "dotenv -e .env -- sh -c 'pnpm --prefix alzan-fe start -- --port $FE_PORT'",
     "build:be": "pnpm --prefix alzan-be build",
     "build:fe": "pnpm --prefix alzan-fe build",
-
     "lint:check": "pnpm --prefix alzan-be lint:check && pnpm --prefix alzan-fe lint:check",
     "lint:fix": "pnpm --prefix alzan-be lint:fix && pnpm --prefix alzan-fe lint:fix",
     "format:check": "pnpm --prefix alzan-be format:check && pnpm --prefix alzan-fe format:check",
     "format": "pnpm --prefix alzan-be format && pnpm --prefix alzan-fe format",
     "typecheck": "pnpm --prefix alzan-be typecheck && pnpm --prefix alzan-fe typecheck",
-
     "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",
-
-    "supabase:types": "supabase gen types --local > alzan-fe/src/types/database.types.ts && pnpm --prefix alzan-fe format",
-    "db:push": "supabase db push --db-url \"$SUPABASE_DB_URL\""
+    "supabase:types": "supabase gen types --local > alzan-fe/src/types/database.types.ts && pnpm --prefix alzan-fe format"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
+    "dotenv": "^17.4.0",
+    "dotenv-expand": "^12.0.3",
+    "dotenv-cli": "^11.0.0",
     "supabase": "github:supabase/cli"
   }
 }
