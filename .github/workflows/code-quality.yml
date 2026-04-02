@@ -1,20 +1,54 @@
-name: FE — Code Quality
+name: Code Quality
 
 on:
   push:
     paths:
+      - 'alzan-be/**'
       - 'alzan-fe/**'
   pull_request:
     paths:
+      - 'alzan-be/**'
       - 'alzan-fe/**'
 
-defaults:
-  run:
-    working-directory: ./alzan-fe
-
 jobs:
-  quality:
+  be-quality:
+    name: BE — Format & Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./alzan-be
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js + Cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: 'alzan-be/pnpm-lock.yaml'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Check linting
+        run: pnpm run lint:check
+
+  fe-quality:
+    name: FE — Format, Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./alzan-fe
 
     steps:
       - name: Checkout Code
