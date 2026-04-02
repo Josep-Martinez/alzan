@@ -1,0 +1,37 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "lib": [
+            "ES2023"
+        ],
+        "module": "commonjs",
+        "declaration": true,
+        "removeComments": true,
+        "emitDecoratorMetadata": true,
+        "moduleResolution": "node",
+        "experimentalDecorators": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "ES2023",
+        "sourceMap": true,
+        "outDir": "./dist",
+        "baseUrl": "./",
+        "incremental": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": false,
+        "typeRoots": [
+            "./types",
+            "./node_modules/@types"
+        ],
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noImplicitOverride": true,
+        "esModuleInterop": true,
+        "allowJs": false,
+        "checkJs": false,
+        "tsBuildInfoFile": "./dist/.tsbuildinfo",
+        "pretty": true,
+        "resolveJsonModule": true,
+    },
+}

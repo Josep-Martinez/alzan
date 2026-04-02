@@ -1,0 +1,43 @@
+name: Code quality checks
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false # Disable auto-install to let us handle caching first
+
+      - name: Setup Node.js + Cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Generate OpenAPI
+        run: pnpm run generate-openapi
+
+      - name: Lint
+        run: pnpm run lint:check
+
+      - name: Build app
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: pnpm run build
