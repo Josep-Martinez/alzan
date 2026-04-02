@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  CanActivate,
-  UnauthorizedException,
-  ExecutionContext,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, CanActivate, UnauthorizedException, ExecutionContext, Logger } from '@nestjs/common';
 import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 import { Reflector } from '@nestjs/core';
 import { Scope, SCOPES_KEY } from './auth.decorator';
@@ -20,9 +14,10 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const validTokenTypes = this.reflector.getAllAndOverride<
-      Scope[] | undefined
-    >(SCOPES_KEY, [context.getHandler(), context.getClass()]);
+    const validTokenTypes = this.reflector.getAllAndOverride<Scope[] | undefined>(SCOPES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!validTokenTypes?.length) {
       throw new UnauthorizedException('Unauthorized!');
