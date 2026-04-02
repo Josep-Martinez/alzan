@@ -1,13 +1,19 @@
-name: Code quality checks
+name: Deploy Web Dev
 
 on:
-  push:
-    branches:
-      - '**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ./alzan-fe
 
 jobs:
-  quality:
+  deploy:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      deployments: write
 
     steps:
       - name: Checkout Code
@@ -16,28 +22,31 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          run_install: false # Disable auto-install to let us handle caching first
+          run_install: false
 
       - name: Setup Node.js + Cache
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
+          cache-dependency-path: 'alzan-fe/pnpm-lock.yaml'
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm run format:check
-
       - name: Generate OpenAPI
         run: pnpm run generate-openapi
 
-      - name: Lint
-        run: pnpm run lint:check
-
-      - name: Build app
+      - name: Build Web App
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: pnpm run build
+        run: pnpm run build:web
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: alzan-fe
+          directory: alzan-fe/dist

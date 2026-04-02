@@ -1,9 +1,16 @@
-name: Code quality checks
+name: BE — Code Quality
 
 on:
   push:
-    branches:
-      - '**'
+    paths:
+      - 'alzan-be/**'
+  pull_request:
+    paths:
+      - 'alzan-be/**'
+
+defaults:
+  run:
+    working-directory: ./alzan-be
 
 jobs:
   quality:
@@ -16,13 +23,14 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          run_install: false # Disable auto-install to let us handle caching first
+          run_install: false
 
       - name: Setup Node.js + Cache
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
+          cache-dependency-path: 'alzan-be/pnpm-lock.yaml'
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile

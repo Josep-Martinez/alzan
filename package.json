@@ -1,0 +1,26 @@
+{
+  "name": "alzan",
+  "private": true,
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "dev:be": "pnpm --prefix alzan-be start:dev",
+    "dev:fe": "pnpm --prefix alzan-fe start",
+
+    "build:be": "pnpm --prefix alzan-be build",
+    "build:fe": "pnpm --prefix alzan-fe build",
+
+    "lint:check": "pnpm --prefix alzan-be lint:check && pnpm --prefix alzan-fe lint:check",
+    "lint:fix": "pnpm --prefix alzan-be lint:fix && pnpm --prefix alzan-fe lint:fix",
+    "format:check": "pnpm --prefix alzan-be format:check && pnpm --prefix alzan-fe format:check",
+    "format": "pnpm --prefix alzan-be format && pnpm --prefix alzan-fe format",
+    "typecheck": "pnpm --prefix alzan-be typecheck && pnpm --prefix alzan-fe typecheck",
+
+    "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",
+
+    "supabase:types": "supabase gen types --local > alzan-fe/src/types/database.types.ts && pnpm --prefix alzan-fe format",
+    "db:push": "supabase db push --db-url \"$SUPABASE_DB_URL\""
+  },
+  "devDependencies": {
+    "supabase": "github:supabase/cli"
+  }
+}
