@@ -9,6 +9,10 @@ export class SupabaseService implements OnModuleInit {
 
   constructor(private readonly configService: ConfigService) {}
 
+  public get client(): SupabaseClient<Database> {
+    return this.supabase;
+  }
+
   onModuleInit() {
     const supabaseUrl = this.configService.get<string>('supabase.supabaseUrl');
     const supabaseServiceRoleKey = this.configService.get<string>('supabase.supabaseServiceRoleKey');
@@ -23,12 +27,5 @@ export class SupabaseService implements OnModuleInit {
         persistSession: false,
       },
     });
-  }
-
-  /**
-   * Returns the strictly typed Supabase client.
-   */
-  public getClient(): SupabaseClient<Database> {
-    return this.supabase;
   }
 }

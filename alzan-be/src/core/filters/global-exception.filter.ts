@@ -1,6 +1,18 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { type Response, type Request } from 'express';
 
+export function extractMessage(res: string | object): string | null {
+  if (typeof res === 'string') {
+    return res;
+  }
+
+  if ('message' in res) {
+    return res.message as string;
+  }
+
+  return null;
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -17,7 +29,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as any).message || message;
+      message = extractMessage(res) ?? message;
       stack = exception.stack;
       // If the exception has a cause (e.g. from InternalServerErrorException), use that stack if available
       if (exception.cause instanceof Error) {
@@ -33,7 +45,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       method: request.method,
       path: request.url,
       message,
-      stack: process.env.NODE_ENV !== 'production' ? stack : undefined,
+      stack,
     };
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {

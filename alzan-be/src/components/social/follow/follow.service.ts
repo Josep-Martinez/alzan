@@ -3,11 +3,10 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
-  HttpException,
 } from '@nestjs/common';
 import { SupabaseClient, User } from '@supabase/supabase-js';
-import { Logger } from 'nestjs-pino';
 
 import { Database } from 'src/types/database.types';
 
@@ -18,14 +17,13 @@ import { FollowCountDto } from './dto/follow-count.dto';
 
 @Injectable()
 export class FollowService {
-  private get client(): SupabaseClient<Database> {
-    return this.supabaseService.getClient();
-  }
+  private readonly logger = new Logger(FollowService.name);
 
-  constructor(
-    private readonly supabaseService: SupabaseService,
-    private readonly logger: Logger,
-  ) {}
+  private supabase: SupabaseClient<Database>;
+
+  constructor(private readonly supabaseService: SupabaseService) {
+    this.supabase = this.supabaseService.client;
+  }
 
   /**
    * Follows a user
@@ -40,36 +38,31 @@ export class FollowService {
       throw new BadRequestException('You cannot follow yourself');
     }
 
-    try {
-      const { data: targetUser, error: findError } = await this.client
-        .from('users')
-        .select('id')
-        .eq('username', to)
-        .single();
+    const { data: targetUser, error: findError } = await this.supabase
+      .from('users')
+      .select('id')
+      .eq('username', to)
+      .single();
 
-      if (findError || !targetUser) {
-        throw new NotFoundException(`User ${to} not found`, { cause: findError });
+    if (findError || !targetUser) {
+      throw new NotFoundException(`User ${to} not found`, { cause: findError });
+    }
+
+    if (targetUser.id === user.id) {
+      throw new BadRequestException('You cannot follow yourself');
+    }
+
+    const { error: insertError } = await this.supabase.from('social_follows').insert({
+      id_follower: user.id,
+      id_followed: targetUser.id,
+    });
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        // Unique violation
+        throw new ConflictException(`You are already following ${to}`);
       }
-
-      if (targetUser.id === user.id) {
-        throw new BadRequestException('You cannot follow yourself');
-      }
-
-      const { error: insertError } = await this.client.from('social_follows').insert({
-        id_follower: user.id,
-        id_followed: targetUser.id,
-      });
-
-      if (insertError) {
-        if (insertError.code === '23505') {
-          // Unique violation
-          throw new ConflictException(`You are already following ${to}`);
-        }
-        throw new InternalServerErrorException(insertError.message, { cause: insertError });
-      }
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      throw new InternalServerErrorException('An unexpected error in follow', { cause: error });
+      throw new InternalServerErrorException(insertError.message, { cause: insertError });
     }
   }
 
@@ -81,7 +74,7 @@ export class FollowService {
    */
   public async unfollow(user: User, to: string): Promise<void> {
     this.logger.debug(`FollowService: Trying to unfollow user ${to}`);
-    const { data: targetUser, error: findError } = await this.client
+    const { data: targetUser, error: findError } = await this.supabase
       .from('users')
       .select('id')
       .eq('username', to)
@@ -91,7 +84,7 @@ export class FollowService {
       throw new NotFoundException(`User ${to} not found`, { cause: findError });
     }
 
-    const { error: deleteError } = await this.client
+    const { error: deleteError } = await this.supabase
       .from('social_follows')
       .delete()
       .eq('id_follower', user.id)
@@ -109,7 +102,7 @@ export class FollowService {
    */
   public async getFollowers(userId: string, pagination: PaginationDto): Promise<FollowResponseDto[]> {
     this.logger.debug(`FollowService: Trying to get followers for user ${userId}`);
-    const { data, error } = await this.client
+    const { data, error } = await this.supabase
       .from('social_follows')
       .select(
         `
@@ -129,7 +122,7 @@ export class FollowService {
       throw new InternalServerErrorException(error.message, { cause: error });
     }
 
-    return data?.map((item: any) => item.users) ?? [];
+    return data?.map(item => item.users) ?? [];
   }
 
   /**
@@ -138,9 +131,9 @@ export class FollowService {
    * @param {PaginationDto} pagination the pagination
    * @returns {Promise<any[]>} the list of users that the user provided is following
    */
-  public async getFollowing(userId: string, pagination: PaginationDto): Promise<any[]> {
+  public async getFollowing(userId: string, pagination: PaginationDto) {
     this.logger.debug(`FollowService: Trying to get following for user ${userId}`);
-    const { data, error } = await this.client
+    const { data, error } = await this.supabase
       .from('social_follows')
       .select(
         `
@@ -160,7 +153,7 @@ export class FollowService {
       throw new InternalServerErrorException(error.message, { cause: error });
     }
 
-    return data?.map((item: any) => item.users) ?? [];
+    return data?.map(item => item.users) ?? [];
   }
 
   /**
@@ -171,22 +164,22 @@ export class FollowService {
    */
   public async getCount(user: User): Promise<FollowCountDto> {
     this.logger.debug('FollowService: Trying to get follow count');
-    const userId: string = user.id;
-    const followers: number = await this.getFollowersCount(userId);
-    const following: number = await this.getFollowingCount(userId);
+    const userId = user.id;
+    const followers = await this.getFollowersCount(userId);
+    const following = await this.getFollowingCount(userId);
 
     return {
       followersCount: followers,
       followingCount: following,
-    } as FollowCountDto;
+    };
   }
 
   // Get followers count from user id provided
   private async getFollowersCount(userId: string): Promise<number> {
     this.logger.debug(`FollowService: Trying to get followers count for user ${userId}`);
-    const { data, error } = await this.client.from('social_follows').select('*').eq('id_followed', userId);
+    const { data, error } = await this.supabase.from('social_follows').select('*').eq('id_followed', userId);
     if (error) {
-      this.logger.error(`FollowService: Error getting followers count: ${error.message}`);
+      this.logger.warn(`FollowService: Error getting followers count: ${error.message}`);
       return 0;
     }
     return data?.length ?? 0;
@@ -195,9 +188,9 @@ export class FollowService {
   // Get following count from user id provided
   private async getFollowingCount(userId: string): Promise<number> {
     this.logger.debug(`FollowService: Trying to get following count for user ${userId}`);
-    const { data, error } = await this.client.from('social_follows').select('*').eq('id_follower', userId);
+    const { data, error } = await this.supabase.from('social_follows').select('*').eq('id_follower', userId);
     if (error) {
-      this.logger.error(`FollowService: Error getting following count: ${error.message}`);
+      this.logger.warn(`FollowService: Error getting following count: ${error.message}`);
       return 0;
     }
     return data?.length ?? 0;

@@ -40,7 +40,7 @@ export class AuthGuard implements CanActivate {
       request.user = await this.userService.getUser(token);
       return true;
     } catch (error) {
-      this.logger.error({
+      this.logger.warn({
         err: error,
         message: 'Unexpected error occurred getting the user from the token',
       });

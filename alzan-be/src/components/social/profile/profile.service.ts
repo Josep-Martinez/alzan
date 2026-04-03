@@ -10,7 +10,6 @@ import { UserService } from '../../user/user.service';
  */
 @Injectable()
 export class ProfileService {
-
   constructor(
     private readonly logger: Logger,
     private readonly userService: UserService,
@@ -35,10 +34,10 @@ export class ProfileService {
     ]);
 
     if (!userDto) {
-      this.logger.error(`ProfileService: User ${user.id} not found`);
+      this.logger.warn(`ProfileService: User ${user.id} not found`);
       throw new BadRequestException(`User ${user.id} not found`);
     }
 
-    return UserProfileDto.of(userDto, followCount);
+    return { ...userDto, followers_count: followCount.followersCount, following_count: followCount.followingCount };
   }
 }

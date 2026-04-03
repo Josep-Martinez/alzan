@@ -1,9 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 
 export class FollowCountDto {
-  @ApiProperty()
+  @Expose()
   followersCount!: number;
 
-  @ApiProperty()
+  @Expose()
   followingCount!: number;
 }

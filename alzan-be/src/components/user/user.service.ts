@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseClient, User } from '@supabase/supabase-js';
-import { SupabaseService } from '../supabase/supabase.service';
+import { SupabaseService } from 'src/core/supabase/supabase.service';
 import { UserRow } from '../social/profile/dto/user-profile.dto';
 
 @Injectable()
@@ -8,7 +8,7 @@ export class UserService {
   private readonly supabase: SupabaseClient;
 
   constructor(private readonly supabaseService: SupabaseService) {
-    this.supabase = this.supabaseService.serviceRole;
+    this.supabase = this.supabaseService.client;
   }
 
   async getUser(token: string): Promise<User> {
