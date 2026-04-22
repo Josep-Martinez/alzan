@@ -444,10 +444,19 @@ CREATE TABLE public.recipe_aliases (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   recipe_id uuid NOT NULL,
   alias_es text NOT NULL,
-  alias_norm_es text NOT NULL UNIQUE,
+  alias_norm_es text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT recipe_aliases_pkey PRIMARY KEY (id),
   CONSTRAINT recipe_aliases_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
+);
+CREATE TABLE public.recipe_favorites (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  recipe_id uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT recipe_favorites_pkey PRIMARY KEY (id),
+  CONSTRAINT recipe_favorites_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT recipe_favorites_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
 );
 CREATE TABLE public.recipe_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -462,17 +471,49 @@ CREATE TABLE public.recipe_items (
   CONSTRAINT recipe_items_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
   CONSTRAINT recipe_items_ingredient_id_fkey FOREIGN KEY (ingredient_id) REFERENCES public.ingredients(id)
 );
+CREATE TABLE public.recipe_usage_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  recipe_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  context USER-DEFINED NOT NULL,
+  used_at timestamp with time zone NOT NULL DEFAULT now(),
+  event_bucket_10m timestamp with time zone NOT NULL,
+  is_public_eligible boolean NOT NULL DEFAULT false,
+  CONSTRAINT recipe_usage_events_pkey PRIMARY KEY (id),
+  CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
+  CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.recipes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name_es text NOT NULL,
   name_en text,
-  name_norm_es text NOT NULL UNIQUE,
+  name_norm_es text NOT NULL,
   description_es text,
   quality_score numeric NOT NULL DEFAULT 0.7 CHECK (quality_score >= 0::numeric AND quality_score <= 1::numeric),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   description_en text,
-  CONSTRAINT recipes_pkey PRIMARY KEY (id)
+  owner_user_id uuid,
+  source USER-DEFINED NOT NULL DEFAULT 'user'::recipe_source_enum,
+  visibility USER-DEFINED NOT NULL DEFAULT 'private'::recipe_visibility_enum,
+  deleted_at timestamp with time zone,
+  kcal_100 numeric NOT NULL DEFAULT 0,
+  protein_g_100 numeric NOT NULL DEFAULT 0,
+  carbs_g_100 numeric NOT NULL DEFAULT 0,
+  fat_g_100 numeric NOT NULL DEFAULT 0,
+  published_at timestamp with time zone,
+  public_slug text,
+  origin_recipe_id uuid,
+  uses_total integer NOT NULL DEFAULT 0,
+  uses_30d integer NOT NULL DEFAULT 0,
+  uses_7d integer NOT NULL DEFAULT 0,
+  users_unique_30d integer NOT NULL DEFAULT 0,
+  saves_total integer NOT NULL DEFAULT 0,
+  favorites_total integer NOT NULL DEFAULT 0,
+  popularity_score numeric NOT NULL DEFAULT 0,
+  CONSTRAINT recipes_pkey PRIMARY KEY (id),
+  CONSTRAINT recipes_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id),
+  CONSTRAINT recipes_origin_recipe_id_fkey FOREIGN KEY (origin_recipe_id) REFERENCES public.recipes(id)
 );
 CREATE TABLE public.resting_hr_logs (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
