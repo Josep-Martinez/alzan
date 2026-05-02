@@ -24,9 +24,7 @@ async function bootstrap(): Promise<void> {
 
   const configService = app.get(ConfigService);
 
-  const serverConfiguration = configService.get<
-    ReturnType<typeof serverConfig>
-  >(ConfigNamespace.SERVER);
+  const serverConfiguration = configService.get<ReturnType<typeof serverConfig>>(ConfigNamespace.SERVER);
   const { cors, environment, port, baseUrl } = serverConfiguration!;
 
   app.enableCors(cors);
@@ -40,6 +38,6 @@ async function bootstrap(): Promise<void> {
 }
 bootstrap()
   .then()
-  .catch((err) => {
+  .catch(err => {
     logger.error('Error while bootstrapping the app', err);
   });

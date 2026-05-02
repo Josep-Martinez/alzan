@@ -15,11 +15,11 @@ import {
   buildLooseIlikePattern,
   getCurrentAppLocale,
   getLocalizedIngredientName,
-  getLocalizedIngredientNotes,
   getLocalizedRecipeDescription,
   getLocalizedRecipeName,
   getSearchRelevanceScore,
   matchesLoosely,
+  getLocalizedIngredientNotes,
 } from '../../../services/localization';
 import { Locale } from '../../../i18n';
 
@@ -380,7 +380,8 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
             quality_score: ing.quality_score,
             source_primary: ing.source_primary,
             source_secondary: ing.source_secondary,
-            notes: getLocalizedIngredientNotes(ing, languageCode) ?? undefined,
+            notes_es: ing.notes_es,
+            notes_en: ing.notes_en,
             kcal_100: Math.round(ing.kcal_100 || 0),
             protein_g_100: roundToOneDecimal(ing.protein_g_100 || 0),
             carbs_g_100: roundToOneDecimal(ing.carbs_g_100 || 0),

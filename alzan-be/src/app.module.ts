@@ -15,6 +15,7 @@ import { validateEnv } from './config/validate-env';
 import { Api } from './core/swagger/swagger-api.decorator';
 import supabaseConfig from './config/supabase.config';
 import { ComponentsModule } from './components/components.modules';
+import { SupabaseModule } from './core/supabase/supabase.module';
 
 export const appRootImports = [
   ConfigModule.forRoot({
@@ -23,6 +24,7 @@ export const appRootImports = [
     load: [serverConfig, supabaseConfig],
   }),
   LoggerModule.forRoot(createLoggerConfig()),
+  SupabaseModule,
 ];
 
 @Api(SwaggerApi.USER_API)

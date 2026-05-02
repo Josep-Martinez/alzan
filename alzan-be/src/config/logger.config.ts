@@ -21,8 +21,7 @@ export const createLoggerConfig = (): Params => {
               },
             },
             serializers: {
-              req: (req: { method: string; url: string }): string =>
-                `${req.method} ${req.url}`,
+              req: (req: { method: string; url: string }): string => `${req.method} ${req.url}`,
               res: (res: { statusCode: number }) => `${res.statusCode}`,
               err: (err: Error): { message: string; stack?: string } => ({
                 message: err.message,
@@ -31,11 +30,7 @@ export const createLoggerConfig = (): Params => {
             },
           }
         : createGcpLoggingPinoConfig({}, { level: 'debug' })),
-      redact: [
-        'req.headers.authorization',
-        'req.headers["x-api-key"]',
-        'req.query.token',
-      ],
+      redact: ['req.headers.authorization', 'req.headers["x-api-key"]', 'req.query.token'],
     },
   };
 };

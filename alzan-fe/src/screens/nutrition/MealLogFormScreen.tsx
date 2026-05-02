@@ -35,6 +35,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { format } from 'date-fns';
+import { getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
   duplicateRecipe,
@@ -44,6 +45,7 @@ import {
   getTrendingRecipes,
   logRecipeUsage,
   publishRecipe,
+  RecipeSearchScope,
   refreshRecipeAggregates,
   searchMealByName,
 } from '../../modules/nutrition/services/nutritionSearchService';
@@ -59,7 +61,6 @@ import {
   getLocalizedRecipeName,
 } from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
-import { RecipeSearchScope } from '../../types/userPreferences.types';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
@@ -718,8 +719,9 @@ export const MealLogFormScreen = () => {
       // It's a precooked ingredient - add as single item
       // Extract real weight from localized notes if available.
       let defaultAmount = 100;
-      if (item.notes) {
-        const weightMatch = item.notes.match(/(?:Peso Real|Actual weight):\s*(\d+)/i);
+      const localizedNotes = getLocalizedIngredientNotes(item);
+      if (localizedNotes) {
+        const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+)/i);
         if (weightMatch && weightMatch[1]) {
           const weight = parseInt(weightMatch[1], 10);
           if (!isNaN(weight) && weight > 0) {
@@ -1240,7 +1242,8 @@ export const MealLogFormScreen = () => {
         carbs_g: totalMacros.carbs_g,
         fats_g: totalMacros.fats_g,
       },
-      notes: null,
+      notes_en: null,
+      notes_es: null,
     };
 
     const syntheticIngredients: RecipeIngredientItem[] = recipe.ingredients.map((ingredient, index) => ({
@@ -3404,13 +3407,13 @@ export const MealLogFormScreen = () => {
                     )}
 
                     {/* Notes */}
-                    {selectedMealDetail.notes && (
+                    {getLocalizedIngredientNotes(selectedMealDetail) && (
                       <View style={styles.detailSection}>
                         <Text style={[styles.detailSectionLabel, { color: themeColors.textSecondary }]}>
                           {t('nutrition.notesAllCaps')}
                         </Text>
                         <Text style={[styles.notesText, { color: themeColors.textPrimary }]}>
-                          {selectedMealDetail.notes}
+                          {getLocalizedIngredientNotes(selectedMealDetail)}
                         </Text>
                       </View>
                     )}

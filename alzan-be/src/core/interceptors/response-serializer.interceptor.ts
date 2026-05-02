@@ -1,11 +1,4 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Inject,
-  Injectable,
-  NestInterceptor,
-  StreamableFile,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor, StreamableFile } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ApiResponseMetadata } from '@nestjs/swagger';
 import { ClassConstructor, plainToInstance } from 'class-transformer';
@@ -21,20 +14,13 @@ const API_RESPONSE_KEY = 'swagger/apiResponse';
 export class ResponseSerializerInterceptor implements NestInterceptor {
   constructor(@Inject(REFLECTOR) private readonly reflector: Reflector) {}
 
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler<unknown>,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
     return next.handle().pipe(
-      map((res) => {
+      map(res => {
         const httpResponse = context.switchToHttp().getResponse<Response>();
 
-        const responseMetadata = this.reflector.get<ApiResponseMetadata[]>(
-          API_RESPONSE_KEY,
-          context.getHandler(),
-        );
-        const apiResponseForStatus =
-          responseMetadata?.[httpResponse.statusCode];
+        const responseMetadata = this.reflector.get<ApiResponseMetadata[]>(API_RESPONSE_KEY, context.getHandler());
+        const apiResponseForStatus = responseMetadata?.[httpResponse.statusCode];
 
         if (!isFileResponse(res)) {
           return res;
@@ -53,9 +39,7 @@ export class ResponseSerializerInterceptor implements NestInterceptor {
   }
 }
 
-function isVoidResponse(
-  apiResponseForStatus: ApiResponseMetadata | undefined,
-): boolean {
+function isVoidResponse(apiResponseForStatus: ApiResponseMetadata | undefined): boolean {
   switch (apiResponseForStatus?.type) {
     case VoidResponse:
       return false;
@@ -72,9 +56,7 @@ function isFileResponse(response: unknown): boolean {
   return true;
 }
 
-function assertIsCls<T>(
-  cls: ApiResponseMetadata['type'],
-): asserts cls is ClassConstructor<T> {
+function assertIsCls<T>(cls: ApiResponseMetadata['type']): asserts cls is ClassConstructor<T> {
   if (cls) {
     return;
   }

@@ -1,5 +1,7 @@
 const en = {
   common: {
+    accept: 'Accept',
+    reject: 'Reject',
     loading: 'Loading...',
     error: 'An error occurred',
     save: 'Save',
@@ -397,6 +399,8 @@ const en = {
     newMessagesCount: '{{count}} new messages',
     timeNow: 'Now',
     timeYesterday: 'Yesterday',
+    followPrivateProfile: 'Follow {{displayName}} to see their posts and activity.',
+    privateProfile: 'Private profile',
   },
   health: {
     last: 'Last',
@@ -1504,6 +1508,12 @@ const en = {
       'Basemap: OpenFreeMap. Geographic data: OpenStreetMap. Open the links below for attribution and licenses.',
     mapInfoProviderLink: 'OpenFreeMap',
     mapInfoDataLink: 'OpenStreetMap',
+  },
+  social: {
+    noNotifications: 'No notifications',
+    searchPlaceholder: 'Search users...',
+    noUsersFound: 'No users found',
+    searchPrompt: 'Search users...',
   },
   tabs: {
     home: 'Home',

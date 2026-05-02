@@ -23,6 +23,10 @@ import { useAlzanStyles } from '../../hooks/useAlzanStyles';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../../types/navigation.types';
 import { useTranslation } from 'react-i18next';
+import { Bell } from 'lucide-react-native';
+import { NotificationsSheet } from '../../components/social/NotificationsSheet';
+import { UserSearchSheet } from '../../components/social/UserSearchSheet';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -213,10 +217,17 @@ const useAlzanTheme = () => {
 };
 
 // Header con Avatar, Toggle y Acciones
-const Header = () => {
+const Header = ({
+  onOpenNotifications,
+  onOpenSearch,
+}: {
+  onOpenNotifications: () => void;
+  onOpenSearch: () => void;
+}) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'siguiendo' | 'global'>('siguiendo');
   const { styles: themeStyles, isDark } = useAlzanTheme();
+  const { unreadCount } = useNotifications();
 
   return (
     <View style={styles.header}>
@@ -276,11 +287,22 @@ const Header = () => {
 
       {/* Iconos derecha */}
       <View style={styles.headerActions}>
-        <TouchableOpacity style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}>
+        <TouchableOpacity
+          style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}
+          onPress={onOpenSearch}
+        >
           <Search size={22} color={themeStyles.headerIconColor} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}>
-          <Flame size={22} color={themeStyles.headerIconColor} />
+        <TouchableOpacity
+          style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}
+          onPress={onOpenNotifications}
+        >
+          <Bell size={22} color={themeStyles.headerIconColor} />
+          {unreadCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -377,6 +399,8 @@ export const AlzanHomeScreen = () => {
   const { styles: themeStyles } = alzanTheme;
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const scrollViewRef = useRef<ScrollView>(null);
+  const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('tabPress', () => {
@@ -416,7 +440,10 @@ export const AlzanHomeScreen = () => {
 
         <SafeAreaView style={styles.safeArea}>
           {/* Fixed Header */}
-          <Header />
+          <Header
+            onOpenNotifications={() => setIsNotificationsVisible(true)}
+            onOpenSearch={() => setIsSearchVisible(true)}
+          />
 
           {/* Scrollable Content with Pull-to-Refresh */}
           <ScrollView
@@ -429,6 +456,9 @@ export const AlzanHomeScreen = () => {
             <PulseSection />
             <FeedSection />
           </ScrollView>
+
+          <NotificationsSheet visible={isNotificationsVisible} onClose={() => setIsNotificationsVisible(false)} />
+          <UserSearchSheet visible={isSearchVisible} onClose={() => setIsSearchVisible(false)} />
         </SafeAreaView>
       </View>
     </AlzanThemeContext.Provider>
@@ -541,6 +571,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#F5F7FA',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 
   // Section Title

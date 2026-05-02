@@ -7,27 +7,23 @@ import { getSwaggerConfig } from './swagger-config';
 
 export const SWAGGER_BEARER_AUTH = 'bearer-auth';
 
-function getModulesForApi(
-  app: INestApplication,
-  apiType: SwaggerApi,
-): Type<unknown>[] {
+function getModulesForApi(app: INestApplication, apiType: SwaggerApi): Type<unknown>[] {
   const modules = app.get(ModulesContainer);
   return Array.from(modules.values())
-    .filter((module) => {
-      const apiTypesForModule: SwaggerApi[] | undefined = Reflect.getMetadata(
-        SWAGGER_METADATA_KEY,
-        module.metatype,
-      ) as SwaggerApi[] | undefined;
+    .filter(module => {
+      const apiTypesForModule: SwaggerApi[] | undefined = Reflect.getMetadata(SWAGGER_METADATA_KEY, module.metatype) as
+        | SwaggerApi[]
+        | undefined;
 
       return (apiTypesForModule ?? []).includes(apiType);
     })
-    .map((module) => module.metatype);
+    .map(module => module.metatype);
 }
 
 export function setupSwagger(app: INestApplication): void {
   const apiTypes = Object.values(SwaggerApi);
 
-  apiTypes.forEach((apiType) => {
+  apiTypes.forEach(apiType => {
     const config = getSwaggerConfig(apiType);
 
     const options = new DocumentBuilder()
