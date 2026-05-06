@@ -234,15 +234,18 @@ export type Database = {
           end_time: string | null
           ended_at_local: string | null
           endurance_template_id: string | null
+          epoc: number | null
           id: string
           imported_at: string | null
           max_cadence: number | null
           max_heart_rate: number | null
           max_power_w: number | null
           max_temp_c: number | null
+          min_heart_rate: number | null
           name: string | null
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
+          pte: number | null
           recovery_time_s: number | null
           route_polyline: string | null
           rpe: number | null
@@ -259,6 +262,7 @@ export type Database = {
           total_sets: number | null
           total_steps: number | null
           total_volume_kg: number | null
+          tss_hr: number | null
           updated_at: string
           user_id: string
           visibility: Database["public"]["Enums"]["visibility_enum"] | null
@@ -282,15 +286,18 @@ export type Database = {
           end_time?: string | null
           ended_at_local?: string | null
           endurance_template_id?: string | null
+          epoc?: number | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
           max_heart_rate?: number | null
           max_power_w?: number | null
           max_temp_c?: number | null
+          min_heart_rate?: number | null
           name?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
+          pte?: number | null
           recovery_time_s?: number | null
           route_polyline?: string | null
           rpe?: number | null
@@ -307,6 +314,7 @@ export type Database = {
           total_sets?: number | null
           total_steps?: number | null
           total_volume_kg?: number | null
+          tss_hr?: number | null
           updated_at?: string
           user_id: string
           visibility?: Database["public"]["Enums"]["visibility_enum"] | null
@@ -330,15 +338,18 @@ export type Database = {
           end_time?: string | null
           ended_at_local?: string | null
           endurance_template_id?: string | null
+          epoc?: number | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
           max_heart_rate?: number | null
           max_power_w?: number | null
           max_temp_c?: number | null
+          min_heart_rate?: number | null
           name?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
+          pte?: number | null
           recovery_time_s?: number | null
           route_polyline?: string | null
           rpe?: number | null
@@ -355,6 +366,7 @@ export type Database = {
           total_sets?: number | null
           total_steps?: number | null
           total_volume_kg?: number | null
+          tss_hr?: number | null
           updated_at?: string
           user_id?: string
           visibility?: Database["public"]["Enums"]["visibility_enum"] | null
@@ -2723,6 +2735,21 @@ export type Database = {
       check_username: { Args: { username_input: string }; Returns: boolean }
       delete_user_account: { Args: never; Returns: undefined }
       duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string }
+      ensure_recipe_ingredient: {
+        Args: {
+          p_barcode: string
+          p_carbs_g_100: number
+          p_category: Database["public"]["Enums"]["ingredients_category"]
+          p_fat_g_100: number
+          p_kcal_100: number
+          p_name_en: string
+          p_name_es: string
+          p_name_norm_es: string
+          p_protein_g_100: number
+          p_source: Database["public"]["Enums"]["meal_items_source"]
+        }
+        Returns: string
+      }
       ensure_recipe_public_slug: {
         Args: { p_recipe_id: string }
         Returns: string
@@ -2814,6 +2841,7 @@ export type Database = {
         | "polar"
         | "fitbit"
         | "other"
+        | "suunto"
       recipe_items_unit: "g" | "ml"
       recipe_source_enum: "system" | "user"
       recipe_usage_context_enum: "meal_log" | "planner" | "quick_add"
@@ -3088,7 +3116,15 @@ export const Constants = {
         "USER_FOLLOW_REQUEST_REJECTED",
       ],
       phase_type_enum: ["warmup", "interval", "recovery", "cooldown", "relax"],
-      provider_enum: ["manual", "strava", "garmin", "polar", "fitbit", "other"],
+      provider_enum: [
+        "manual",
+        "strava",
+        "garmin",
+        "polar",
+        "fitbit",
+        "other",
+        "suunto",
+      ],
       recipe_items_unit: ["g", "ml"],
       recipe_source_enum: ["system", "user"],
       recipe_usage_context_enum: ["meal_log", "planner", "quick_add"],

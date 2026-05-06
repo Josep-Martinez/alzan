@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Trash2, Calendar, AlertTriangle } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { startOfWeek, format } from 'date-fns';
+import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
@@ -28,6 +28,20 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 
 type TrainingSectionInfoKey = 'general' | 'data' | 'danger';
+
+const MAX_EXPORT_RANGE_DAYS = 92;
+
+const getDefaultExportRange = () => {
+  const end = new Date();
+  return {
+    start: subDays(end, 7),
+    end,
+  };
+};
+
+const getMinExportStartDate = (endDate: Date) => {
+  return subDays(endDate, MAX_EXPORT_RANGE_DAYS);
+};
 
 const TrainingSettingsScreen = () => {
   const { t } = useTranslation();
@@ -65,12 +79,10 @@ const TrainingSettingsScreen = () => {
 
   // Export State
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportStart, setExportStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [exportEnd, setExportEnd] = useState<Date>(new Date());
-  const [exportStartInput, setExportStartInput] = useState(
-    format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-  );
-  const [exportEndInput, setExportEndInput] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [exportStart, setExportStart] = useState<Date>(() => getDefaultExportRange().start);
+  const [exportEnd, setExportEnd] = useState<Date>(() => getDefaultExportRange().end);
+  const [exportStartInput, setExportStartInput] = useState(() => format(getDefaultExportRange().start, 'yyyy-MM-dd'));
+  const [exportEndInput, setExportEndInput] = useState(() => format(getDefaultExportRange().end, 'yyyy-MM-dd'));
   const [isExporting, setIsExporting] = useState(false);
 
   // Delete State
@@ -116,6 +128,16 @@ const TrainingSettingsScreen = () => {
     setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
   }, [showExportModal, exportStart, exportEnd]);
 
+  const exportMinStartDate = getMinExportStartDate(exportEnd);
+  const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
+  const exportRangeErrorMessage =
+    exportRangeDays < 0
+      ? t('nutrition.invalidDatesMessage')
+      : exportRangeDays > MAX_EXPORT_RANGE_DAYS
+        ? t('nutrition.exportRangeMinStartMessage', { date: format(exportMinStartDate, 'yyyy-MM-dd') })
+        : null;
+  const isExportDisabled = isExporting || !!exportRangeErrorMessage;
+
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error && error.message.trim()) return error.message;
     if (typeof error === 'string' && error.trim()) return error;
@@ -141,6 +163,7 @@ const TrainingSettingsScreen = () => {
 
   const handleExport = async () => {
     if (!user) return;
+    if (exportRangeErrorMessage) return;
     const exportStartDate = format(exportStart, 'yyyy-MM-dd');
     const exportEndDate = format(exportEnd, 'yyyy-MM-dd');
     const webPrintWindow: WebExportWindow | null =
@@ -186,6 +209,23 @@ const TrainingSettingsScreen = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const applyExportStartDate = (nextStart: Date) => {
+    setExportStart(nextStart);
+  };
+
+  const applyExportEndDate = (nextEnd: Date) => {
+    setExportEnd(nextEnd);
+  };
+
+  const openExportModal = () => {
+    const defaultRange = getDefaultExportRange();
+    setExportStart(defaultRange.start);
+    setExportEnd(defaultRange.end);
+    setExportStartInput(format(defaultRange.start, 'yyyy-MM-dd'));
+    setExportEndInput(format(defaultRange.end, 'yyyy-MM-dd'));
+    setShowExportModal(true);
   };
 
   const handleDeletePlans = async (type: 'all' | 'range') => {
@@ -286,7 +326,7 @@ const TrainingSettingsScreen = () => {
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.card]}>
-              <TouchableOpacity style={styles.actionRow} onPress={() => setShowExportModal(true)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionRow} onPress={openExportModal} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
                 <Text style={[styles.actionText, { color: themeColors.primary }]}>
                   {t('training.exportWorkoutHistory')}
@@ -354,11 +394,8 @@ const TrainingSettingsScreen = () => {
                         setExportStartInput(value);
                         const parsed = parseWebDateInput(value);
                         if (!parsed) return;
-                        setExportStart(parsed);
-                        if (parsed > exportEnd) {
-                          setExportEnd(parsed);
-                          setExportEndInput(format(parsed, 'yyyy-MM-dd'));
-                        }
+                        if (parsed > new Date()) return;
+                        applyExportStartDate(parsed);
                       }}
                       onBlur={() => {
                         if (!parseWebDateInput(exportStartInput)) {
@@ -379,8 +416,7 @@ const TrainingSettingsScreen = () => {
                       themeVariant={isDark ? 'dark' : 'light'}
                       onChange={(e, d) => {
                         if (d) {
-                          setExportStart(d);
-                          if (d > exportEnd) setExportEnd(d);
+                          applyExportStartDate(d);
                         }
                       }}
                     />
@@ -396,8 +432,8 @@ const TrainingSettingsScreen = () => {
                       onChangeText={value => {
                         setExportEndInput(value);
                         const parsed = parseWebDateInput(value);
-                        if (!parsed || parsed < exportStart) return;
-                        setExportEnd(parsed);
+                        if (!parsed || parsed > new Date()) return;
+                        applyExportEndDate(parsed);
                       }}
                       onBlur={() => {
                         if (!parseWebDateInput(exportEndInput)) {
@@ -414,14 +450,16 @@ const TrainingSettingsScreen = () => {
                       value={exportEnd}
                       mode="date"
                       display="default"
-                      minimumDate={exportStart}
                       maximumDate={new Date()}
                       themeVariant={isDark ? 'dark' : 'light'}
-                      onChange={(e, d) => d && setExportEnd(d)}
+                      onChange={(e, d) => d && applyExportEndDate(d)}
                     />
                   )}
                 </View>
               </View>
+              {exportRangeErrorMessage ? (
+                <Text style={[styles.exportRangeError, { color: themeColors.danger }]}>{exportRangeErrorMessage}</Text>
+              ) : null}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity onPress={() => setShowExportModal(false)} style={styles.modalBtnCancel}>
@@ -432,9 +470,9 @@ const TrainingSettingsScreen = () => {
                   style={[
                     styles.modalBtnConfirm,
                     { backgroundColor: themeColors.primary },
-                    isExporting && { opacity: 0.7 },
+                    isExportDisabled && { opacity: 0.45 },
                   ]}
-                  disabled={isExporting}
+                  disabled={isExportDisabled}
                 >
                   {isExporting ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -676,6 +714,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.s,
     paddingHorizontal: spacing.m,
     fontSize: 16,
+  },
+  exportRangeError: {
+    ...typography.caption,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
   modalButtons: {
     flexDirection: 'row',

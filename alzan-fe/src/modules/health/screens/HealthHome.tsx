@@ -73,11 +73,9 @@ export const HealthHome = () => {
         {/* Top Bar - EXACT COPY FROM NUTRITION */}
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('health.summary')}</Text>
-          <View style={styles.topActions}>
-            <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')}>
-              <BarChart2 size={24} color={themeColors.textPrimary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')} style={styles.topActions}>
+            <BarChart2 size={24} color={themeColors.textPrimary} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -304,6 +302,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingHorizontal: 16,

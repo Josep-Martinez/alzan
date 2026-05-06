@@ -38,6 +38,11 @@ import { format } from 'date-fns';
 import { getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
+  FOOD_QUALITY_SCORE_VERSION,
+  calculateFoodQualityScore,
+  toFoodCategory,
+} from '../../modules/nutrition/services/foodQualityScore';
+import {
   duplicateRecipe,
   getMostUsedRecipes,
   getRecipeLibraryPage,
@@ -54,6 +59,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearchService';
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
+import { IngredientsCategory, MealItemsSource } from '../../types/requests.types';
 import {
   getCurrentAppLocale,
   getLocalizedIngredientName,
@@ -72,12 +78,110 @@ type RecipeOriginFilter = 'all' | 'users' | 'system';
 const RECIPE_LIBRARY_PAGE_SIZE = 10;
 const RECIPE_LIBRARY_SAVED_PAGE_SIZE = 10;
 const MEAL_RECIPE_PAGE_SIZE = 5;
+const INGREDIENT_AMOUNT_DECIMALS = 1;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const roundIngredientAmount = (amount: number): number =>
+  Math.round(amount * 10 ** INGREDIENT_AMOUNT_DECIMALS) / 10 ** INGREDIENT_AMOUNT_DECIMALS;
+
+const parseIngredientAmountInput = (input: string): number | null => {
+  const normalized = input.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  return roundIngredientAmount(amount);
+};
+
+const sanitizeIngredientAmountInput = (input: string): string => {
+  const normalized = input.replace(',', '.').replace(/[^\d.]/g, '');
+  const [integerPart, ...decimalParts] = normalized.split('.');
+  if (decimalParts.length === 0) return integerPart;
+  return `${integerPart}.${decimalParts.join('')}`;
+};
+
+const formatIngredientAmount = (amount: number): string => {
+  const rounded = roundIngredientAmount(amount);
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(INGREDIENT_AMOUNT_DECIMALS);
+};
+
+const isIngredientAmountOverLimit = (input: string): boolean => {
+  const amount = parseIngredientAmountInput(input);
+  return amount != null && amount > 1000;
+};
+
+const isUuid = (value: string | null | undefined): value is string => Boolean(value && UUID_PATTERN.test(value));
+
+const parseManualMacroInput = (input: string): number | null => {
+  const normalized = input.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
+
+type ManualIngredientNutritionValidationReason =
+  | 'negative'
+  | 'macro_over_100'
+  | 'macro_sum_over_limit'
+  | 'kcal_over_limit'
+  | 'zero_kcal_with_macros'
+  | 'energy_mismatch';
+
+type ManualIngredientNutritionInput = {
+  kcal_100: number;
+  protein_g_100: number;
+  carbs_g_100: number;
+  fat_g_100: number;
+};
+
+type ManualIngredientNutritionValidation = {
+  isValid: boolean;
+  reason?: ManualIngredientNutritionValidationReason;
+};
+
+const validateManualIngredientNutrition = ({
+  kcal_100,
+  protein_g_100,
+  carbs_g_100,
+  fat_g_100,
+}: ManualIngredientNutritionInput): ManualIngredientNutritionValidation => {
+  const values = [kcal_100, protein_g_100, carbs_g_100, fat_g_100];
+  if (values.some(value => !Number.isFinite(value) || value < 0)) {
+    return { isValid: false, reason: 'negative' };
+  }
+
+  if (protein_g_100 > 100 || carbs_g_100 > 100 || fat_g_100 > 100) {
+    return { isValid: false, reason: 'macro_over_100' };
+  }
+
+  if (protein_g_100 + carbs_g_100 + fat_g_100 > 115) {
+    return { isValid: false, reason: 'macro_sum_over_limit' };
+  }
+
+  if (kcal_100 > 950) {
+    return { isValid: false, reason: 'kcal_over_limit' };
+  }
+
+  const estimatedKcal = protein_g_100 * 4 + carbs_g_100 * 4 + fat_g_100 * 9;
+  if (kcal_100 === 0 && estimatedKcal > 0) {
+    return { isValid: false, reason: 'zero_kcal_with_macros' };
+  }
+
+  if (estimatedKcal >= 5 && (kcal_100 < estimatedKcal * 0.35 || kcal_100 > estimatedKcal * 2.5)) {
+    return { isValid: false, reason: 'energy_mismatch' };
+  }
+
+  return { isValid: true };
+};
 
 interface SavedRecipeDraft {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
+  quality_score: number;
   source: 'user';
   visibility: 'private' | 'public';
   published_at: string | null;
@@ -92,6 +196,7 @@ interface SavedRecipeRow {
   name_en: string | null;
   created_at: string;
   updated_at: string;
+  quality_score: number | null;
   source: 'user';
   visibility: 'private' | 'public';
   published_at: string | null;
@@ -105,6 +210,7 @@ interface SavedRecipeItemRow {
   quantity: number;
   ingredient_id: string;
   ingredients: {
+    category: string | null;
     name_es: string;
     name_en: string | null;
     kcal_100: number | null;
@@ -240,6 +346,25 @@ export const MealLogFormScreen = () => {
     carbs_g_100: 0,
     fat_g_100: 0,
   });
+  const [manualMacroInputs, setManualMacroInputs] = useState({
+    kcal_100: '',
+    protein_g_100: '',
+    carbs_g_100: '',
+    fat_g_100: '',
+  });
+  const manualIngredientNutritionValidation = validateManualIngredientNutrition(manualPer100g);
+  const isManualIngredientFieldsComplete =
+    manualIngName.trim().length > 0 &&
+    parseIngredientAmountInput(amountInput) != null &&
+    !isIngredientAmountOverLimit(amountInput) &&
+    parseManualMacroInput(manualMacroInputs.kcal_100) != null &&
+    parseManualMacroInput(manualMacroInputs.protein_g_100) != null &&
+    parseManualMacroInput(manualMacroInputs.carbs_g_100) != null &&
+    parseManualMacroInput(manualMacroInputs.fat_g_100) != null;
+  const shouldShowManualIngredientNutritionWarning =
+    isManualIngredientFieldsComplete && !manualIngredientNutritionValidation.isValid;
+  const isManualIngredientFormComplete =
+    isManualIngredientFieldsComplete && manualIngredientNutritionValidation.isValid;
 
   // Inline Editing State
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
@@ -256,7 +381,7 @@ export const MealLogFormScreen = () => {
       const mapped: MealComponent[] = dbIngredients.map(item => ({
         id: item.id,
         name: item.name,
-        amount_g: item.quantity_g || 0,
+        amount_g: roundIngredientAmount(item.quantity_g || 0),
         source: item.source as MealComponent['source'],
         external_id: item.source_ref || undefined,
         macros_per_100g: undefined, // Removed property
@@ -410,6 +535,11 @@ export const MealLogFormScreen = () => {
     return Number(value.toFixed(2)).toString();
   };
 
+  const logRecipeQualityDebug = (payload: Record<string, unknown>) => {
+    if (!__DEV__) return;
+    console.info('[MealLogForm] Recipe quality score debug', payload);
+  };
+
   const toRecipeDisplayName = (rawName: string): string => {
     return rawName.replace(/\s*\((?:copia|copy)(?:\s+\d+)?\)\s*$/i, '').trim();
   };
@@ -419,7 +549,7 @@ export const MealLogFormScreen = () => {
       name: recipeName.trim().toLowerCase(),
       ingredients: recipeIngredients.map(ingredient => ({
         ingredientId: ingredient.external_id || ingredient.id,
-        quantity: Number((ingredient.amount_g || 0).toFixed(2)),
+        quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g',
       })),
     };
@@ -427,24 +557,58 @@ export const MealLogFormScreen = () => {
     return JSON.stringify(signature);
   };
 
-  const buildRecipeNutritionSnapshot = (recipeIngredients: MealComponent[]) => {
+  // Only used when saving/updating user recipes.
+  const buildRecipeNutritionSnapshot = (recipeIngredients: MealComponent[], recipeName: string) => {
     const totalWeight = recipeIngredients.reduce((sum, ingredient) => sum + (ingredient.amount_g || 0), 0);
     const totalMacros = calculateTotalMacros(recipeIngredients);
     const scaleTo100g = totalWeight > 0 ? 100 / totalWeight : 0;
+    const qualityInput = {
+      ingredients: recipeIngredients.map(ingredient => {
+        const computed = ingredient.calculated_macros || calculateMacros(ingredient, ingredient.amount_g || 0);
+        return {
+          category: toFoodCategory(ingredient.category),
+          weight_g: ingredient.amount_g || 0,
+          macros: {
+            energyKcal: computed.kcal,
+            protein_g: computed.protein_g,
+            carbs_g: computed.carbs_g,
+            fat_g: computed.fats_g,
+          },
+        };
+      }),
+      totalMacros: {
+        energyKcal: totalMacros.kcal,
+        protein_g: totalMacros.protein_g,
+        carbs_g: totalMacros.carbs_g,
+        fat_g: totalMacros.fats_g,
+      },
+    };
+    const qualityResult = calculateFoodQualityScore(qualityInput);
+
+    logRecipeQualityDebug({
+      recipeName,
+      algorithm: FOOD_QUALITY_SCORE_VERSION,
+      score: qualityResult.score,
+      grade: qualityResult.grade,
+      score01: qualityResult.score01,
+      breakdown: qualityResult.breakdown,
+      debug: qualityResult.debug,
+    });
 
     return {
       kcal_100: Number((totalMacros.kcal * scaleTo100g).toFixed(2)),
       protein_g_100: Number((totalMacros.protein_g * scaleTo100g).toFixed(2)),
       carbs_g_100: Number((totalMacros.carbs_g * scaleTo100g).toFixed(2)),
       fat_g_100: Number((totalMacros.fats_g * scaleTo100g).toFixed(2)),
+      quality_score: qualityResult.score01,
     };
   };
 
   const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
   const isEditingRecipe = editingSavedRecipeId !== null;
-  const hasRecipeChanges =
-    isEditingRecipe && editingRecipeSignature !== null && editingRecipeSignature !== currentRecipeSignature;
-  const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && (!isEditingRecipe || hasRecipeChanges);
+  const isIdenticalToOriginalRecipe =
+    editingRecipeSignature !== null && editingRecipeSignature === currentRecipeSignature;
+  const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && !isIdenticalToOriginalRecipe;
 
   // Handler to show meal detail
   const handleShowMealDetail = async (item: MealComponent, prefetchedIngredients?: RecipeIngredientItem[]) => {
@@ -691,7 +855,7 @@ export const MealLogFormScreen = () => {
           const transformedIngredients: MealComponent[] = recipeIngredients.map((ri, index: number) => ({
             id: `recipe-${index}-${Date.now()}`,
             name: ri.ingredient_name,
-            amount_g: ri.quantity,
+            amount_g: roundIngredientAmount(ri.quantity),
             source: 'database' as const,
             external_id: ri.ingredient_id,
             itemType: 'ingredient' as const,
@@ -706,10 +870,11 @@ export const MealLogFormScreen = () => {
                 carbs_g_100: ri.carbs_g_100 || 0,
                 fat_g_100: ri.fat_g_100 || 0,
               },
-              ri.quantity,
+              roundIngredientAmount(ri.quantity),
             ),
           }));
           setIngredients(transformedIngredients);
+          setEditingRecipeSignature(buildRecipeSignature(item.name, transformedIngredients));
           setSearchMessage({ type: 'info', text: t('nutrition.ingredientsAddedAutomatically') });
         }
       } catch (error) {
@@ -721,10 +886,10 @@ export const MealLogFormScreen = () => {
       let defaultAmount = 100;
       const localizedNotes = getLocalizedIngredientNotes(item);
       if (localizedNotes) {
-        const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+)/i);
+        const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+(?:[.,]\d+)?)/i);
         if (weightMatch && weightMatch[1]) {
-          const weight = parseInt(weightMatch[1], 10);
-          if (!isNaN(weight) && weight > 0) {
+          const weight = parseIngredientAmountInput(weightMatch[1]);
+          if (weight != null) {
             defaultAmount = weight;
           }
         }
@@ -736,6 +901,7 @@ export const MealLogFormScreen = () => {
         amount_g: defaultAmount,
         source: item.source,
         external_id: item.external_id,
+        category: toFoodCategory(item.category),
         itemType: item.itemType,
         source_primary: item.source_primary, // Cast if needed or ensure types align
         kcal_100: item.kcal_100,
@@ -769,6 +935,43 @@ export const MealLogFormScreen = () => {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+
+  const canResolveRecipeIngredient = (ingredient: MealComponent): boolean =>
+    isUuid(ingredient.external_id) || ingredient.source === 'manual' || ingredient.source === 'openfoodfacts';
+
+  const resolveRecipeIngredientId = async (ingredient: MealComponent): Promise<string | null> => {
+    if (isUuid(ingredient.external_id)) {
+      return ingredient.external_id;
+    }
+
+    if (ingredient.source !== 'manual' && ingredient.source !== 'openfoodfacts') {
+      return null;
+    }
+
+    const source: Extract<MealItemsSource, 'manual' | 'openfoodfacts'> = ingredient.source;
+    const category: IngredientsCategory = toFoodCategory(ingredient.category);
+    const barcode = ingredient.barcode ?? (source === 'openfoodfacts' ? ingredient.external_id : null) ?? null;
+
+    const { data, error } = await supabase.rpc('ensure_recipe_ingredient', {
+      p_name_es: ingredient.name,
+      p_name_en: ingredient.name,
+      p_name_norm_es: normalizeName(ingredient.name),
+      p_category: category,
+      p_kcal_100: ingredient.kcal_100 ?? 0,
+      p_protein_g_100: ingredient.protein_g_100 ?? 0,
+      p_carbs_g_100: ingredient.carbs_g_100 ?? 0,
+      p_fat_g_100: ingredient.fat_g_100 ?? 0,
+      p_source: source,
+      p_barcode: barcode ?? '',
+    });
+
+    if (error) {
+      console.error('[MealLogForm] Error resolving recipe ingredient:', error);
+      return null;
+    }
+
+    return data;
+  };
 
   const getCurrentUserId = async (): Promise<string | null> => {
     const {
@@ -852,9 +1055,10 @@ export const MealLogFormScreen = () => {
     return {
       id: `saved-recipe-item-${item.recipe_id}-${index}`,
       name: ingredientName,
-      amount_g: item.quantity,
+      amount_g: roundIngredientAmount(item.quantity),
       source: 'database',
       external_id: item.ingredient_id,
+      category: toFoodCategory(item.ingredients.category),
       itemType: 'ingredient',
       kcal_100: item.ingredients.kcal_100 || 0,
       protein_g_100: item.ingredients.protein_g_100 || 0,
@@ -879,7 +1083,7 @@ export const MealLogFormScreen = () => {
     const { data: recipesData, error: recipesError } = await supabase
       .from('recipes')
       .select(
-        'id, name_es, name_en, created_at, updated_at, source, visibility, published_at, public_slug, origin_recipe_id',
+        'id, name_es, name_en, created_at, updated_at, quality_score, source, visibility, published_at, public_slug, origin_recipe_id',
       )
       .eq('owner_user_id', currentUserId)
       .eq('source', 'user')
@@ -904,6 +1108,7 @@ export const MealLogFormScreen = () => {
           quantity,
           ingredient_id,
           ingredients (
+            category,
             name_es,
             name_en,
             kcal_100,
@@ -934,6 +1139,7 @@ export const MealLogFormScreen = () => {
       name: toRecipeDisplayName(getLocalizedIngredientName({ name_es: recipe.name_es, name_en: recipe.name_en })),
       created_at: recipe.created_at,
       updated_at: recipe.updated_at,
+      quality_score: recipe.quality_score ?? 0.7,
       source: 'user',
       visibility: recipe.visibility,
       published_at: recipe.published_at,
@@ -1062,6 +1268,8 @@ export const MealLogFormScreen = () => {
   };
 
   const handleSaveCurrentRecipe = async () => {
+    if (isSaving) return;
+
     if (!name.trim()) {
       Alert.alert(t('nutrition.missingMealNameTitle'), t('nutrition.missingMealNameMessage'));
       return;
@@ -1072,7 +1280,7 @@ export const MealLogFormScreen = () => {
       return;
     }
 
-    const missingDbIngredient = ingredients.some(ingredient => !ingredient.external_id);
+    const missingDbIngredient = ingredients.some(ingredient => !canResolveRecipeIngredient(ingredient));
     if (missingDbIngredient) {
       Alert.alert(
         t('nutrition.saveRecipeNeedsDatabaseIngredientsTitle'),
@@ -1081,6 +1289,8 @@ export const MealLogFormScreen = () => {
       return;
     }
 
+    setIsSaving(true);
+
     try {
       const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
@@ -1088,9 +1298,21 @@ export const MealLogFormScreen = () => {
         return;
       }
 
+      const resolvedRecipeIngredientIds = await Promise.all(
+        ingredients.map(ingredient => resolveRecipeIngredientId(ingredient)),
+      );
+
+      if (resolvedRecipeIngredientIds.some(ingredientId => !ingredientId)) {
+        Alert.alert(
+          t('nutrition.saveRecipeNeedsDatabaseIngredientsTitle'),
+          t('nutrition.saveRecipeNeedsDatabaseIngredientsMessage'),
+        );
+        return;
+      }
+
       const normalizedName = normalizeName(name.trim());
       let recipeId = editingSavedRecipeId;
-      const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients);
+      const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients, name.trim());
 
       if (recipeId) {
         if (!editingSavedRecipeUpdatedAt) {
@@ -1169,9 +1391,9 @@ export const MealLogFormScreen = () => {
 
       const recipeItemsPayload = ingredients.map((ingredient, index) => ({
         recipe_id: recipeId as string,
-        ingredient_id: ingredient.external_id as string,
+        ingredient_id: resolvedRecipeIngredientIds[index] as string,
         order_index: index,
-        quantity: ingredient.amount_g || 0,
+        quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g' as const,
       }));
 
@@ -1202,6 +1424,8 @@ export const MealLogFormScreen = () => {
     } catch (error) {
       console.error('[MealLogForm] Error saving recipe:', error);
       Alert.alert(t('common.error'), t('nutrition.saveMealError'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1230,6 +1454,7 @@ export const MealLogFormScreen = () => {
       source: 'database',
       itemType: 'recipe',
       recipe_source: 'user',
+      quality_score: recipe.quality_score,
       amount_g: totalRecipeAmount || 100,
       // Keep parity with recipe search service: kcal as integer, macros with 1 decimal.
       kcal_100: Math.round(totalMacros.kcal * scaleTo100g),
@@ -1252,7 +1477,7 @@ export const MealLogFormScreen = () => {
       ingredient_name: ingredient.name,
       ingredient_name_es: ingredient.name,
       ingredient_name_en: ingredient.name,
-      quantity: ingredient.amount_g || 0,
+      quantity: roundIngredientAmount(ingredient.amount_g || 0),
       unit: 'g',
       order_index: index,
       kcal_100: ingredient.kcal_100 || 0,
@@ -1372,7 +1597,7 @@ export const MealLogFormScreen = () => {
 
   const handleStartEdit = (ing: MealComponent) => {
     setEditingIngredientId(ing.id);
-    setEditAmountInput((ing.amount_g || 0).toString());
+    setEditAmountInput(formatIngredientAmount(ing.amount_g || 0));
   };
 
   const handleCancelEdit = () => {
@@ -1381,9 +1606,8 @@ export const MealLogFormScreen = () => {
   };
 
   const handleSaveEdit = () => {
-    if (!editAmountInput) return;
-    const amount = parseFloat(editAmountInput);
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = parseIngredientAmountInput(editAmountInput);
+    if (amount == null) return;
 
     setIngredients(prev =>
       prev.map(ing => {
@@ -1403,14 +1627,15 @@ export const MealLogFormScreen = () => {
   };
 
   const handleAddIngredient = () => {
-    if (!amountInput) return;
-    const amount = parseFloat(amountInput);
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = parseIngredientAmountInput(amountInput);
+    if (amount == null) return;
 
     let newIngredient: MealComponent;
 
     if (inputMode === 'manual') {
       if (!manualIngName) return;
+      if (!isManualIngredientFormComplete) return;
+
       newIngredient = {
         id: Date.now().toString(),
         name: manualIngName,
@@ -1429,7 +1654,9 @@ export const MealLogFormScreen = () => {
         amount_g: amount,
         source: selectedFood.source,
         external_id: selectedFood.external_id,
+        category: toFoodCategory(selectedFood.category),
         brand: selectedFood.brand,
+        barcode: selectedFood.barcode,
         kcal_100: selectedFood.kcal_100,
         protein_g_100: selectedFood.protein_g_100,
         carbs_g_100: selectedFood.carbs_g_100,
@@ -1450,6 +1677,7 @@ export const MealLogFormScreen = () => {
     setSelectedFood(null);
     setSelectedFood(null);
     setManualPer100g({ kcal_100: 0, protein_g_100: 0, carbs_g_100: 0, fat_g_100: 0 });
+    setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
   };
 
   const handleRemoveIngredient = (id: string) => {
@@ -1510,7 +1738,7 @@ export const MealLogFormScreen = () => {
 
       const ingredientsPayload = ingredients.map(ing => ({
         name: ing.name,
-        quantity_g: ing.amount_g || 0,
+        quantity_g: roundIngredientAmount(ing.amount_g || 0),
         source: ing.source,
         source_ref: ing.external_id,
         kcal_100: ing.kcal_100,
@@ -1537,6 +1765,12 @@ export const MealLogFormScreen = () => {
 
   const renderPublicRecipeCard = (recipe: MealComponent) => {
     const isFavorite = recipe.external_id ? favoriteRecipeIds.includes(recipe.external_id) : false;
+    const macroSummary = t('nutrition.recipeMacroSummaryDetailed', {
+      kcal: Math.round(recipe.kcal_100 || 0),
+      protein: Number((recipe.protein_g_100 || 0).toFixed(1)),
+      carbs: Number((recipe.carbs_g_100 || 0).toFixed(1)),
+      fat: Number((recipe.fat_g_100 || 0).toFixed(1)),
+    });
 
     return (
       <View
@@ -1548,11 +1782,9 @@ export const MealLogFormScreen = () => {
             {recipe.name}
           </Text>
         </View>
-        {typeof recipe.description === 'string' && recipe.description.trim().length > 0 && (
-          <Text style={[styles.recipeLibraryDescription, { color: themeColors.textSecondary }]} numberOfLines={2}>
-            {recipe.description}
-          </Text>
-        )}
+        <Text style={[styles.recipeLibraryMacroText, { color: themeColors.textSecondary }]} numberOfLines={1}>
+          {macroSummary}
+        </Text>
         <View style={styles.recipeCardActions}>
           <TouchableOpacity
             style={styles.recipeCardActionBtn}
@@ -2261,14 +2493,14 @@ export const MealLogFormScreen = () => {
                                         },
                                       ]}
                                       value={editAmountInput}
-                                      onChangeText={setEditAmountInput}
-                                      keyboardType="numeric"
+                                      onChangeText={value => setEditAmountInput(sanitizeIngredientAmountInput(value))}
+                                      keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                       autoFocus
                                       selectTextOnFocus
                                     />
                                     <Text style={[styles.editUnit, { color: themeColors.textSecondary }]}>g</Text>
                                   </View>
-                                  {parseFloat(editAmountInput) > 1000 && (
+                                  {isIngredientAmountOverLimit(editAmountInput) && (
                                     <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4 }}>
                                       {t('nutrition.max1kgLabel')}
                                     </Text>
@@ -2277,7 +2509,7 @@ export const MealLogFormScreen = () => {
                               ) : (
                                 <View style={styles.ingredientMeta}>
                                   <Text style={[styles.ingredientAmount, { color: themeColors.primary }]}>
-                                    {ing.amount_g}g
+                                    {formatIngredientAmount(ing.amount_g || 0)}g
                                   </Text>
                                   <View style={styles.dot} />
                                   <Text style={[styles.ingredientSource, { color: themeColors.textSecondary }]}>
@@ -2292,8 +2524,11 @@ export const MealLogFormScreen = () => {
                                 <>
                                   <TouchableOpacity
                                     onPress={handleSaveEdit}
-                                    style={[styles.actionBtn, parseFloat(editAmountInput) > 1000 && { opacity: 0.5 }]}
-                                    disabled={parseFloat(editAmountInput) > 1000}
+                                    style={[
+                                      styles.actionBtn,
+                                      isIngredientAmountOverLimit(editAmountInput) && { opacity: 0.5 },
+                                    ]}
+                                    disabled={isIngredientAmountOverLimit(editAmountInput)}
                                   >
                                     <Check size={20} color={themeColors.primary} strokeWidth={2.5} />
                                   </TouchableOpacity>
@@ -2329,19 +2564,31 @@ export const MealLogFormScreen = () => {
                     style={[
                       styles.recipeBuilderSaveButton,
                       {
-                        backgroundColor: canSubmitRecipe
-                          ? themeColors.primary
-                          : isDark
-                            ? 'rgba(255,255,255,0.14)'
-                            : 'rgba(0,0,0,0.12)',
+                        backgroundColor:
+                          canSubmitRecipe && !isSaving
+                            ? themeColors.primary
+                            : isDark
+                              ? 'rgba(255,255,255,0.14)'
+                              : 'rgba(0,0,0,0.12)',
                       },
                     ]}
                     onPress={handleSaveCurrentRecipe}
-                    disabled={!canSubmitRecipe}
+                    disabled={!canSubmitRecipe || isSaving}
                   >
-                    <Text style={styles.recipeBuilderSaveButtonText}>
-                      {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
-                    </Text>
+                    <View style={styles.recipeBuilderSaveButtonContent}>
+                      {isSaving ? (
+                        <>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.recipeBuilderSaveButtonText}>
+                            {isEditingRecipe ? t('nutrition.updatingRecipeAction') : t('nutrition.savingRecipeAction')}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.recipeBuilderSaveButtonText}>
+                          {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                   <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
                     {t('nutrition.saveRecipeHint')}
@@ -2468,8 +2715,8 @@ export const MealLogFormScreen = () => {
                                   },
                                 ]}
                                 value={amountInput}
-                                onChangeText={setAmountInput}
-                                keyboardType="numeric"
+                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                 placeholder="100"
                                 placeholderTextColor={themeColors.textSecondary}
                                 selectTextOnFocus
@@ -2479,17 +2726,17 @@ export const MealLogFormScreen = () => {
                                 onPress={handleAddIngredient}
                                 style={[
                                   styles.addBtn,
-                                  parseFloat(amountInput) > 1000 && {
+                                  isIngredientAmountOverLimit(amountInput) && {
                                     backgroundColor: themeColors.textSecondary,
                                     opacity: 0.5,
                                   },
                                 ]}
-                                disabled={parseFloat(amountInput) > 1000}
+                                disabled={isIngredientAmountOverLimit(amountInput)}
                               >
                                 <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
                               </TouchableOpacity>
                             </View>
-                            {parseFloat(amountInput) > 1000 && (
+                            {isIngredientAmountOverLimit(amountInput) && (
                               <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
                                 {t('nutrition.maxInputLimit1kg')}
                               </Text>
@@ -2586,8 +2833,8 @@ export const MealLogFormScreen = () => {
                                   },
                                 ]}
                                 value={amountInput}
-                                onChangeText={setAmountInput}
-                                keyboardType="numeric"
+                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                 placeholder="100"
                                 placeholderTextColor={themeColors.textSecondary}
                                 selectTextOnFocus
@@ -2597,17 +2844,17 @@ export const MealLogFormScreen = () => {
                                 onPress={handleAddIngredient}
                                 style={[
                                   styles.addBtn,
-                                  parseFloat(amountInput) > 1000 && {
+                                  isIngredientAmountOverLimit(amountInput) && {
                                     backgroundColor: themeColors.textSecondary,
                                     opacity: 0.5,
                                   },
                                 ]}
-                                disabled={parseFloat(amountInput) > 1000}
+                                disabled={isIngredientAmountOverLimit(amountInput)}
                               >
                                 <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
                               </TouchableOpacity>
                             </View>
-                            {parseFloat(amountInput) > 1000 && (
+                            {isIngredientAmountOverLimit(amountInput) && (
                               <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
                                 {t('nutrition.maxInputLimit1kg')}
                               </Text>
@@ -2643,12 +2890,12 @@ export const MealLogFormScreen = () => {
                             },
                           ]}
                           value={amountInput}
-                          onChangeText={setAmountInput}
-                          keyboardType="numeric"
+                          onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                          keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                           placeholder={t('nutrition.weightGrams')}
                           placeholderTextColor={themeColors.textSecondary}
                         />
-                        {parseFloat(amountInput) > 1000 && (
+                        {isIngredientAmountOverLimit(amountInput) && (
                           <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -8, marginBottom: 4 }}>
                             {t('nutrition.maxInputLimit1kg')}
                           </Text>
@@ -2671,14 +2918,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.kcal_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, kcal_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  kcal_100: parseEnergyToKcal(parseFloat(t) || 0),
-                                })
-                              }
+                                  kcal_100: parseEnergyToKcal(parseManualMacroInput(value) ?? 0),
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2695,14 +2945,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.protein_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, protein_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  protein_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  protein_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2719,14 +2972,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.carbs_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, carbs_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  carbs_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  carbs_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2743,27 +2999,35 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.fat_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, fat_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  fat_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  fat_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                         </View>
+                        {shouldShowManualIngredientNutritionWarning && (
+                          <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 6 }}>
+                            {t('nutrition.manualIngredientNutritionInvalid')}
+                          </Text>
+                        )}
                         <TouchableOpacity
                           onPress={handleAddIngredient}
                           style={[
                             styles.manualAddButton,
-                            parseFloat(amountInput) > 1000 && {
+                            !isManualIngredientFormComplete && {
                               backgroundColor: themeColors.textSecondary,
                               opacity: 0.5,
                             },
                           ]}
-                          disabled={parseFloat(amountInput) > 1000}
+                          disabled={!isManualIngredientFormComplete}
                         >
                           <Text style={styles.manualAddButtonText}>{t('nutrition.addIngredient')}</Text>
                         </TouchableOpacity>
@@ -2933,11 +3197,18 @@ export const MealLogFormScreen = () => {
                   </Text>
                 )}
                 {recipeLibraryView !== 'search' &&
-                  ((
-                    recipeLibraryView === 'favorites'
-                      ? paginatedFavoriteLibraryRecipes.length === 0
-                      : filteredDisplayedSavedRecipes.length === 0
-                  ) ? (
+                  (isRecipeLibraryLoading ? (
+                    <View style={styles.recipesLoadingRow}>
+                      <ActivityIndicator size="small" color={themeColors.primary} />
+                      <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
+                        {t('common.loading')}
+                      </Text>
+                    </View>
+                  ) : (
+                      recipeLibraryView === 'favorites'
+                        ? paginatedFavoriteLibraryRecipes.length === 0
+                        : filteredDisplayedSavedRecipes.length === 0
+                    ) ? (
                     <View
                       style={[
                         styles.recipeEmptyState,
@@ -3013,14 +3284,7 @@ export const MealLogFormScreen = () => {
                   </>
                 ) : (
                   <>
-                    {isRecipeLibraryLoading ? (
-                      <View style={styles.recipesLoadingRow}>
-                        <ActivityIndicator size="small" color={themeColors.primary} />
-                        <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
-                          {t('common.loading')}
-                        </Text>
-                      </View>
-                    ) : !hasDiscoveryResults ? (
+                    {!isRecipeLibraryLoading && !hasDiscoveryResults ? (
                       <View
                         style={[
                           styles.recipeEmptyState,
@@ -3031,7 +3295,7 @@ export const MealLogFormScreen = () => {
                           {t('nutrition.discoveryRecipesEmpty')}
                         </Text>
                       </View>
-                    ) : (
+                    ) : !isRecipeLibraryLoading ? (
                       displayedDiscoverySections.map(section => {
                         if (section.recipes.length === 0) {
                           return null;
@@ -3052,7 +3316,7 @@ export const MealLogFormScreen = () => {
                           </View>
                         );
                       })
-                    )}
+                    ) : null}
                   </>
                 )}
                 {recipeLibraryView !== 'search' && savedRecipesTotalPages > 1 && (
@@ -3365,7 +3629,7 @@ export const MealLogFormScreen = () => {
                               {ing.ingredient_name}
                             </Text>
                             <Text style={[styles.macroValue, { color: themeColors.textSecondary }]}>
-                              {ing.quantity}g
+                              {formatIngredientAmount(ing.quantity)}g
                             </Text>
                           </View>
                         ))}
@@ -3626,6 +3890,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  recipeBuilderSaveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   recipeBuilderSaveButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
@@ -3770,6 +4039,11 @@ const styles = StyleSheet.create({
   },
   recipeLibraryDescription: {
     fontSize: 12,
+    lineHeight: 17,
+  },
+  recipeLibraryMacroText: {
+    fontSize: 12,
+    fontWeight: '600',
     lineHeight: 17,
   },
   recipeCardActions: {
