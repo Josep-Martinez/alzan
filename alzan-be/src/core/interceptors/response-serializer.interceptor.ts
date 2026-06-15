@@ -19,6 +19,14 @@ export class ResponseSerializerInterceptor implements NestInterceptor {
       map(res => {
         const httpResponse = context.switchToHttp().getResponse<Response>();
 
+        // Handlers that write the response themselves via @Res() (e.g. the OAuth
+        // callback redirect) have already flushed headers. There is nothing to
+        // serialize, and the response value must be passed through untouched —
+        // otherwise this interceptor throws on the missing @ApiResponse metadata.
+        if (httpResponse.headersSent) {
+          return res;
+        }
+
         const responseMetadata = this.reflector.get<ApiResponseMetadata[]>(API_RESPONSE_KEY, context.getHandler());
         const apiResponseForStatus = responseMetadata?.[httpResponse.statusCode];
 

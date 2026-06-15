@@ -52,6 +52,18 @@ const verificationCases: VerificationCase[] = [
   },
   {
     kind: 'service',
+    provider: 'suunto',
+    check: 'canonical activity writer persists dense stream samples in transport-safe chunks',
+    specFile: 'src/components/wearables/services/canonical-activity-writer.service.spec.ts',
+  },
+  {
+    kind: 'service',
+    provider: 'suunto',
+    check: 'Suunto cloud sync only imports workout summaries from the last 30 days',
+    specFile: 'src/components/wearables/services/suunto-cloud-sync.service.spec.ts',
+  },
+  {
+    kind: 'service',
     provider: 'matching',
     check: 'endurance template match scoring (structural and totals)',
     specFile: 'src/components/activity-import/matching/endurance-template-match.spec.ts',

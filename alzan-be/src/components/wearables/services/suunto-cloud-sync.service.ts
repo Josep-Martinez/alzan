@@ -30,6 +30,8 @@ export interface SuuntoSyncResult {
 
 const WORKOUT_LOOKBACK_DAYS = 30;
 const WORKOUT_LIST_LIMIT = 100;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
 @Injectable()
 export class SuuntoCloudSyncService {
@@ -106,15 +108,62 @@ export class SuuntoCloudSyncService {
   }
 
   private async fetchWorkoutSummaries(accessToken: string): Promise<JsonRecord[]> {
-    const since = Date.now() - WORKOUT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const since = this.getWorkoutLookbackStartMs();
     const response = await this.getSuunto<JsonRecord | JsonRecord[]>('/v2/workouts', accessToken, {
       since: String(since),
       limit: String(WORKOUT_LIST_LIMIT),
     });
-    if (Array.isArray(response)) return response.filter(this.isRecord);
+    if (Array.isArray(response)) return this.filterRecentWorkoutSummaries(response);
     const workouts = response.payload ?? response.workouts ?? response.data;
-    if (Array.isArray(workouts)) return workouts.filter(this.isRecord);
+    if (Array.isArray(workouts)) return this.filterRecentWorkoutSummaries(workouts);
     return [];
+  }
+
+  private filterRecentWorkoutSummaries(values: unknown[]): JsonRecord[] {
+    const since = this.getWorkoutLookbackStartMs();
+    return values.filter(this.isRecord).filter(workout => this.isWorkoutWithinLookback(workout, since));
+  }
+
+  private isWorkoutWithinLookback(workout: JsonRecord, sinceMs: number): boolean {
+    const startedAtMs = this.readWorkoutStartedAtMs(workout);
+    return startedAtMs != null && startedAtMs >= sinceMs;
+  }
+
+  private getWorkoutLookbackStartMs(): number {
+    return Date.now() - WORKOUT_LOOKBACK_DAYS * MS_PER_DAY;
+  }
+
+  private readWorkoutStartedAtMs(workout: JsonRecord): number | null {
+    return this.readTimestampMs(
+      workout.startTime ??
+        workout.start_time ??
+        workout.startedAt ??
+        workout.started_at ??
+        workout.startDate ??
+        workout.start_date ??
+        workout.startDateTime ??
+        workout.start_date_time ??
+        workout.date ??
+        workout.timestamp ??
+        workout.startTimeInSeconds ??
+        workout.StartTimeInSeconds,
+    );
+  }
+
+  private readTimestampMs(value: unknown): number | null {
+    if (typeof value === 'number') return this.normalizeEpochMs(value);
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numericValue = Number(trimmed);
+    if (Number.isFinite(numericValue) && /^\d+(\.\d+)?$/.test(trimmed)) return this.normalizeEpochMs(numericValue);
+    const parsedMs = Date.parse(trimmed);
+    return Number.isFinite(parsedMs) ? parsedMs : null;
+  }
+
+  private normalizeEpochMs(value: number): number | null {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value < EPOCH_MS_THRESHOLD ? value * 1000 : value;
   }
 
   private async fetchWorkoutFit(accessToken: string, workoutKey: string): Promise<Uint8Array> {

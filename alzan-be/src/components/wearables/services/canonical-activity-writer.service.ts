@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { Json } from '../../../types/database.types';
 import { Database, Insert, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
@@ -29,7 +29,8 @@ type ActivityProviderFieldsInsert = Insert<'activity_provider_fields'>;
 type StreamType = Database['public']['Enums']['stream_type_enum'];
 
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
-const INSERT_CHUNK_SIZE = 1000;
+const DEFAULT_INSERT_CHUNK_SIZE = 1000;
+const STREAM_SAMPLE_INSERT_CHUNK_SIZE = 250;
 
 /**
  * Gym workouts can arrive from watches as either 'strength' or 'gym', and
@@ -43,6 +44,8 @@ function isStrengthSport(sportType: string | null | undefined): boolean {
 
 @Injectable()
 export class CanonicalActivityWriterService {
+  private readonly logger = new Logger(CanonicalActivityWriterService.name);
+
   constructor(
     private readonly supabaseAdminService: SupabaseAdminService,
     private readonly rawPayloadService: RawPayloadService,
@@ -526,10 +529,18 @@ export class CanonicalActivityWriterService {
     rows: T[],
     errorCode: string,
   ): Promise<void> {
-    for (let startIndex = 0; startIndex < rows.length; startIndex += INSERT_CHUNK_SIZE) {
-      const chunk = rows.slice(startIndex, startIndex + INSERT_CHUNK_SIZE);
+    const chunkSize = table === 'activity_stream_samples' ? STREAM_SAMPLE_INSERT_CHUNK_SIZE : DEFAULT_INSERT_CHUNK_SIZE;
+    for (let startIndex = 0; startIndex < rows.length; startIndex += chunkSize) {
+      const chunk = rows.slice(startIndex, startIndex + chunkSize);
       const { error } = await this.supabaseAdminService.client.from(table).insert(chunk);
-      if (error) throw new InternalServerErrorException(errorCode);
+      if (error) {
+        this.logger.error(
+          `${errorCode}: insert into ${table} failed for chunk [${startIndex}-${startIndex + chunk.length}] ` +
+            `(${rows.length} rows total) — code=${error.code ?? 'n/a'} message="${error.message}" ` +
+            `details="${error.details ?? ''}" hint="${error.hint ?? ''}"`,
+        );
+        throw new InternalServerErrorException(errorCode);
+      }
     }
   }
 }

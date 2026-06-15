@@ -17,8 +17,8 @@ Esta guía explica **qué hace cada comando** y **en qué orden** ejecutarlos. T
 
 El `.env` raíz es el único que se edita a mano. Los `.env` por paquete (`alzan-be/.env`, `alzan-fe/.env`) se **generan** a partir de él y **no deben editarse directamente**.
 
-| Comando | Para qué sirve |
-| --- | --- |
+| Comando         | Para qué sirve                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm env:sync` | Regenera `alzan-be/.env` y `alzan-fe/.env` desde el `.env` raíz. Se ejecuta solo antes de cada `start`, pero puedes lanzarlo a mano tras tocar el `.env`. |
 
 ---
@@ -30,30 +30,35 @@ Flujo normal del día a día. Levanta una Supabase local en Docker y la app apun
 **Orden:**
 
 1. **Levantar Supabase local** (Postgres + Auth + Studio):
+
    ```bash
    pnpm supabase start
    ```
+
    - API: `http://127.0.0.1:54321` · Studio: `http://127.0.0.1:54323` · DB: `54322`.
 
 2. **Aplicar migraciones + seeds y regenerar tipos** (primera vez o tras cambios de esquema):
+
    ```bash
    pnpm supabase db reset      # aplica supabase/migrations/ + supabase/seeds/*.sql
    pnpm run supabase:types     # regenera los tipos DB desde la instancia local
    ```
+
    - `db reset` reconstruye la DB local aplicando `supabase/migrations/` y luego `supabase/seeds/*.sql`.
    - `supabase:types` genera `supabase/database.types.ts` desde la instancia local y lo copia a BE y FE (ver detalle en la sección 2). Se ejecuta **después** del reset.
 
 3. **Arrancar la app** (elige una):
 
-   | Comando | Qué arranca |
-   | --- | --- |
-   | `pnpm start` | BE (NestJS watch) + FE (Expo dev server). Desde Expo abres iOS / Android / Web. |
-   | `pnpm start:web` | BE + FE en **web** (Expo web en `FE_PORT`, por defecto `8082`). |
-   | `pnpm start:be` | Solo el backend. |
-   | `pnpm start:fe` | Solo el frontend (Expo dev server). |
-   | `pnpm start:fe:web` | Solo el frontend en web. |
+   | Comando             | Qué arranca                                                                     |
+   | ------------------- | ------------------------------------------------------------------------------- |
+   | `pnpm start`        | BE (NestJS watch) + FE (Expo dev server). Desde Expo abres iOS / Android / Web. |
+   | `pnpm start:web`    | BE + FE en **web** (Expo web en `FE_PORT`, por defecto `8082`).                 |
+   | `pnpm start:be`     | Solo el backend.                                                                |
+   | `pnpm start:fe`     | Solo el frontend (Expo dev server).                                             |
+   | `pnpm start:fe:web` | Solo el frontend en web.                                                        |
 
    **Simulador nativo iOS/Android** (build nativo, equivale al flujo manual):
+
    ```bash
    pnpm start:be                          # backend en una terminal
    pnpm --prefix alzan-fe exec expo run:ios     # o expo run:android, en otra terminal
@@ -80,11 +85,11 @@ pnpm supabase:types
 
 Genera `supabase/database.types.ts` desde la instancia **local** y lo copia (junto con `requests.types.ts`) a `alzan-be/src/types/` y `alzan-fe/src/types/`, y formatea.
 
-| Sub-comando | Qué hace (normalmente no se llama a mano) |
-| --- | --- |
-| `pnpm supabase:gen` | Genera `database.types.ts` desde la DB local. |
-| `pnpm copy:db:types` | Copia `database.types.ts` a BE y FE. |
-| `pnpm copy:request:types` | Copia `requests.types.ts` a BE y FE. |
+| Sub-comando               | Qué hace (normalmente no se llama a mano)     |
+| ------------------------- | --------------------------------------------- |
+| `pnpm supabase:gen`       | Genera `database.types.ts` desde la DB local. |
+| `pnpm copy:db:types`      | Copia `database.types.ts` a BE y FE.          |
+| `pnpm copy:request:types` | Copia `requests.types.ts` a BE y FE.          |
 
 ### b) Cliente API del frontend (tras tocar controllers/DTOs del BE)
 
@@ -128,13 +133,13 @@ Las migraciones de `supabase/migrations/` llegan a la nube con `supabase db push
 
 ### Comandos
 
-| Comando | Qué arranca (contra cloud) |
-| --- | --- |
-| `pnpm start:web:cloud` | BE + FE en **web** contra cloud. Comando principal. |
-| `pnpm start:be:cloud` | Solo el backend contra cloud. |
-| `pnpm ios:cloud` | Simulador **iOS** contra cloud (`expo run:ios`). |
-| `pnpm android:cloud` | Simulador **Android** contra cloud (`expo run:android`). |
-| `pnpm env:sync:cloud` | Regenera los `.env` por paquete con los valores de `.env.cloud` (lo hacen los comandos anteriores automáticamente). |
+| Comando                | Qué arranca (contra cloud)                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `pnpm start:web:cloud` | BE + FE en **web** contra cloud. Comando principal.                                                                 |
+| `pnpm start:be:cloud`  | Solo el backend contra cloud.                                                                                       |
+| `npx expo run:ios`     | Simulador **iOS** contra cloud (`expo run:ios`).                                                                    |
+| `pnpm android:cloud`   | Simulador **Android** contra cloud (`expo run:android`).                                                            |
+| `pnpm env:sync:cloud`  | Regenera los `.env` por paquete con los valores de `.env.cloud` (lo hacen los comandos anteriores automáticamente). |
 
 Cómo funciona: `.env.cloud` se **superpone** al `.env` raíz, sobrescribiendo **solo** las claves de Supabase; los puertos, el `BACKEND_URL` y el OAuth siguen en local (el backend corre en tu máquina, solo cambia la base de datos a la nube).
 
@@ -159,13 +164,13 @@ Cualquier comando local (`pnpm start`, `pnpm start:web`, `pnpm env:sync`) **rest
 
 ## 4. Calidad y verificación (tras cualquier cambio de código)
 
-| Comando | Qué hace |
-| --- | --- |
-| `pnpm format` | Formatea BE y FE (Prettier). Ejecútalo primero. |
-| `pnpm run lint:check` | Lint de BE y FE. Solo un exit code distinto de 0 es fallo; los warnings se ignoran. |
-| `pnpm typecheck` | `tsc --noEmit` en BE y FE. |
-| `pnpm verify:activity-import` | Suite de verificación de importación de actividades. |
-| `pnpm verify:import-review` | Verificación del flujo de import-review. |
+| Comando                       | Qué hace                                                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm format`                 | Formatea BE y FE (Prettier). Ejecútalo primero.                                     |
+| `pnpm run lint:check`         | Lint de BE y FE. Solo un exit code distinto de 0 es fallo; los warnings se ignoran. |
+| `pnpm typecheck`              | `tsc --noEmit` en BE y FE.                                                          |
+| `pnpm verify:activity-import` | Suite de verificación de importación de actividades.                                |
+| `pnpm verify:import-review`   | Verificación del flujo de import-review.                                            |
 
 **Orden recomendado tras cambios:** `pnpm format` → `pnpm run lint:check` (→ `pnpm typecheck`).
 </content>
