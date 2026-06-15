@@ -73,6 +73,21 @@ function sampleCoords(coords: LatLngTuple[], maxPoints: number): LatLngTuple[] {
   return sampled;
 }
 
+function isValidLatLng([lat, lon]: LatLngTuple): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+function sanitizeCoords(coords: LatLngTuple[]): LatLngTuple[] {
+  const cleaned: LatLngTuple[] = [];
+  for (const coord of coords) {
+    if (!isValidLatLng(coord)) continue;
+    const previous = cleaned[cleaned.length - 1];
+    if (previous && previous[0] === coord[0] && previous[1] === coord[1]) continue;
+    cleaned.push(coord);
+  }
+  return cleaned.length >= 2 ? cleaned : [];
+}
+
 export const RouteMap: React.FC<RouteMapProps> = ({
   polyline,
   height = 200,
@@ -85,7 +100,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
     if (!polyline) return null;
 
     try {
-      const decoded = decodePolyline(polyline);
+      const decoded = sanitizeCoords(decodePolyline(polyline));
       if (decoded.length < 2) return null;
 
       const sampled = sampleCoords(decoded, 1500);

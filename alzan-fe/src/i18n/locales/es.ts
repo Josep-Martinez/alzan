@@ -1474,6 +1474,15 @@ export default {
     importNoKeepBoth: 'No, mantener ambos',
     importDuplicateSubtle: 'Ya tienes otro entreno de {{sport}} hoy.',
     importMergeManually: 'Fusionar con el otro entreno',
+    importWatchActivity: 'Actividad del reloj',
+    importExistingWorkout: 'Entreno de Alzan',
+    importMergeExplanation:
+      'Conservaremos el entreno de Alzan, añadiremos los datos del reloj y eliminaremos el duplicado importado.',
+    importStrengthMergeExplanation:
+      'Conservaremos tu entreno de Alzan con sus ejercicios y series, añadiremos los datos del reloj y eliminaremos el duplicado importado.',
+    importMergeKeepExisting: 'Fusionar',
+    importSessionSets: '{{count}} series',
+    importSessionKcal: '{{kcal}} kcal',
     importSuggestedTemplate: 'Parece que este entreno podría ser: {{templateName}}',
     importAssociate: 'Asociar',
     importKeepGeneric: 'Mantener genérico',
@@ -1498,6 +1507,7 @@ export default {
     importKeepMine: 'Mantener los míos',
     importMultipleStrengthPrompt: 'Hoy tienes varios entrenos de fuerza. ¿Este del reloj corresponde a alguno?',
     importAssignToSession: 'Asociar a {{name}}',
+    importAssignToSessionKeepingData: 'Asociar a {{name}} y conservar sus series',
     importKeepAsNew: 'Mantener como entreno nuevo',
     importRenameActivity: 'Cambiar nombre',
     importRenamePlaceholder: 'Nombre de la actividad',

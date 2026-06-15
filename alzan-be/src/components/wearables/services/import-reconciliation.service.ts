@@ -35,8 +35,12 @@ type ActivityLapRow = Row<'activity_laps'>;
 type MatchMethod = 'structural' | 'totals';
 
 export type StrengthWriteDirective =
-  | { kind: 'insert'; extraFields: Partial<ActivitySessionInsert> }
+  | { kind: 'insert'; extraFields: Partial<ActivitySessionInsert>; autoMerge?: boolean }
   | { kind: 'associate'; targetSessionId: string; payload: ActivitySessionUpdate };
+
+export type EnduranceWriteDirective =
+  | { kind: 'insert'; runTemplateMatch: boolean }
+  | { kind: 'associate'; targetSessionId: string };
 
 interface TemplateMatchResult {
   templateId: string;
@@ -76,17 +80,18 @@ export class ImportReconciliationService {
   }
 
   /**
-   * Endurance (non-strength) reconciliation, executed after the imported
-   * session and its laps are persisted: duplicate detection against the same
-   * sport on the same day, then template matching unless a strong duplicate
-   * is pending. Never throws (the session must survive regardless).
+   * Resolves non-strength imports before writing. Strong same-day duplicates
+   * update the existing Alzan session directly, so a second visible card is
+   * never created just to be merged later. Weak/doubtful matches become a new
+   * generic imported workout.
    */
-  public async reconcileEnduranceAfterInsert(userId: string, sessionId: string): Promise<void> {
+  public async resolveEnduranceDirective(
+    userId: string,
+    activity: CanonicalActivity,
+  ): Promise<EnduranceWriteDirective> {
     try {
-      const session = await this.getSession(userId, sessionId);
-      if (!session) return;
-      const candidates = (await this.findTodaysSessions(userId, [session.sport_type], session, sessionId)).filter(
-        candidate => candidate.status === 'completed',
+      const candidates = (await this.findTodaysSessions(userId, [activity.sportType], activity)).filter(
+        candidate => candidate.status !== 'cancelled',
       );
       const plan = planEnduranceReconciliation(
         candidates.map(candidate => ({
@@ -97,25 +102,22 @@ export class ImportReconciliationService {
           endTime: candidate.end_time,
         })),
         {
-          distanceM: session.distance_m,
-          durationS: session.duration_s,
-          startTime: session.start_time,
-          endTime: session.end_time,
+          distanceM: activity.summary.distanceM,
+          durationS: activity.summary.durationSeconds,
+          startTime: activity.summary.startedAt,
+          endTime: activity.summary.endedAt,
         },
       );
-
-      if (plan.duplicateOfSessionId != null) {
-        await this.updateSession(sessionId, {
-          duplicate_of_session_id: plan.duplicateOfSessionId,
-          duplicate_score: plan.duplicateScore,
-          duplicate_resolution: 'pending',
-        });
+      if (plan.duplicateOfSessionId != null && plan.autoMerge) {
+        return { kind: 'associate', targetSessionId: plan.duplicateOfSessionId };
       }
-      if (plan.runTemplateMatch) {
-        await this.runEnduranceTemplateMatch(userId, sessionId);
-      }
+      return { kind: 'insert', runTemplateMatch: plan.runTemplateMatch };
     } catch (error) {
-      this.logger.error(`Endurance reconciliation failed for session ${sessionId}`, error as Error);
+      this.logger.error(
+        `Endurance reconciliation failed for user ${userId}; importing as plain session`,
+        error as Error,
+      );
+      return { kind: 'insert', runTemplateMatch: true };
     }
   }
 
@@ -175,6 +177,32 @@ export class ImportReconciliationService {
     });
   }
 
+  /**
+   * When a watch activity is written straight onto an existing Alzan session,
+   * mark the corresponding calendar plan completed too. The method is
+   * best-effort so a plan bookkeeping problem never blocks the import.
+   */
+  public async completePlansForAssociatedSession(userId: string, sessionId: string): Promise<void> {
+    try {
+      const session = await this.getSession(userId, sessionId);
+      if (!session) return;
+      const localDate = (session.started_at_local ?? session.start_time).slice(0, 10);
+      await this.completePlansBySessionId(userId, sessionId);
+      if (session.endurance_template_id) {
+        await this.completePlansByTemplate(userId, localDate, sessionId, {
+          endurance_template_id: session.endurance_template_id,
+        });
+      }
+      if (session.workout_template_id) {
+        await this.completePlansByTemplate(userId, localDate, sessionId, {
+          gym_template_id: session.workout_template_id,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Plan completion skipped for associated session ${sessionId}`, error as Error);
+    }
+  }
+
   /** Splits watch metrics vs an existing session into applicable/conflicting/previous. */
   public splitMetricsAgainstSession(session: ActivitySessionRow, activity: CanonicalActivity): StrengthMetricSplit {
     return splitStrengthMetrics(this.toStrengthLite(session), this.toWatchMetrics(activity));
@@ -203,11 +231,18 @@ export class ImportReconciliationService {
       case 'create_duplicate_pending':
         return {
           kind: 'insert',
+          autoMerge: plan.autoMerge,
           extraFields: {
             duplicate_of_session_id: plan.ofSessionId,
             duplicate_score: plan.score,
             duplicate_resolution: 'pending',
           },
+        };
+      case 'update_existing_external':
+        return {
+          kind: 'associate',
+          targetSessionId: plan.targetSessionId,
+          payload: this.buildStrengthWatchPayload(watch),
         };
       case 'associate': {
         // Watch wins by default: apply both the filled-in and the overriding
@@ -239,6 +274,27 @@ export class ImportReconciliationService {
         return { kind: 'associate', targetSessionId: plan.targetSessionId, payload };
       }
     }
+  }
+
+  private buildStrengthWatchPayload(watch: WatchStrengthMetrics): ActivitySessionUpdate {
+    return {
+      status: 'completed',
+      duration_s: watch.durationS,
+      end_time: watch.endTime,
+      calories_kcal: watch.caloriesKcal,
+      avg_heart_rate: watch.avgHeartRate,
+      max_heart_rate: watch.maxHeartRate,
+      min_heart_rate: watch.minHeartRate,
+      recovery_time_s: watch.recoveryTimeS,
+      epoc: watch.epoc,
+      pte: watch.pte,
+      tss_hr: watch.tssHr,
+      pending_watch_metrics: null,
+      duplicate_of_session_id: null,
+      duplicate_score: null,
+      duplicate_resolution: 'merged',
+      needs_strength_review: false,
+    };
   }
 
   private async scoreTemplates(
@@ -473,6 +529,42 @@ export class ImportReconciliationService {
       })
       .eq('id', planId)
       .eq('status', 'planned');
+    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
+  }
+
+  private async completePlansBySessionId(userId: string, sessionId: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client
+      .from('workout_plans')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        activity_session_id: sessionId,
+      })
+      .eq('user_id', userId)
+      .eq('activity_session_id', sessionId)
+      .eq('status', 'planned');
+    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
+  }
+
+  private async completePlansByTemplate(
+    userId: string,
+    localDate: string,
+    sessionId: string,
+    match: { endurance_template_id?: string; gym_template_id?: string },
+  ): Promise<void> {
+    let query = this.supabaseAdminService.client
+      .from('workout_plans')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        activity_session_id: sessionId,
+      })
+      .eq('user_id', userId)
+      .eq('planned_date', localDate)
+      .eq('status', 'planned');
+    if (match.endurance_template_id) query = query.eq('endurance_template_id', match.endurance_template_id);
+    if (match.gym_template_id) query = query.eq('gym_template_id', match.gym_template_id);
+    const { error } = await query;
     if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
   }
 

@@ -96,7 +96,7 @@ function assertCase4MultipleSessionsNeedReview(): void {
   assert.equal(plan.kind, 'create_needs_review');
 }
 
-function assertCase5ExistingExternalSessionIsDuplicatePending(): void {
+function assertCase5StrongExternalSessionUpdatesExisting(): void {
   const session = strengthSession({
     hasExternalData: true,
     durationS: 3600,
@@ -104,10 +104,24 @@ function assertCase5ExistingExternalSessionIsDuplicatePending(): void {
     avgHeartRate: 121,
   });
   const plan = planStrengthReconciliation([session], watchMetrics());
+  assert.equal(plan.kind, 'update_existing_external');
+  if (plan.kind !== 'update_existing_external') return;
+  assert.equal(plan.targetSessionId, 'session-a');
+  assert.ok(plan.score >= 80, `expected high duplicate score, got ${plan.score}`);
+}
+
+function assertCase5WeakExternalSessionNeedsReviewOnly(): void {
+  const session = strengthSession({
+    hasExternalData: true,
+    durationS: 1800,
+    caloriesKcal: 150,
+    avgHeartRate: 90,
+  });
+  const plan = planStrengthReconciliation([session], watchMetrics());
   assert.equal(plan.kind, 'create_duplicate_pending');
   if (plan.kind !== 'create_duplicate_pending') return;
-  assert.equal(plan.ofSessionId, 'session-a');
-  assert.ok(plan.score >= 80, `expected high duplicate score, got ${plan.score}`);
+  assert.ok(plan.score < 80, `expected weak duplicate score, got ${plan.score}`);
+  assert.equal(plan.autoMerge, false, 'weak imported strength duplicates should stay reviewable');
 }
 
 function assertCancelledSessionsAreIgnored(): void {
@@ -131,6 +145,7 @@ function assertEnduranceStrongDuplicateSkipsTemplateMatch(): void {
   assert.equal(plan.duplicateOfSessionId, 'existing');
   assert.ok((plan.duplicateScore ?? 0) >= 80);
   assert.equal(plan.runTemplateMatch, false);
+  assert.equal(plan.autoMerge, true);
 }
 
 function assertEnduranceWeakDuplicateStillMatchesTemplates(): void {
@@ -149,6 +164,7 @@ function assertEnduranceWeakDuplicateStillMatchesTemplates(): void {
   assert.equal(plan.duplicateOfSessionId, 'existing');
   assert.ok((plan.duplicateScore ?? 100) < 80);
   assert.equal(plan.runTemplateMatch, true);
+  assert.equal(plan.autoMerge, false);
 }
 
 function assertEnduranceNoSessionsRunsTemplateMatch(): void {
@@ -161,6 +177,30 @@ function assertEnduranceNoSessionsRunsTemplateMatch(): void {
   assert.equal(plan.duplicateOfSessionId, null);
   assert.equal(plan.duplicateScore, null);
   assert.equal(plan.runTemplateMatch, true);
+  assert.equal(plan.autoMerge, false);
+}
+
+function assertEnduranceShiftedWatchStartStillAutoMergesByMetrics(): void {
+  const plan = planEnduranceReconciliation(
+    [
+      {
+        id: 'existing-run',
+        distanceM: 8020,
+        durationS: 2488,
+        startTime: '2026-05-24T09:06:00Z',
+        endTime: null,
+      },
+    ],
+    {
+      distanceM: 8000,
+      durationS: 2488,
+      startTime: '2026-05-24T10:15:00Z',
+      endTime: null,
+    },
+  );
+  assert.equal(plan.duplicateOfSessionId, 'existing-run');
+  assert.ok((plan.duplicateScore ?? 0) >= 80, `expected strong shifted-start duplicate, got ${plan.duplicateScore}`);
+  assert.equal(plan.autoMerge, true);
 }
 
 function assertSameLocalDayPrefersLocalTimestamps(): void {
@@ -232,9 +272,11 @@ assertCase2NoConflictAppliesEverything();
 assertNearEqualValuesAreNotConflicts();
 assertCase3InProgressSessionAssociatesAndFinishes();
 assertCase4MultipleSessionsNeedReview();
-assertCase5ExistingExternalSessionIsDuplicatePending();
+assertCase5StrongExternalSessionUpdatesExisting();
+assertCase5WeakExternalSessionNeedsReviewOnly();
 assertCancelledSessionsAreIgnored();
 assertEnduranceStrongDuplicateSkipsTemplateMatch();
 assertEnduranceWeakDuplicateStillMatchesTemplates();
 assertEnduranceNoSessionsRunsTemplateMatch();
+assertEnduranceShiftedWatchStartStillAutoMergesByMetrics();
 assertSameLocalDayPrefersLocalTimestamps();

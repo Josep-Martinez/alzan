@@ -11,7 +11,7 @@
  * and asserts the resulting DB state never loses data or leaves duplicates,
  * then cleans everything up.
  */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { strict as assert } from 'assert';
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -113,6 +113,14 @@ async function main(): Promise<void> {
         distance_m: 10050,
         duration_s: 3010,
       });
+      await client.from('activity_route_points').insert({
+        session_id: imported,
+        user_id: userId,
+        point_index: 0,
+        lat: 39.47,
+        lon: -0.37,
+        source: 'wearable_import',
+      });
       const survivorId = await review.mergeDuplicate(userId, imported);
       assert.equal(survivorId, existing, 'survivor must be the existing session');
       assert.equal(await exists(imported), false, 'imported session must be deleted after merge');
@@ -130,7 +138,60 @@ async function main(): Promise<void> {
         .select('id', { count: 'exact', head: true })
         .eq('session_id', imported);
       assert.equal(orphanLaps ?? 0, 0, 'no laps left on deleted session');
-      pass('endurance merge: existing survives, laps moved, imported deleted');
+      const { count: routePointCount } = await client
+        .from('activity_route_points')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', existing);
+      assert.equal(routePointCount ?? 0, 1, 'imported route points moved onto survivor');
+      pass('endurance merge: existing survives, artifacts moved, imported deleted');
+    }
+
+    // --- Endurance AUTO-MERGE: strong pending duplicate is absorbed without user action ---
+    {
+      const existing = await insertSession({
+        sport_type: 'running',
+        distance_m: 8020,
+        duration_s: 2488,
+        name: 'Carrera',
+      });
+      const imported = await insertSession({
+        sport_type: 'running',
+        distance_m: 8000,
+        duration_s: 2488,
+        start_time: '2026-06-12T09:09:00Z',
+        provider: 'suunto',
+        provider_activity_id: `auto-run-${Date.now()}`,
+        source: 'imported',
+        imported_at: new Date().toISOString(),
+        duplicate_of_session_id: existing,
+        duplicate_score: 80,
+        duplicate_resolution: 'pending',
+      });
+      const survivorId = await review.autoMergeDuplicateIfStrong(userId, imported);
+      assert.equal(survivorId, existing, 'strong duplicate auto-merge keeps existing session');
+      assert.equal(await exists(imported), false, 'auto-merged imported duplicate is deleted');
+      assert.equal(await exists(existing), true, 'existing session survives auto-merge');
+      pass('endurance auto-merge: strong imported duplicate absorbed safely');
+    }
+
+    // --- Endurance WEAK DUPLICATE: stays reviewable/generic ---
+    {
+      const existing = await insertSession({ sport_type: 'running', distance_m: 5000, duration_s: 1500 });
+      const imported = await insertSession({
+        sport_type: 'running',
+        distance_m: 10000,
+        duration_s: 3000,
+        source: 'imported',
+        imported_at: new Date().toISOString(),
+        duplicate_of_session_id: existing,
+        duplicate_score: 50,
+        duplicate_resolution: 'pending',
+      });
+      const survivorId = await review.autoMergeDuplicateIfStrong(userId, imported);
+      assert.equal(survivorId, null, 'weak duplicate is not auto-merged');
+      assert.equal(await exists(existing), true);
+      assert.equal(await exists(imported), true);
+      pass('endurance weak duplicate: not auto-merged');
     }
 
     // --- Endurance KEEP BOTH: both survive ---
@@ -313,6 +374,7 @@ async function main(): Promise<void> {
     for (const id of createdSessionIds) {
       await client.from('workout_sets').delete().eq('session_id', id);
       await client.from('activity_laps').delete().eq('session_id', id);
+      await client.from('activity_route_points').delete().eq('session_id', id);
       await client.from('activity_sessions').delete().eq('id', id);
     }
     await client.auth.admin.deleteUser(userId);

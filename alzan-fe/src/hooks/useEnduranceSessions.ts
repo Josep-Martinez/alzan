@@ -20,6 +20,11 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     try {
       if (!user) return [];
       let query = supabase.from('activity_sessions').select('*').eq('user_id', user.id);
+      query = query
+        .eq('needs_strength_review', false)
+        .or(
+          'duplicate_resolution.is.null,duplicate_resolution.neq.pending,duplicate_score.lt.80,duplicate_score.is.null',
+        );
 
       // Apply date filters if provided
       if (options?.startDate) {
@@ -61,7 +66,14 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
   const fetchSessionsCount = async () => {
     if (!user) return 0;
 
-    let query = supabase.from('activity_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+    let query = supabase
+      .from('activity_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('needs_strength_review', false)
+      .or(
+        'duplicate_resolution.is.null,duplicate_resolution.neq.pending,duplicate_score.lt.80,duplicate_score.is.null',
+      );
 
     if (options?.startDate) {
       query = query.gte('start_time', options.startDate);

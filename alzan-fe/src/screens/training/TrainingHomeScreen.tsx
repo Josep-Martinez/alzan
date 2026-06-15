@@ -427,6 +427,10 @@ export const TrainingHomeScreen = () => {
         .from('activity_sessions')
         .select('id, sport_type, workout_template_id, start_time, name, source, distance_m, duration_s')
         .eq('user_id', user.id)
+        .eq('needs_strength_review', false)
+        .or(
+          'duplicate_resolution.is.null,duplicate_resolution.neq.pending,duplicate_score.lt.80,duplicate_score.is.null',
+        )
         .not('end_time', 'is', null) // Only completed sessions
         .gte('start_time', startOfDayStr)
         .lte('start_time', endOfDayStr);

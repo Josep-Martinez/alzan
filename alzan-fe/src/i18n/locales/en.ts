@@ -2049,6 +2049,14 @@ const en = {
     importNoKeepBoth: 'No, keep both',
     importDuplicateSubtle: 'You already have another {{sport}} workout today.',
     importMergeManually: 'Merge with the other workout',
+    importWatchActivity: 'Watch activity',
+    importExistingWorkout: 'Alzan workout',
+    importMergeExplanation: 'We will keep the Alzan workout, add the watch data and remove the imported duplicate.',
+    importStrengthMergeExplanation:
+      'We will keep your Alzan workout with its exercises and sets, add the watch data and remove the imported duplicate.',
+    importMergeKeepExisting: 'Merge',
+    importSessionSets: '{{count}} sets',
+    importSessionKcal: '{{kcal}} kcal',
     importSuggestedTemplate: 'This workout could be: {{templateName}}',
     importAssociate: 'Associate',
     importKeepGeneric: 'Keep generic',
@@ -2073,6 +2081,7 @@ const en = {
     importMultipleStrengthPrompt:
       'You have several strength workouts today. Does this one from the watch belong to any of them?',
     importAssignToSession: 'Associate with {{name}}',
+    importAssignToSessionKeepingData: 'Associate with {{name}} and keep its sets',
     importKeepAsNew: 'Keep as a new workout',
     importRenameActivity: 'Rename activity',
     importRenamePlaceholder: 'Activity name',

@@ -44,10 +44,10 @@ function createService(response: JsonRecord[]): {
   return { capturedRequest, service };
 }
 
-async function assertWorkoutSummariesAreLimitedToLastThirtyDays(): Promise<void> {
+async function assertWorkoutSummariesAreLimitedToLastTwentyDays(): Promise<void> {
   const originalNow = Date.now;
   const fixedNowMs = Date.parse('2026-06-15T10:00:00.000Z');
-  const cutoffMs = fixedNowMs - 30 * 24 * 60 * 60 * 1000;
+  const cutoffMs = fixedNowMs - 20 * 24 * 60 * 60 * 1000;
   Date.now = (): number => fixedNowMs;
   try {
     const { capturedRequest, service } = createService([
@@ -55,7 +55,7 @@ async function assertWorkoutSummariesAreLimitedToLastThirtyDays(): Promise<void>
       { startTime: new Date(cutoffMs).toISOString(), workoutKey: 'boundary-iso' },
       { startTimeInSeconds: Math.floor((fixedNowMs - 1000) / 1000), workoutKey: 'recent-seconds' },
       { startTime: fixedNowMs - 2000, workoutKey: 'recent-millis' },
-      { startTime: '2026-05-01T09:00:00.000Z', workoutKey: 'old-iso' },
+      { startTime: '2026-05-25T09:00:00.000Z', workoutKey: 'old-iso' },
       { workoutKey: 'undated' },
     ]);
 
@@ -74,7 +74,7 @@ async function assertWorkoutSummariesAreLimitedToLastThirtyDays(): Promise<void>
 }
 
 async function run(): Promise<void> {
-  await assertWorkoutSummariesAreLimitedToLastThirtyDays();
+  await assertWorkoutSummariesAreLimitedToLastTwentyDays();
 }
 
 void run();

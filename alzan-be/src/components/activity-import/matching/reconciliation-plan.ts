@@ -57,7 +57,8 @@ export interface StrengthMetricSplit {
 export type StrengthReconciliationPlan =
   | { kind: 'create_generic' }
   | { kind: 'create_needs_review' }
-  | { kind: 'create_duplicate_pending'; ofSessionId: string; score: number }
+  | { kind: 'create_duplicate_pending'; ofSessionId: string; score: number; autoMerge: false }
+  | { kind: 'update_existing_external'; targetSessionId: string; score: number }
   | { kind: 'associate'; targetSessionId: string; metrics: StrengthMetricSplit }
   | { kind: 'associate_finish'; targetSessionId: string };
 
@@ -79,7 +80,9 @@ export interface EnduranceActivityLite {
 export interface EnduranceReconciliationPlan {
   duplicateOfSessionId: string | null;
   duplicateScore: number | null;
-  /** False only for strong duplicates (>= threshold): match runs after the user keeps both. */
+  /** Strong duplicates are auto-mergeable; weak matches keep template matching enabled. */
+  autoMerge: boolean;
+  /** False only for strong duplicates (>= threshold): match runs only if both sessions survive. */
   runTemplateMatch: boolean;
 }
 
@@ -146,7 +149,15 @@ export function planStrengthReconciliation(
       caloriesKcal: session.caloriesKcal,
       avgHeartRate: session.avgHeartRate,
     });
-    return { kind: 'create_duplicate_pending', ofSessionId: session.id, score };
+    if (score >= DUPLICATE_THRESHOLD) {
+      return { kind: 'update_existing_external', targetSessionId: session.id, score };
+    }
+    return {
+      kind: 'create_duplicate_pending',
+      ofSessionId: session.id,
+      score,
+      autoMerge: false,
+    };
   }
   if (session.status === 'completed') {
     return { kind: 'associate', targetSessionId: session.id, metrics: splitStrengthMetrics(session, watch) };
@@ -177,12 +188,14 @@ export function planEnduranceReconciliation(
     }
   }
   if (bestId == null || bestScore == null) {
-    return { duplicateOfSessionId: null, duplicateScore: null, runTemplateMatch: true };
+    return { duplicateOfSessionId: null, duplicateScore: null, autoMerge: false, runTemplateMatch: true };
   }
+  const autoMerge = bestScore >= DUPLICATE_THRESHOLD;
   return {
     duplicateOfSessionId: bestId,
     duplicateScore: bestScore,
-    runTemplateMatch: bestScore < DUPLICATE_THRESHOLD,
+    autoMerge,
+    runTemplateMatch: !autoMerge,
   };
 }
 

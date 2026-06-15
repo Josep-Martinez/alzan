@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { Json } from '../../../types/database.types';
 import { Database, Insert, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
+import { DUPLICATE_THRESHOLD } from '../../activity-import/matching/duplicate-score';
 import {
   CanonicalActivity,
   CanonicalActivityMetricSample,
@@ -27,10 +28,26 @@ type ActivityRoutePointInsert = Insert<'activity_route_points'>;
 type ActivityStreamSampleInsert = Insert<'activity_stream_samples'>;
 type ActivityProviderFieldsInsert = Insert<'activity_provider_fields'>;
 type StreamType = Database['public']['Enums']['stream_type_enum'];
+type ChunkInsertError = {
+  code?: string | null;
+  details?: string | null;
+  hint?: string | null;
+  message?: string | null;
+};
+type ExistingSessionMeta = {
+  duplicate_of_session_id: string | null;
+  duplicate_resolution: string | null;
+  duplicate_score: number | null;
+  source: string | null;
+  sport_type: string;
+};
 
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
-const DEFAULT_INSERT_CHUNK_SIZE = 1000;
-const STREAM_SAMPLE_INSERT_CHUNK_SIZE = 250;
+const ROUTE_POINT_INSERT_CHUNK_SIZE = 200;
+const STREAM_SAMPLE_INSERT_CHUNK_SIZE = 100;
+const MIN_RETRY_INSERT_CHUNK_SIZE = 25;
+const INSERT_RETRY_BASE_DELAY_MS = 150;
+const INSERT_RETRY_ATTEMPTS = 3;
 
 /**
  * Gym workouts can arrive from watches as either 'strength' or 'gym', and
@@ -59,19 +76,33 @@ export class CanonicalActivityWriterService {
     const sessionPayload = this.buildSessionPayload(input, deviceId);
 
     let sessionId: string;
-    let isNewImport = false;
     let strengthAssociation = false;
+    let shouldRunEnduranceTemplateMatch = false;
     if (existingSessionId) {
+      const writeSessionId = await this.resolveExistingWriteSessionId(existingSessionId);
+      const redirectedDuplicate = writeSessionId !== existingSessionId;
+      if (writeSessionId !== existingSessionId) {
+        await this.clearProvenance(existingSessionId);
+      }
       // Re-sync of an activity already linked to a session. If that session
       // is an Alzan strength session that absorbed the external activity,
       // never overwrite its metrics again (the user may have chosen to keep
       // their own values): refresh provenance only.
-      const existingMeta = await this.getSessionMeta(existingSessionId);
-      if (isStrengthSport(existingMeta?.sport_type) && existingMeta?.source !== 'imported') {
+      const existingMeta = await this.getSessionMeta(writeSessionId);
+      if (redirectedDuplicate) {
+        strengthAssociation = isStrengthSport(input.activity.sportType);
+        sessionId = await this.updateSession(
+          writeSessionId,
+          strengthAssociation
+            ? this.buildStrengthAssociationPayload(input, deviceId)
+            : this.buildEnduranceAssociationPayload(input, deviceId),
+        );
+        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+      } else if (isStrengthSport(existingMeta?.sport_type) && existingMeta?.source !== 'imported') {
         strengthAssociation = true;
-        sessionId = await this.updateSession(existingSessionId, this.buildProvenancePayload(input, deviceId));
+        sessionId = await this.updateSession(writeSessionId, this.buildProvenancePayload(input, deviceId));
       } else {
-        sessionId = await this.updateSession(existingSessionId, sessionPayload);
+        sessionId = await this.updateSession(writeSessionId, sessionPayload);
       }
     } else if (isStrengthSport(input.activity.sportType)) {
       // The watch never creates sets: a same-day Alzan strength session may
@@ -83,12 +114,22 @@ export class CanonicalActivityWriterService {
           ...directive.payload,
           ...this.buildProvenancePayload(input, deviceId),
         });
+        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
       } else {
         sessionId = await this.insertSession({ ...sessionPayload, ...directive.extraFields } as ActivitySessionInsert);
       }
     } else {
-      sessionId = await this.insertSession(sessionPayload as ActivitySessionInsert);
-      isNewImport = true;
+      const directive = await this.importReconciliationService.resolveEnduranceDirective(input.userId, input.activity);
+      if (directive.kind === 'associate') {
+        sessionId = await this.updateSession(
+          directive.targetSessionId,
+          this.buildEnduranceAssociationPayload(input, deviceId),
+        );
+        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+      } else {
+        sessionId = await this.insertSession(sessionPayload as ActivitySessionInsert);
+        shouldRunEnduranceTemplateMatch = directive.runTemplateMatch;
+      }
     }
 
     if (!strengthAssociation) {
@@ -104,19 +145,30 @@ export class CanonicalActivityWriterService {
       relatedId: sessionId,
     });
 
-    if (isNewImport) {
-      // Duplicate detection + template matching for the freshly imported
-      // session. Runs after laps/zones are persisted; never blocks the import.
-      await this.importReconciliationService.reconcileEnduranceAfterInsert(input.userId, sessionId);
+    if (shouldRunEnduranceTemplateMatch) {
+      await this.importReconciliationService.runEnduranceTemplateMatch(input.userId, sessionId);
     }
 
     return sessionId;
   }
 
-  private async getSessionMeta(sessionId: string): Promise<{ sport_type: string; source: string | null } | null> {
+  private async resolveExistingWriteSessionId(sessionId: string): Promise<string> {
+    const meta = await this.getSessionMeta(sessionId);
+    if (!meta) return sessionId;
+    if (
+      meta.duplicate_resolution === 'pending' &&
+      meta.duplicate_of_session_id != null &&
+      (meta.duplicate_score ?? 0) >= DUPLICATE_THRESHOLD
+    ) {
+      return meta.duplicate_of_session_id;
+    }
+    return sessionId;
+  }
+
+  private async getSessionMeta(sessionId: string): Promise<ExistingSessionMeta | null> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
-      .select('sport_type, source')
+      .select('sport_type, source, duplicate_of_session_id, duplicate_resolution, duplicate_score')
       .eq('id', sessionId)
       .maybeSingle();
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LOOKUP_FAILED');
@@ -273,6 +325,65 @@ export class CanonicalActivityWriterService {
     };
   }
 
+  private buildEnduranceAssociationPayload(input: UpsertActivityInput, deviceId: string | null): ActivitySessionUpdate {
+    const summary = input.activity.summary;
+    const payload: ActivitySessionUpdate = {
+      status: 'completed',
+      end_time: summary.endedAt,
+      duration_s: summary.durationSeconds,
+      distance_m: summary.distanceM,
+      elev_gain_m: summary.elevationGainM,
+      elev_loss_m: summary.elevationLossM,
+      avg_heart_rate: summary.avgHeartRate,
+      max_heart_rate: summary.maxHeartRate,
+      min_heart_rate: summary.minHeartRate,
+      avg_speed_m_per_s: summary.avgSpeedMps,
+      calories_kcal: summary.caloriesKcal,
+      avg_cadence: summary.avgCadence == null ? null : Math.round(summary.avgCadence),
+      max_cadence: summary.maxCadence == null ? null : Math.round(summary.maxCadence),
+      avg_power_w: summary.avgPowerW == null ? null : Math.round(summary.avgPowerW),
+      max_power_w: summary.maxPowerW == null ? null : Math.round(summary.maxPowerW),
+      avg_temp_c: summary.avgTemperatureC,
+      max_temp_c: summary.maxTemperatureC,
+      recovery_time_s: summary.recoveryTimeSeconds,
+      total_steps: summary.totalSteps,
+      vo2_max: summary.vo2Max,
+      tss_hr: summary.tss,
+      epoc: summary.epoc,
+      pte: summary.pte,
+      ...this.buildProvenancePayload(input, deviceId),
+      duplicate_of_session_id: null,
+      duplicate_score: null,
+      duplicate_resolution: 'merged',
+      needs_strength_review: false,
+    };
+    if (summary.startedAt) payload.start_time = summary.startedAt;
+    return payload;
+  }
+
+  private buildStrengthAssociationPayload(input: UpsertActivityInput, deviceId: string | null): ActivitySessionUpdate {
+    const summary = input.activity.summary;
+    return {
+      status: 'completed',
+      end_time: summary.endedAt,
+      duration_s: summary.durationSeconds,
+      calories_kcal: summary.caloriesKcal,
+      avg_heart_rate: summary.avgHeartRate,
+      max_heart_rate: summary.maxHeartRate,
+      min_heart_rate: summary.minHeartRate,
+      recovery_time_s: summary.recoveryTimeSeconds,
+      epoc: summary.epoc,
+      pte: summary.pte,
+      tss_hr: summary.tss,
+      ...this.buildProvenancePayload(input, deviceId),
+      pending_watch_metrics: null,
+      duplicate_of_session_id: null,
+      duplicate_score: null,
+      duplicate_resolution: 'merged',
+      needs_strength_review: false,
+    };
+  }
+
   private async insertSession(payload: ActivitySessionInsert): Promise<string> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
@@ -290,6 +401,14 @@ export class CanonicalActivityWriterService {
       .eq('id', sessionId);
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_UPDATE_FAILED');
     return sessionId;
+  }
+
+  private async clearProvenance(sessionId: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .update({ provider_activity_id: null, source_record_id: null })
+      .eq('id', sessionId);
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_PROVENANCE_CLEAR_FAILED');
   }
 
   private async replaceLaps(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void> {
@@ -436,9 +555,13 @@ export class CanonicalActivityWriterService {
       .delete()
       .eq('session_id', sessionId);
     if (deleteError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_ROUTE_DELETE_FAILED');
-    if (activity.streams.position.length === 0) return;
+    const positionSamples = this.sanitizePositionSamples(activity.streams.position);
+    if (positionSamples.length === 0) {
+      await this.clearRoutePolyline(sessionId);
+      return;
+    }
 
-    const rows: ActivityRoutePointInsert[] = activity.streams.position.map((point, index) => ({
+    const rows: ActivityRoutePointInsert[] = positionSamples.map((point, index) => ({
       session_id: sessionId,
       user_id: userId,
       point_index: index,
@@ -454,12 +577,37 @@ export class CanonicalActivityWriterService {
     }));
     await this.insertInChunks('activity_route_points', rows, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
 
-    const polyline = encodePolyline(activity.streams.position.map(point => [point.lat, point.lon] as [number, number]));
+    const polyline = encodePolyline(positionSamples.map(point => [point.lat, point.lon] as [number, number]));
     const { error: polylineError } = await this.supabaseAdminService.client
       .from('activity_sessions')
       .update({ route_polyline: polyline })
       .eq('id', sessionId);
     if (polylineError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_POLYLINE_UPDATE_FAILED');
+  }
+
+  private sanitizePositionSamples(
+    samples: CanonicalActivity['streams']['position'],
+  ): CanonicalActivity['streams']['position'] {
+    const cleaned: CanonicalActivity['streams']['position'] = [];
+    for (const sample of samples) {
+      if (!this.isValidCoordinate(sample.lat, sample.lon)) continue;
+      const previous = cleaned[cleaned.length - 1];
+      if (previous && previous.lat === sample.lat && previous.lon === sample.lon) continue;
+      cleaned.push(sample);
+    }
+    return cleaned.length >= 2 ? cleaned : [];
+  }
+
+  private isValidCoordinate(lat: number, lon: number): boolean {
+    return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  }
+
+  private async clearRoutePolyline(sessionId: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .update({ route_polyline: null })
+      .eq('id', sessionId);
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_POLYLINE_UPDATE_FAILED');
   }
 
   private async upsertProviderFields(
@@ -529,18 +677,82 @@ export class CanonicalActivityWriterService {
     rows: T[],
     errorCode: string,
   ): Promise<void> {
-    const chunkSize = table === 'activity_stream_samples' ? STREAM_SAMPLE_INSERT_CHUNK_SIZE : DEFAULT_INSERT_CHUNK_SIZE;
+    const chunkSize =
+      table === 'activity_stream_samples' ? STREAM_SAMPLE_INSERT_CHUNK_SIZE : ROUTE_POINT_INSERT_CHUNK_SIZE;
     for (let startIndex = 0; startIndex < rows.length; startIndex += chunkSize) {
       const chunk = rows.slice(startIndex, startIndex + chunkSize);
-      const { error } = await this.supabaseAdminService.client.from(table).insert(chunk);
-      if (error) {
-        this.logger.error(
-          `${errorCode}: insert into ${table} failed for chunk [${startIndex}-${startIndex + chunk.length}] ` +
-            `(${rows.length} rows total) — code=${error.code ?? 'n/a'} message="${error.message}" ` +
-            `details="${error.details ?? ''}" hint="${error.hint ?? ''}"`,
-        );
-        throw new InternalServerErrorException(errorCode);
-      }
+      await this.insertChunkWithRecovery(table, chunk, errorCode, startIndex, rows.length);
     }
+  }
+
+  private async insertChunkWithRecovery<T extends ActivityRoutePointInsert | ActivityStreamSampleInsert>(
+    table: 'activity_route_points' | 'activity_stream_samples',
+    rows: T[],
+    errorCode: string,
+    startIndex: number,
+    totalRows: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseAdminService.client.from(table).insert(rows);
+    if (!error) return;
+    if (this.isRetryableInsertError(error) && rows.length > MIN_RETRY_INSERT_CHUNK_SIZE) {
+      const midpoint = Math.ceil(rows.length / 2);
+      this.logger.log(
+        `${errorCode}: retrying ${table} chunk [${startIndex}-${startIndex + rows.length}] as smaller chunks`,
+      );
+      await this.insertChunkWithRecovery(table, rows.slice(0, midpoint), errorCode, startIndex, totalRows);
+      await this.insertChunkWithRecovery(table, rows.slice(midpoint), errorCode, startIndex + midpoint, totalRows);
+      return;
+    }
+    if (this.isRetryableInsertError(error)) {
+      await this.retrySmallChunk(table, rows, errorCode, startIndex, totalRows, error);
+      return;
+    }
+    this.throwChunkInsertError(table, errorCode, startIndex, rows.length, totalRows, error);
+  }
+
+  private async retrySmallChunk<T extends ActivityRoutePointInsert | ActivityStreamSampleInsert>(
+    table: 'activity_route_points' | 'activity_stream_samples',
+    rows: T[],
+    errorCode: string,
+    startIndex: number,
+    totalRows: number,
+    firstError: ChunkInsertError,
+  ): Promise<void> {
+    let lastError = firstError;
+    for (let attempt = 2; attempt <= INSERT_RETRY_ATTEMPTS; attempt += 1) {
+      await this.sleep(INSERT_RETRY_BASE_DELAY_MS * attempt);
+      const { error } = await this.supabaseAdminService.client.from(table).insert(rows);
+      if (!error) return;
+      lastError = error;
+      if (!this.isRetryableInsertError(error)) break;
+    }
+    this.throwChunkInsertError(table, errorCode, startIndex, rows.length, totalRows, lastError);
+  }
+
+  private isRetryableInsertError(error: ChunkInsertError): boolean {
+    const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+    return message.includes('fetch failed') || message.includes('socket') || message.includes('und_err_socket');
+  }
+
+  private throwChunkInsertError(
+    table: 'activity_route_points' | 'activity_stream_samples',
+    errorCode: string,
+    startIndex: number,
+    chunkLength: number,
+    totalRows: number,
+    error: ChunkInsertError,
+  ): never {
+    this.logger.error(
+      `${errorCode}: insert into ${table} failed for chunk [${startIndex}-${startIndex + chunkLength}] ` +
+        `(${totalRows} rows total) — code=${error.code ?? 'n/a'} message="${error.message ?? ''}" ` +
+        `details="${error.details ?? ''}" hint="${error.hint ?? ''}"`,
+    );
+    throw new InternalServerErrorException(errorCode);
+  }
+
+  private async sleep(milliseconds: number): Promise<void> {
+    await new Promise(resolve => {
+      setTimeout(resolve, milliseconds);
+    });
   }
 }

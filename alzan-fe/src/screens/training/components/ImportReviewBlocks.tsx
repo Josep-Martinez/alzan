@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +12,9 @@ import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import { useImportReview } from '../../../hooks/useImportReview';
+import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { ActivitySession } from '../../../types/requests.types';
-import { getSportDefaultTitleKey } from '../../../constants/sports';
+import { formatDuration, getSportDefaultTitleKey } from '../../../constants/sports';
 
 const STRONG_DUPLICATE_THRESHOLD = 80;
 
@@ -47,13 +48,21 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const { t } = useTranslation();
   const { colors: themeColors } = useTrainingStyles();
   const { user } = useAuth();
+  const { convertDistanceToUi } = useUnitConversion();
   const review = useImportReview(session.id);
   const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
   const [plannedRoutineDismissed, setPlannedRoutineDismissed] = useState(false);
+  const [duplicateActionCompleted, setDuplicateActionCompleted] = useState(false);
+
+  useEffect(() => {
+    setDuplicateActionCompleted(false);
+  }, [session.id]);
 
   const isStrength = session.sport_type === 'strength';
   const sportLabel = t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype));
-  const duplicatePending = session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
+  const duplicateActionPending = review.mergeDuplicate.isPending || review.keepBothDuplicates.isPending;
+  const duplicatePending =
+    !duplicateActionCompleted && session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
   const duplicateScore = session.duplicate_score ?? 0;
   const hasPendingWatchMetrics = session.pending_watch_metrics != null;
   const associatedTemplateId = isStrength ? session.workout_template_id : session.endurance_template_id;
@@ -88,6 +97,21 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       return data ? { id: data.id, name: data.base_name, description: data.description } : null;
     },
     enabled: !!associatedTemplateId,
+  });
+
+  const { data: duplicateTarget } = useQuery({
+    queryKey: ['importReviewDuplicateTarget', session.duplicate_of_session_id],
+    queryFn: async (): Promise<ActivitySession | null> => {
+      if (!session.duplicate_of_session_id) return null;
+      const { data, error } = await supabase
+        .from('activity_sessions')
+        .select('*')
+        .eq('id', session.duplicate_of_session_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: duplicatePending,
   });
 
   const { data: templateOptions = [] } = useQuery({
@@ -192,15 +216,24 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   };
 
   const handleMerge = () => {
+    const targetSessionId = duplicateTarget?.id ?? session.duplicate_of_session_id ?? undefined;
     review.mergeDuplicate.mutate(
-      {},
+      { targetSessionId },
       {
         onSuccess: survivorId => {
+          setDuplicateActionCompleted(true);
           if (survivorId !== session.id) onSessionReplaced(survivorId);
         },
         onError: showError,
       },
     );
+  };
+
+  const handleKeepBoth = () => {
+    review.keepBothDuplicates.mutate(undefined, {
+      onSuccess: () => setDuplicateActionCompleted(true),
+      onError: showError,
+    });
   };
 
   const handleAssign = (targetSessionId?: string) => {
@@ -218,6 +251,24 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const sessionDisplayName = (candidate: ActivitySession): string => {
     const base = candidate.name || t(getSportDefaultTitleKey(candidate.sport_type, candidate.sport_subtype));
     return `${base} · ${format(new Date(candidate.start_time), 'HH:mm')}`;
+  };
+
+  const sessionMetricSummary = (candidate: ActivitySession): string => {
+    const parts = [format(new Date(candidate.start_time), 'HH:mm')];
+    if (candidate.duration_s != null && candidate.duration_s > 0) {
+      parts.push(formatDuration(candidate.duration_s));
+    }
+    if (candidate.distance_m != null && candidate.distance_m > 0) {
+      const distance = convertDistanceToUi(candidate.distance_m, 2);
+      parts.push(`${distance.value} ${distance.unit}`);
+    }
+    if (candidate.total_sets != null && candidate.total_sets > 0) {
+      parts.push(t('training.importSessionSets', { count: candidate.total_sets }));
+    }
+    if (candidate.calories_kcal != null && candidate.calories_kcal > 0) {
+      parts.push(t('training.importSessionKcal', { kcal: Math.round(candidate.calories_kcal) }));
+    }
+    return parts.join(' · ');
   };
 
   const renderTemplatePicker = () => (
@@ -276,17 +327,56 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
                 : t('training.importDuplicatePriorityTitle', { sport: sportLabel })}
             </Text>
           </View>
+          {duplicateTarget && (
+            <View style={[styles.comparisonBox, { borderColor: themeColors.border }]}>
+              <View style={styles.comparisonColumn}>
+                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+                  {t('training.importWatchActivity')}
+                </Text>
+                <Text
+                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}
+                  numberOfLines={1}
+                >
+                  {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+                </Text>
+                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+                  {sessionMetricSummary(session)}
+                </Text>
+              </View>
+              <View style={[styles.comparisonDivider, { backgroundColor: themeColors.border }]} />
+              <View style={styles.comparisonColumn}>
+                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+                  {t('training.importExistingWorkout')}
+                </Text>
+                <Text
+                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}
+                  numberOfLines={1}
+                >
+                  {duplicateTarget.name ||
+                    t(getSportDefaultTitleKey(duplicateTarget.sport_type, duplicateTarget.sport_subtype))}
+                </Text>
+                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+                  {sessionMetricSummary(duplicateTarget)}
+                </Text>
+              </View>
+            </View>
+          )}
+          <Text style={[typography.caption, { color: themeColors.textSecondary, marginBottom: spacing.s }]}>
+            {t(isStrength ? 'training.importStrengthMergeExplanation' : 'training.importMergeExplanation')}
+          </Text>
           <View style={styles.buttonRow}>
             <PrimaryButton
-              title={t(isStrength ? 'training.importYesSame' : 'training.importMerge')}
+              title={t('training.importMergeKeepExisting')}
               onPress={handleMerge}
               loading={review.mergeDuplicate.isPending}
+              disabled={duplicateActionPending || duplicateActionCompleted}
               style={styles.rowButton}
             />
             <PrimaryButton
               title={t(isStrength ? 'training.importNoKeepBoth' : 'training.importKeepBoth')}
-              onPress={() => review.keepBothDuplicates.mutate(undefined, { onError: showError })}
+              onPress={handleKeepBoth}
               loading={review.keepBothDuplicates.isPending}
+              disabled={duplicateActionPending || duplicateActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -300,7 +390,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
             {t('training.importDuplicateSubtle', { sport: sportLabel })}
           </Text>
-          <TouchableOpacity onPress={handleMerge} disabled={review.mergeDuplicate.isPending}>
+          <TouchableOpacity onPress={handleMerge} disabled={duplicateActionPending || duplicateActionCompleted}>
             <Text style={[typography.caption, styles.linkText, { color: themeColors.primary }]}>
               {t('training.importMergeManually')}
             </Text>
@@ -320,7 +410,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           {todaysStrengthSessions.map(candidate => (
             <PrimaryButton
               key={candidate.id}
-              title={t('training.importAssignToSession', { name: sessionDisplayName(candidate) })}
+              title={t('training.importAssignToSessionKeepingData', { name: sessionDisplayName(candidate) })}
               onPress={() => handleAssign(candidate.id)}
               loading={review.assignStrengthSession.isPending}
               variant="secondary"
@@ -535,6 +625,21 @@ const styles = StyleSheet.create({
   stackedButton: {
     marginTop: spacing.s,
     height: 44,
+  },
+  comparisonBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: borderRadius.m,
+    flexDirection: 'row',
+    gap: spacing.s,
+    marginBottom: spacing.s,
+    padding: spacing.s,
+  },
+  comparisonColumn: {
+    flex: 1,
+    gap: 2,
+  },
+  comparisonDivider: {
+    width: StyleSheet.hairlineWidth,
   },
   linkText: {
     fontWeight: '600',

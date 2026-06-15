@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Row, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
+import { DUPLICATE_THRESHOLD } from '../../activity-import/matching/duplicate-score';
 import {
   splitStrengthMetrics,
   StrengthSessionLite,
@@ -109,7 +110,11 @@ export class ImportReviewService {
    * everything else succeeded.
    */
   public async mergeDuplicate(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
-    const imported = await this.getOwnedSession(userId, sessionId);
+    const imported = await this.getOwnedSessionOrMergedTarget(userId, sessionId, targetSessionId);
+    if (!imported) {
+      if (!targetSessionId) throw new BadRequestException('IMPORT_REVIEW_MERGE_TARGET_REQUIRED');
+      return targetSessionId;
+    }
     const targetId = targetSessionId ?? imported.duplicate_of_session_id;
     if (!targetId || targetId === sessionId) {
       throw new BadRequestException('IMPORT_REVIEW_MERGE_TARGET_REQUIRED');
@@ -155,6 +160,41 @@ export class ImportReviewService {
     // a single transaction (no half-moved state on a mid-operation failure).
     await this.absorbAndDelete(source.id, survivor.id);
     return survivor.id;
+  }
+
+  private async getOwnedSessionOrMergedTarget(
+    userId: string,
+    sessionId: string,
+    targetSessionId?: string,
+  ): Promise<ActivitySessionRow | null> {
+    try {
+      return await this.getOwnedSession(userId, sessionId);
+    } catch (error) {
+      if (!targetSessionId || !this.isNotFoundException(error)) throw error;
+      await this.getOwnedSession(userId, targetSessionId);
+      return null;
+    }
+  }
+
+  /**
+   * Automatically merges high-confidence imported duplicates. Returns the
+   * survivor id when a merge happened, otherwise null so the import can remain
+   * reviewable or generic without blocking sync.
+   */
+  public async autoMergeDuplicateIfStrong(userId: string, sessionId: string): Promise<string | null> {
+    const session = await this.getOwnedSession(userId, sessionId);
+    if (
+      session.duplicate_resolution !== 'pending' ||
+      session.duplicate_of_session_id == null ||
+      (session.duplicate_score ?? 0) < DUPLICATE_THRESHOLD
+    ) {
+      return null;
+    }
+    const target = await this.getOwnedSession(userId, session.duplicate_of_session_id);
+    const importedIsExternal = session.imported_at != null || session.provider_activity_id != null;
+    const source = importedIsExternal ? session : target;
+    if (!this.isImportedSession(source)) return null;
+    return this.mergeDuplicate(userId, session.id, target.id);
   }
 
   /** Keeps both sessions; for endurance the template match runs now. */
@@ -247,6 +287,7 @@ export class ImportReviewService {
 
   private buildStrengthWatchPayload(source: ActivitySessionRow): ActivitySessionUpdate {
     return {
+      status: 'completed',
       duration_s: source.duration_s,
       end_time: source.end_time,
       calories_kcal: source.calories_kcal,
@@ -263,6 +304,7 @@ export class ImportReviewService {
 
   private buildEnduranceWatchPayload(source: ActivitySessionRow): ActivitySessionUpdate {
     return {
+      status: 'completed',
       start_time: source.start_time,
       end_time: source.end_time,
       duration_s: source.duration_s,
@@ -420,6 +462,10 @@ export class ImportReviewService {
     if (error) throw new InternalServerErrorException('IMPORT_REVIEW_SESSION_READ_FAILED');
     if (!data) throw new NotFoundException('IMPORT_REVIEW_SESSION_NOT_FOUND');
     return data;
+  }
+
+  private isNotFoundException(error: unknown): boolean {
+    return error instanceof NotFoundException;
   }
 
   private async assertOwnedRow(

@@ -65,6 +65,21 @@ function sampleCoords(coords: LatLon[], maxPoints: number): LatLon[] {
   return sampled;
 }
 
+function isValidLatLon([lat, lon]: LatLon): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+function sanitizeCoords(coords: LatLon[]): LatLon[] {
+  const cleaned: LatLon[] = [];
+  for (const coord of coords) {
+    if (!isValidLatLon(coord)) continue;
+    const previous = cleaned[cleaned.length - 1];
+    if (previous && previous[0] === coord[0] && previous[1] === coord[1]) continue;
+    cleaned.push(coord);
+  }
+  return cleaned.length >= 2 ? cleaned : [];
+}
+
 function normaliseCoords(coords: LatLon[]) {
   const lats = coords.map(([lat]) => lat);
   const lons = coords.map(([, lon]) => lon);
@@ -152,7 +167,7 @@ function parseRoute(polyline: string | null | undefined): ParsedRoute {
   }
 
   try {
-    const decoded = decodePolyline(polyline);
+    const decoded = sanitizeCoords(decodePolyline(polyline));
     if (decoded.length < 2) {
       return {
         valid: false,

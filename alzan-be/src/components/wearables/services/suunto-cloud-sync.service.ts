@@ -28,7 +28,7 @@ export interface SuuntoSyncResult {
   lastSuccessAt: string;
 }
 
-const WORKOUT_LOOKBACK_DAYS = 30;
+const WORKOUT_LOOKBACK_DAYS = 20;
 const WORKOUT_LIST_LIMIT = 100;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;

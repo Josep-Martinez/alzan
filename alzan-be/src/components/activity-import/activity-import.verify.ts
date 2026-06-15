@@ -58,8 +58,14 @@ const verificationCases: VerificationCase[] = [
   },
   {
     kind: 'service',
+    provider: 'import_review',
+    check: 'import review duplicate merge is idempotent after the source was absorbed',
+    specFile: 'src/components/wearables/services/import-review.service.spec.ts',
+  },
+  {
+    kind: 'service',
     provider: 'suunto',
-    check: 'Suunto cloud sync only imports workout summaries from the last 30 days',
+    check: 'Suunto cloud sync only imports workout summaries from the last 20 days',
     specFile: 'src/components/wearables/services/suunto-cloud-sync.service.spec.ts',
   },
   {
