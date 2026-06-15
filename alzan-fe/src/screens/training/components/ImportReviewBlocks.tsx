@@ -52,22 +52,34 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const review = useImportReview(session.id);
   const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
   const [plannedRoutineDismissed, setPlannedRoutineDismissed] = useState(false);
-  const [duplicateActionCompleted, setDuplicateActionCompleted] = useState(false);
+  const [reviewActionCompleted, setReviewActionCompleted] = useState(false);
 
   useEffect(() => {
-    setDuplicateActionCompleted(false);
+    setReviewActionCompleted(false);
   }, [session.id]);
 
   const isStrength = session.sport_type === 'strength';
   const sportLabel = t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype));
-  const duplicateActionPending = review.mergeDuplicate.isPending || review.keepBothDuplicates.isPending;
+  const reviewActionPending =
+    review.associateTemplate.isPending ||
+    review.dismissSuggestion.isPending ||
+    review.mergeDuplicate.isPending ||
+    review.keepBothDuplicates.isPending ||
+    review.revertWatchMetrics.isPending ||
+    review.keepWatchMetrics.isPending ||
+    review.assignStrengthSession.isPending;
   const duplicatePending =
-    !duplicateActionCompleted && session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
+    !reviewActionCompleted && session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
   const duplicateScore = session.duplicate_score ?? 0;
-  const hasPendingWatchMetrics = session.pending_watch_metrics != null;
+  const hasPendingWatchMetrics = !reviewActionCompleted && session.pending_watch_metrics != null;
   const associatedTemplateId = isStrength ? session.workout_template_id : session.endurance_template_id;
 
   const showError = () => Alert.alert(t('common.error'), t('training.importReviewActionError'));
+
+  const handleReviewActionSuccess = (survivorId: string) => {
+    setReviewActionCompleted(true);
+    if (survivorId !== session.id) onSessionReplaced(survivorId);
+  };
 
   const { data: suggestedTemplate } = useQuery({
     queryKey: ['importReviewSuggestedTemplate', session.suggested_endurance_template_id],
@@ -113,6 +125,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     },
     enabled: duplicatePending,
   });
+  const reviewTargetSessionId = duplicateTarget?.id ?? session.duplicate_of_session_id ?? undefined;
 
   const { data: templateOptions = [] } = useQuery({
     queryKey: ['importReviewTemplateOptions', user?.id, session.sport_type],
@@ -185,10 +198,13 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const handleAssociateTemplate = (templateId: string) => {
     setTemplatePickerVisible(false);
     review.associateTemplate.mutate(
-      isStrength ? { workoutTemplateId: templateId } : { enduranceTemplateId: templateId },
+      isStrength
+        ? { workoutTemplateId: templateId, targetSessionId: reviewTargetSessionId }
+        : { enduranceTemplateId: templateId, targetSessionId: reviewTargetSessionId },
       {
-        onSuccess: () => {
-          if (isStrength && !hasSets) {
+        onSuccess: survivorId => {
+          handleReviewActionSuccess(survivorId);
+          if (survivorId === session.id && isStrength && !hasSets) {
             Alert.alert(t('training.importCompleteExercises'), t('training.importNoExercisesPrompt'), [
               { text: t('training.importNotNow'), style: 'cancel' },
               { text: t('training.importCompleteExercises'), onPress: onCompleteExercises },
@@ -208,41 +224,93 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
         style: 'destructive',
         onPress: () =>
           review.associateTemplate.mutate(
-            { enduranceTemplateId: null, workoutTemplateId: null },
-            { onError: showError },
+            { enduranceTemplateId: null, targetSessionId: reviewTargetSessionId, workoutTemplateId: null },
+            { onError: showError, onSuccess: handleReviewActionSuccess },
           ),
       },
     ]);
   };
 
   const handleMerge = () => {
-    const targetSessionId = duplicateTarget?.id ?? session.duplicate_of_session_id ?? undefined;
     review.mergeDuplicate.mutate(
-      { targetSessionId },
+      { targetSessionId: reviewTargetSessionId },
       {
-        onSuccess: survivorId => {
-          setDuplicateActionCompleted(true);
-          if (survivorId !== session.id) onSessionReplaced(survivorId);
-        },
+        onSuccess: handleReviewActionSuccess,
         onError: showError,
       },
     );
   };
 
   const handleKeepBoth = () => {
-    review.keepBothDuplicates.mutate(undefined, {
-      onSuccess: () => setDuplicateActionCompleted(true),
-      onError: showError,
-    });
+    review.keepBothDuplicates.mutate(
+      { targetSessionId: reviewTargetSessionId },
+      {
+        onSuccess: handleReviewActionSuccess,
+        onError: showError,
+      },
+    );
+  };
+
+  const handleDismissSuggestion = () => {
+    review.dismissSuggestion.mutate(
+      { targetSessionId: reviewTargetSessionId },
+      {
+        onSuccess: handleReviewActionSuccess,
+        onError: showError,
+      },
+    );
+  };
+
+  const handleKeepWatchMetrics = () => {
+    review.keepWatchMetrics.mutate(
+      { targetSessionId: reviewTargetSessionId },
+      {
+        onSuccess: handleReviewActionSuccess,
+        onError: showError,
+      },
+    );
+  };
+
+  const handleRevertWatchMetrics = () => {
+    review.revertWatchMetrics.mutate(
+      { targetSessionId: reviewTargetSessionId },
+      {
+        onSuccess: handleReviewActionSuccess,
+        onError: showError,
+      },
+    );
+  };
+
+  const handleKeepPlannedRoutineGeneric = () => {
+    if (reviewActionPending || reviewActionCompleted) return;
+    setPlannedRoutineDismissed(true);
+  };
+
+  const handleOpenTemplatePicker = () => {
+    if (reviewActionPending || reviewActionCompleted) return;
+    setTemplatePickerVisible(true);
+  };
+
+  const handleCompleteExercises = () => {
+    if (reviewActionPending || reviewActionCompleted) return;
+    onCompleteExercises();
   };
 
   const handleAssign = (targetSessionId?: string) => {
     review.assignStrengthSession.mutate(
       { targetSessionId },
       {
-        onSuccess: survivorId => {
-          if (survivorId !== session.id) onSessionReplaced(survivorId);
-        },
+        onSuccess: handleReviewActionSuccess,
+        onError: showError,
+      },
+    );
+  };
+
+  const handleKeepAsNewStrength = () => {
+    review.assignStrengthSession.mutate(
+      {},
+      {
+        onSuccess: handleReviewActionSuccess,
         onError: showError,
       },
     );
@@ -295,6 +363,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.templateRow, { borderColor: themeColors.border }]}
+                  disabled={reviewActionPending || reviewActionCompleted}
                   onPress={() => handleAssociateTemplate(item.id)}
                 >
                   <Text style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}>
@@ -369,14 +438,14 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               title={t('training.importMergeKeepExisting')}
               onPress={handleMerge}
               loading={review.mergeDuplicate.isPending}
-              disabled={duplicateActionPending || duplicateActionCompleted}
+              disabled={reviewActionPending || reviewActionCompleted}
               style={styles.rowButton}
             />
             <PrimaryButton
               title={t(isStrength ? 'training.importNoKeepBoth' : 'training.importKeepBoth')}
               onPress={handleKeepBoth}
               loading={review.keepBothDuplicates.isPending}
-              disabled={duplicateActionPending || duplicateActionCompleted}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -390,7 +459,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
             {t('training.importDuplicateSubtle', { sport: sportLabel })}
           </Text>
-          <TouchableOpacity onPress={handleMerge} disabled={duplicateActionPending || duplicateActionCompleted}>
+          <TouchableOpacity onPress={handleMerge} disabled={reviewActionPending || reviewActionCompleted}>
             <Text style={[typography.caption, styles.linkText, { color: themeColors.primary }]}>
               {t('training.importMergeManually')}
             </Text>
@@ -399,7 +468,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 3. Multiple strength sessions chooser */}
-      {session.needs_strength_review && (
+      {!reviewActionCompleted && session.needs_strength_review && (
         <GlassCard style={styles.blockCard}>
           <View style={styles.blockHeader}>
             <Link2 size={20} color={themeColors.primary} />
@@ -413,14 +482,16 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               title={t('training.importAssignToSessionKeepingData', { name: sessionDisplayName(candidate) })}
               onPress={() => handleAssign(candidate.id)}
               loading={review.assignStrengthSession.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="secondary"
               style={styles.stackedButton}
             />
           ))}
           <PrimaryButton
             title={t('training.importKeepAsNew')}
-            onPress={() => handleAssign(undefined)}
+            onPress={handleKeepAsNewStrength}
             loading={review.assignStrengthSession.isPending}
+            disabled={reviewActionPending || reviewActionCompleted}
             variant="outline"
             style={styles.stackedButton}
           />
@@ -439,14 +510,16 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           <View style={styles.buttonRow}>
             <PrimaryButton
               title={t('training.importKeepWatchData')}
-              onPress={() => review.keepWatchMetrics.mutate(undefined, { onError: showError })}
+              onPress={handleKeepWatchMetrics}
               loading={review.keepWatchMetrics.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               style={styles.rowButton}
             />
             <PrimaryButton
               title={t('training.importKeepMine')}
-              onPress={() => review.revertWatchMetrics.mutate(undefined, { onError: showError })}
+              onPress={handleRevertWatchMetrics}
               loading={review.revertWatchMetrics.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -455,7 +528,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 4b. Planned gym routine suggestion (strength BPMN) */}
-      {isStrength && !associatedTemplateId && plannedRoutine && !plannedRoutineDismissed && (
+      {isStrength && !reviewActionCompleted && !associatedTemplateId && plannedRoutine && !plannedRoutineDismissed && (
         <GlassCard style={styles.blockCard}>
           <View style={styles.blockHeader}>
             <Sparkles size={20} color={themeColors.success} />
@@ -468,11 +541,13 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               title={t('training.importAssociate')}
               onPress={() => handleAssociateTemplate(plannedRoutine.id)}
               loading={review.associateTemplate.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               style={styles.rowButton}
             />
             <PrimaryButton
               title={t('training.importKeepGeneric')}
-              onPress={() => setPlannedRoutineDismissed(true)}
+              onPress={handleKeepPlannedRoutineGeneric}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -481,7 +556,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 5. Template suggestion (60-79%) */}
-      {!associatedTemplateId && suggestedTemplate && (
+      {!reviewActionCompleted && !associatedTemplateId && suggestedTemplate && (
         <GlassCard style={styles.blockCard}>
           <View style={styles.blockHeader}>
             <Sparkles size={20} color={themeColors.success} />
@@ -499,12 +574,14 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               title={t('training.importAssociate')}
               onPress={() => handleAssociateTemplate(suggestedTemplate.id)}
               loading={review.associateTemplate.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               style={styles.rowButton}
             />
             <PrimaryButton
               title={t('training.importKeepGeneric')}
-              onPress={() => review.dismissSuggestion.mutate(undefined, { onError: showError })}
+              onPress={handleDismissSuggestion}
               loading={review.dismissSuggestion.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -539,7 +616,8 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           <View style={[styles.buttonRow, { marginTop: spacing.m }]}>
             <PrimaryButton
               title={t('training.importChangeTemplate')}
-              onPress={() => setTemplatePickerVisible(true)}
+              onPress={handleOpenTemplatePicker}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="secondary"
               style={styles.rowButton}
             />
@@ -547,6 +625,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               title={t('training.importRemoveAssociation')}
               onPress={handleRemoveAssociation}
               loading={review.associateTemplate.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
               style={styles.rowButton}
             />
@@ -554,7 +633,8 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           {isStrength && !hasSets && (
             <PrimaryButton
               title={t('training.importCompleteExercises')}
-              onPress={onCompleteExercises}
+              onPress={handleCompleteExercises}
+              disabled={reviewActionPending || reviewActionCompleted}
               variant="secondary"
               style={styles.stackedButton}
             />
@@ -570,13 +650,15 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               <View style={styles.buttonRow}>
                 <PrimaryButton
                   title={t('training.importAssociate')}
-                  onPress={() => setTemplatePickerVisible(true)}
+                  onPress={handleOpenTemplatePicker}
+                  disabled={reviewActionPending || reviewActionCompleted}
                   style={styles.rowButton}
                 />
                 {!hasSets && (
                   <PrimaryButton
                     title={t('training.importCompleteExercises')}
-                    onPress={onCompleteExercises}
+                    onPress={handleCompleteExercises}
+                    disabled={reviewActionPending || reviewActionCompleted}
                     variant="outline"
                     style={styles.rowButton}
                   />
@@ -584,7 +666,10 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               </View>
             </>
           ) : (
-            <TouchableOpacity onPress={() => setTemplatePickerVisible(true)}>
+            <TouchableOpacity
+              onPress={handleOpenTemplatePicker}
+              disabled={reviewActionPending || reviewActionCompleted}
+            >
               <Text style={[typography.body, styles.linkText, { color: themeColors.primary }]}>
                 {t('training.importAssociateTemplate')}
               </Text>

@@ -40,8 +40,9 @@ export class ImportReviewService {
     userId: string,
     sessionId: string,
     input: { enduranceTemplateId?: string | null; workoutTemplateId?: string | null },
+    targetSessionId?: string,
   ): Promise<string> {
-    const session = await this.getOwnedSession(userId, sessionId);
+    const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
     const localDate = this.sessionLocalDate(session);
 
     if (input.enduranceTemplateId) {
@@ -56,17 +57,17 @@ export class ImportReviewService {
       if (templateSport !== session.sport_type) {
         throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
       }
-      await this.revertPlansCompletedBySession(sessionId);
-      await this.updateSession(sessionId, {
+      await this.revertPlansCompletedBySession(session.id);
+      await this.updateSession(session.id, {
         endurance_template_id: input.enduranceTemplateId,
         suggested_endurance_template_id: null,
         template_match_score: null,
         template_match_method: null,
       });
-      await this.completePlannedPlan(userId, localDate, sessionId, {
+      await this.completePlannedPlan(userId, localDate, session.id, {
         endurance_template_id: input.enduranceTemplateId,
       });
-      return sessionId;
+      return session.id;
     }
     if (input.workoutTemplateId) {
       await this.assertOwnedRow(userId, 'workout_templates', input.workoutTemplateId);
@@ -74,33 +75,40 @@ export class ImportReviewService {
       if (session.sport_type !== 'strength' && session.sport_type !== 'gym') {
         throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
       }
-      await this.revertPlansCompletedBySession(sessionId);
-      await this.updateSession(sessionId, { workout_template_id: input.workoutTemplateId });
-      await this.completePlannedPlan(userId, localDate, sessionId, { gym_template_id: input.workoutTemplateId });
-      return sessionId;
+      await this.revertPlansCompletedBySession(session.id);
+      await this.updateSession(session.id, { workout_template_id: input.workoutTemplateId });
+      await this.completePlannedPlan(userId, localDate, session.id, { gym_template_id: input.workoutTemplateId });
+      return session.id;
     }
 
     // Remove association: clear template links and revert any plan this
     // session had completed, so the calendar shows the plan as pending again.
-    await this.revertPlansCompletedBySession(sessionId);
-    await this.updateSession(sessionId, {
+    await this.revertPlansCompletedBySession(session.id);
+    await this.updateSession(session.id, {
       endurance_template_id: null,
       workout_template_id: null,
       template_match_score: null,
       template_match_method: null,
     });
-    return sessionId;
+    return session.id;
   }
 
   /** Clears a pending template suggestion ("keep generic"). */
-  public async dismissSuggestion(userId: string, sessionId: string): Promise<string> {
-    await this.getOwnedSession(userId, sessionId);
-    await this.updateSession(sessionId, {
+  public async dismissSuggestion(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
+    const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
+    if (
+      session.suggested_endurance_template_id == null &&
+      session.template_match_score == null &&
+      session.template_match_method == null
+    ) {
+      return session.id;
+    }
+    await this.updateSession(session.id, {
       suggested_endurance_template_id: null,
       template_match_score: null,
       template_match_method: null,
     });
-    return sessionId;
+    return session.id;
   }
 
   /**
@@ -110,7 +118,7 @@ export class ImportReviewService {
    * everything else succeeded.
    */
   public async mergeDuplicate(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
-    const imported = await this.getOwnedSessionOrMergedTarget(userId, sessionId, targetSessionId);
+    const imported = await this.getOwnedSessionOrExistingTarget(userId, sessionId, targetSessionId);
     if (!imported) {
       if (!targetSessionId) throw new BadRequestException('IMPORT_REVIEW_MERGE_TARGET_REQUIRED');
       return targetSessionId;
@@ -162,7 +170,7 @@ export class ImportReviewService {
     return survivor.id;
   }
 
-  private async getOwnedSessionOrMergedTarget(
+  private async getOwnedSessionOrExistingTarget(
     userId: string,
     sessionId: string,
     targetSessionId?: string,
@@ -174,6 +182,27 @@ export class ImportReviewService {
       await this.getOwnedSession(userId, targetSessionId);
       return null;
     }
+  }
+
+  private async getCanonicalActionSession(
+    userId: string,
+    sessionId: string,
+    targetSessionId?: string,
+  ): Promise<ActivitySessionRow> {
+    try {
+      const session = await this.getOwnedSession(userId, sessionId);
+      if (targetSessionId && this.shouldUseTargetForAction(session, targetSessionId)) {
+        return this.getOwnedSession(userId, targetSessionId);
+      }
+      return session;
+    } catch (error) {
+      if (!targetSessionId || !this.isNotFoundException(error)) throw error;
+      return this.getOwnedSession(userId, targetSessionId);
+    }
+  }
+
+  private shouldUseTargetForAction(session: ActivitySessionRow, targetSessionId: string): boolean {
+    return session.duplicate_resolution === 'pending' && session.duplicate_of_session_id === targetSessionId;
   }
 
   /**
@@ -198,13 +227,18 @@ export class ImportReviewService {
   }
 
   /** Keeps both sessions; for endurance the template match runs now. */
-  public async keepBothDuplicates(userId: string, sessionId: string): Promise<string> {
-    const session = await this.getOwnedSession(userId, sessionId);
-    await this.updateSession(sessionId, { duplicate_resolution: 'kept_both' });
-    if (session.sport_type !== 'strength' && session.endurance_template_id == null) {
-      await this.importReconciliationService.runEnduranceTemplateMatch(userId, sessionId);
+  public async keepBothDuplicates(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
+    const session = await this.getOwnedSessionOrExistingTarget(userId, sessionId, targetSessionId);
+    if (!session) {
+      if (!targetSessionId) throw new BadRequestException('IMPORT_REVIEW_KEEP_BOTH_TARGET_REQUIRED');
+      return targetSessionId;
     }
-    return sessionId;
+    if (session.duplicate_resolution !== 'pending') return session.id;
+    await this.updateSession(session.id, { duplicate_resolution: 'kept_both' });
+    if (session.sport_type !== 'strength' && session.endurance_template_id == null) {
+      await this.importReconciliationService.runEnduranceTemplateMatch(userId, session.id);
+    }
+    return session.id;
   }
 
   /**
@@ -212,24 +246,25 @@ export class ImportReviewService {
    * values ("keep mine"). The watch values were applied by default, so this
    * restores `previous` and clears the pending notice.
    */
-  public async revertWatchMetrics(userId: string, sessionId: string): Promise<string> {
-    const session = await this.getOwnedSession(userId, sessionId);
+  public async revertWatchMetrics(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
+    const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
     const previous = this.readPreviousWatchMetrics(session);
-    if (!previous) return sessionId;
+    if (!previous) return session.id;
     const payload: ActivitySessionUpdate = { pending_watch_metrics: null };
     for (const column of PENDING_METRIC_COLUMNS) {
       const value = previous[column];
       if (typeof value === 'number') payload[column] = value;
     }
-    await this.updateSession(sessionId, payload);
-    return sessionId;
+    await this.updateSession(session.id, payload);
+    return session.id;
   }
 
   /** Keeps the watch values (the default) and clears the revert notice. */
-  public async keepWatchMetrics(userId: string, sessionId: string): Promise<string> {
-    await this.getOwnedSession(userId, sessionId);
-    await this.updateSession(sessionId, { pending_watch_metrics: null });
-    return sessionId;
+  public async keepWatchMetrics(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
+    const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
+    if (session.pending_watch_metrics == null) return session.id;
+    await this.updateSession(session.id, { pending_watch_metrics: null });
+    return session.id;
   }
 
   /**
@@ -239,7 +274,11 @@ export class ImportReviewService {
    * imported session stays as a new workout.
    */
   public async assignStrengthSession(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
-    const generic = await this.getOwnedSession(userId, sessionId);
+    const generic = await this.getOwnedSessionOrExistingTarget(userId, sessionId, targetSessionId);
+    if (!generic) {
+      if (!targetSessionId) throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
+      return targetSessionId;
+    }
     if (!targetSessionId) {
       await this.updateSession(sessionId, { needs_strength_review: false });
       return sessionId;

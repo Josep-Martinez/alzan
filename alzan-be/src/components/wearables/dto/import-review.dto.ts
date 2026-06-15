@@ -11,6 +11,18 @@ export class TemplateAssociationInputDto {
   @IsOptional()
   @IsUUID()
   workout_template_id?: string | null;
+
+  @ApiPropertyOptional({ name: 'target_session_id', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  target_session_id?: string;
+}
+
+export class ImportReviewTargetInputDto {
+  @ApiPropertyOptional({ name: 'target_session_id', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  target_session_id?: string;
 }
 
 export class DuplicateMergeInputDto {

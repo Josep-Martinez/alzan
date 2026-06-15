@@ -4,6 +4,7 @@ import { UserContext, UserCtx } from '../../../common/decorators/user-context.de
 import { SupabaseUserAuth } from '../../../core/guards/auth.decorator';
 import {
   DuplicateMergeInputDto,
+  ImportReviewTargetInputDto,
   ImportReviewSessionOutputDto,
   StrengthAssignmentInputDto,
   TemplateAssociationInputDto,
@@ -23,10 +24,15 @@ export class ImportReviewController {
     @Param('id', ParseUUIDPipe) sessionId: string,
     @Body() body: TemplateAssociationInputDto,
   ): Promise<ImportReviewSessionOutputDto> {
-    const id = await this.importReviewService.associateTemplate(ctx.user.id, sessionId, {
-      enduranceTemplateId: body.endurance_template_id ?? null,
-      workoutTemplateId: body.workout_template_id ?? null,
-    });
+    const id = await this.importReviewService.associateTemplate(
+      ctx.user.id,
+      sessionId,
+      {
+        enduranceTemplateId: body.endurance_template_id ?? null,
+        workoutTemplateId: body.workout_template_id ?? null,
+      },
+      body.target_session_id,
+    );
     return { session_id: id };
   }
 
@@ -35,8 +41,11 @@ export class ImportReviewController {
   public async dismissSuggestion(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
+    @Body() body: ImportReviewTargetInputDto = {},
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.dismissSuggestion(ctx.user.id, sessionId) };
+    return {
+      session_id: await this.importReviewService.dismissSuggestion(ctx.user.id, sessionId, body.target_session_id),
+    };
   }
 
   @Post(':id/duplicate/merge')
@@ -56,8 +65,11 @@ export class ImportReviewController {
   public async keepBothDuplicates(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
+    @Body() body: ImportReviewTargetInputDto = {},
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.keepBothDuplicates(ctx.user.id, sessionId) };
+    return {
+      session_id: await this.importReviewService.keepBothDuplicates(ctx.user.id, sessionId, body.target_session_id),
+    };
   }
 
   @Post(':id/watch-metrics/revert')
@@ -65,8 +77,11 @@ export class ImportReviewController {
   public async revertWatchMetrics(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
+    @Body() body: ImportReviewTargetInputDto = {},
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.revertWatchMetrics(ctx.user.id, sessionId) };
+    return {
+      session_id: await this.importReviewService.revertWatchMetrics(ctx.user.id, sessionId, body.target_session_id),
+    };
   }
 
   @Post(':id/watch-metrics/keep')
@@ -74,8 +89,11 @@ export class ImportReviewController {
   public async keepWatchMetrics(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
+    @Body() body: ImportReviewTargetInputDto = {},
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.keepWatchMetrics(ctx.user.id, sessionId) };
+    return {
+      session_id: await this.importReviewService.keepWatchMetrics(ctx.user.id, sessionId, body.target_session_id),
+    };
   }
 
   @Post(':id/strength-assignment')

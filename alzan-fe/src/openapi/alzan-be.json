@@ -563,6 +563,10 @@
       "post": {
         "operationId": "dismissSuggestion",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewTargetInputDto" } } }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -609,6 +613,10 @@
       "post": {
         "operationId": "keepBothDuplicates",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewTargetInputDto" } } }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -630,6 +638,10 @@
       "post": {
         "operationId": "revertWatchMetrics",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewTargetInputDto" } } }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -651,6 +663,10 @@
       "post": {
         "operationId": "keepWatchMetrics",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewTargetInputDto" } } }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -964,7 +980,8 @@
         "type": "object",
         "properties": {
           "endurance_template_id": { "type": "string", "nullable": true, "format": "uuid" },
-          "workout_template_id": { "type": "string", "nullable": true, "format": "uuid" }
+          "workout_template_id": { "type": "string", "nullable": true, "format": "uuid" },
+          "target_session_id": { "type": "string", "format": "uuid" }
         }
       },
       "ImportReviewSessionOutputDto": {
@@ -977,6 +994,10 @@
           }
         },
         "required": ["session_id"]
+      },
+      "ImportReviewTargetInputDto": {
+        "type": "object",
+        "properties": { "target_session_id": { "type": "string", "format": "uuid" } }
       },
       "DuplicateMergeInputDto": {
         "type": "object",
