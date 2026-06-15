@@ -64,6 +64,34 @@ if (unfilled.length) {
   );
 }
 
+// ─── 3) Nada puede tapar el alzan-fe/.env generado ────────────────────────────
+// Expo carga .env.local / .env.<NODE_ENV>[.local] con MÁS prioridad que .env, así
+// que un override ahí mandaría la app a la Supabase equivocada (p.ej. la local)
+// ignorando lo que env:sync:cloud escribe. Lo bloqueamos.
+const feDir = path.join(ROOT, "alzan-fe");
+const shadows = fs
+  .readdirSync(feDir)
+  .filter((f) => f.startsWith(".env.") && f !== ".env" && !f.includes("example"))
+  .filter((f) => {
+    try {
+      return /^\s*EXPO_PUBLIC_SUPABASE_URL\s*=/m.test(
+        fs.readFileSync(path.join(feDir, f), "utf8"),
+      );
+    } catch {
+      return false;
+    }
+  });
+
+if (shadows.length) {
+  fail(
+    `Hay ficheros .env en alzan-fe que TAPAN al generado y mandan la app a la Supabase equivocada:\n` +
+      shadows.map((f) => `     - alzan-fe/${f}`).join("\n") +
+      `\n   Expo prioriza .env.local / .env.<env> sobre .env. env:sync gestiona alzan-fe/.env,\n` +
+      `   así que estos sobran — bórralos:\n` +
+      shadows.map((f) => `     rm alzan-fe/${f}`).join("\n"),
+  );
+}
+
 console.log(
-  `✅  Rama "${branch}" y .env.cloud verificados — arrancando contra Supabase cloud.`,
+  `✅  Rama "${branch}", .env.cloud y alzan-fe/.env verificados — arrancando contra Supabase cloud.`,
 );

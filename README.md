@@ -151,6 +151,10 @@ pnpm ios:cloud            # 2) en otra terminal: engancha el simulador al mismo 
 
 Cualquier comando local (`pnpm start`, `pnpm start:web`, `pnpm env:sync`) **restaura** automáticamente los `.env` por paquete a los valores locales.
 
+> ⚠️ **No crees `alzan-fe/.env.local` (ni `.env.<algo>`).** Expo da **más prioridad** a `.env.local` / `.env.<NODE_ENV>` que a `.env`, así que cualquier valor ahí **tapa** lo que `env:sync` genera y manda la app a la Supabase equivocada (síntoma típico: solo entras con usuarios del entorno viejo). `env:sync` gestiona `alzan-fe/.env`; no hace falta ningún `.env*.local`. El guard de cloud **bloquea el arranque** si detecta uno.
+>
+> ℹ️ **Caché de Metro al cambiar local ↔ cloud.** Las `EXPO_PUBLIC_*` se **inlinean en el bundle** en build-time. `env:sync` detecta cuando el target del FE cambia y **limpia la caché de Metro automáticamente** (equivalente a `expo start --clear`), solo en ese caso, para que el arranque local siempre quede en local y el cloud en cloud. No necesitas pasar `--clear` a mano; basta reiniciar el comando correspondiente.
+
 ---
 
 ## 4. Calidad y verificación (tras cualquier cambio de código)

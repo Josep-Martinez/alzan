@@ -7,6 +7,7 @@
 //        pnpm env:sync
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { config, parse } = require("dotenv");
 const { expand } = require("dotenv-expand");
@@ -151,10 +152,52 @@ function writeEnv(targetPath, root, mapping, label) {
   console.log(`  ✅  Written: ${path.relative(ROOT, targetPath)}`);
 }
 
+// Same effect as `expo start --clear`: drop Metro's transform/file-map caches so
+// the next start re-inlines the current EXPO_PUBLIC_* values instead of serving
+// a bundle built for the previous Supabase target.
+function clearMetroCache() {
+  const tmp = os.tmpdir();
+  let cleared = 0;
+  try {
+    for (const entry of fs.readdirSync(tmp)) {
+      if (entry === "metro-cache" || entry.startsWith("metro-file-map-")) {
+        fs.rmSync(path.join(tmp, entry), { recursive: true, force: true });
+        cleared++;
+      }
+    }
+  } catch {
+    /* best-effort: a missing/locked cache is fine */
+  }
+  console.log(
+    cleared
+      ? `  🧹  Caché de Metro limpiada (${cleared} entrada/s) para re-inlinar el nuevo target.`
+      : `  🧹  No había caché de Metro que limpiar.`,
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
+const feEnvPath = path.join(ROOT, "alzan-fe", ".env");
+// Capture the previous FE Supabase target before overwriting, to detect flips.
+const prevFeUrl = readExistingEnv(feEnvPath).EXPO_PUBLIC_SUPABASE_URL;
+
 console.log(`\n🔄  Syncing env from root .env...\n`);
 
 writeEnv(path.join(ROOT, "alzan-be", ".env"), root, BE_MAPPING, "alzan-be");
-writeEnv(path.join(ROOT, "alzan-fe", ".env"), root, FE_MAPPING, "alzan-fe");
+writeEnv(feEnvPath, root, FE_MAPPING, "alzan-fe");
+
+// EXPO_PUBLIC_* values are inlined into the Metro bundle at build time. When the
+// FE Supabase target changes (local ↔ cloud), Metro would otherwise serve a
+// bundle built for the previous project. Clearing the cache on a real change
+// (and only then) keeps normal restarts fast while guaranteeing local stays
+// local and cloud stays cloud.
+const newFeUrl = root?.SUPABASE_URL ?? "";
+if (prevFeUrl && newFeUrl && prevFeUrl !== newFeUrl) {
+  console.log(
+    `\n🔁  El target de Supabase del FE cambió:\n` +
+      `       antes: ${prevFeUrl}\n` +
+      `       ahora: ${newFeUrl}`,
+  );
+  clearMetroCache();
+}
 
 console.log(`\n✨  Done!\n`);
