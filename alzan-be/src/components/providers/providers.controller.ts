@@ -41,8 +41,17 @@ export class ProvidersController {
     @Query() query: OAuthCallbackQueryDto,
   ): Promise<void> {
     const { code, state, error, error_description: errorDescription } = query;
+    const oauthProvider = this.providersRegistry.getOAuthProvider(provider);
+
     if (error) {
-      const encoded = encodeURIComponent(`${error}: ${errorDescription ?? 'Unknown error'}`);
+      const message = `${error}: ${errorDescription ?? 'Unknown error'}`;
+      const redirectUri = state ? await oauthProvider.consumeRedirectUriForError(state) : null;
+      const clientErrorRedirect = redirectUri ? this.buildOAuthErrorRedirectUrl(redirectUri, message) : null;
+      if (clientErrorRedirect) {
+        res.redirect(303, clientErrorRedirect);
+        return;
+      }
+      const encoded = encodeURIComponent(message);
       res.redirect(303, `/oauth/error?message=${encoded}`);
       return;
     }
@@ -52,7 +61,6 @@ export class ProvidersController {
       return;
     }
 
-    const oauthProvider = this.providersRegistry.getOAuthProvider(provider);
     const oauthState = await oauthProvider.handleCallback(code, state);
 
     if (oauthState.redirectUri) {
@@ -88,5 +96,15 @@ export class ProvidersController {
       success: false,
       message,
     };
+  }
+
+  private buildOAuthErrorRedirectUrl(redirectUri: string, message: string): string | null {
+    try {
+      const url = new URL(redirectUri);
+      url.searchParams.set('oauth_error', message);
+      return url.toString();
+    } catch {
+      return null;
+    }
   }
 }

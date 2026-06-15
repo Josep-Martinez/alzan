@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,13 +12,29 @@ import './src/i18n';
 import { enableScreens } from 'react-native-screens';
 import { AlzanBackendClientProvider } from './src/context/AlzanBackendClientContext';
 import { AlertProvider } from './src/context/AlertContext';
+import { ProviderOAuthWebCallback } from './src/modules/wearables/ProviderOAuthWebCallback';
 
 // Enable screens for better performance
 enableScreens(true);
 
 const queryClient = new QueryClient();
 
+const shouldRenderProviderOAuthWebCallback = (): boolean => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/oauth/');
+};
+
 export default function App() {
+  if (shouldRenderProviderOAuthWebCallback()) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ProviderOAuthWebCallback />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

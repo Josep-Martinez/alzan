@@ -100,6 +100,23 @@ export abstract class BaseOAuthProvider {
   }
 
   /**
+   * Consumes a stored state after provider-side OAuth errors so the original
+   * app redirect can receive the error in the same popup/auth session.
+   */
+  async consumeRedirectUriForError(state: string): Promise<string | null> {
+    const { data: stateData, error } = await this.supabaseAdmin.client
+      .from('provider_oauth_states')
+      .select('*')
+      .eq('state', state)
+      .single();
+    if (error || !stateData) return null;
+    await this.supabaseAdmin.client.from('provider_oauth_states').delete().eq('state', state);
+    if (stateData.provider !== this.providerName) return null;
+    if (new Date(stateData.expires_at) < new Date()) return null;
+    return stateData.redirect_uri || null;
+  }
+
+  /**
    * Refreshes the access token using the refresh token.
    */
   async refreshAccessToken(userId: string, refreshToken: string): Promise<OAuthTokenResponse> {

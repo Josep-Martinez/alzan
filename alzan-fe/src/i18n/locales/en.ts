@@ -894,6 +894,8 @@ const en = {
     permissionSheetOAuthDescription:
       'You are about to open {{service}} sign-in. You can cancel here and stay in Alzan, or continue to authorize the connection.',
     permissionSheetContinue: 'Continue',
+    oauthCallbackCompleting: 'Completing connection. You can close this window in a moment.',
+    oauthCallbackManualClose: 'Return to Alzan to finish the connection.',
     healthConnectSourceTitle: 'Choose one Health Connect source',
     healthConnectNoDataTitle: 'No data found in Health Connect',
     healthConnectNoDataMessage:

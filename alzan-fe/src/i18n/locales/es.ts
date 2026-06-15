@@ -905,6 +905,8 @@ export default {
     permissionSheetOAuthDescription:
       'Vas a abrir el inicio de sesión de {{service}}. Puedes cancelar aquí y seguir en Alzan, o continuar para autorizar la conexión.',
     permissionSheetContinue: 'Continuar',
+    oauthCallbackCompleting: 'Completando conexión. Podrás cerrar esta ventana en un momento.',
+    oauthCallbackManualClose: 'Vuelve a Alzan para terminar la conexión.',
     healthConnectSourceTitle: 'Elige un origen de Health Connect',
     healthConnectNoDataTitle: 'No hay datos en Health Connect',
     healthConnectNoDataMessage:

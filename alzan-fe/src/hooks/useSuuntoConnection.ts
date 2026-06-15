@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,40 @@ import { wearablesLocalHealthApi } from '../modules/wearables';
 const SUUNTO_PROVIDER = 'suunto';
 const QUERY_KEY = ['suuntoConnection'];
 
+interface SuuntoConnection {
+  id: string;
+  created_at: string | null;
+  last_synced_at: string | null;
+  status: string | null;
+}
+
+const getSuuntoRedirectUri = (): string => {
+  if (Platform.OS !== 'web') return 'alzan://oauth/success';
+  if (typeof window === 'undefined') return 'alzan://oauth/success';
+  return `${window.location.origin}/oauth/suunto/success`;
+};
+
+const getOAuthErrorMessage = (url?: string): string | null => {
+  if (!url) return null;
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.searchParams.get('oauth_error');
+  } catch {
+    return null;
+  }
+};
+
+const getSuuntoConnection = async (userId: string): Promise<SuuntoConnection | null> => {
+  const { data, error } = await supabase
+    .from('user_connections')
+    .select('id, created_at, last_synced_at, status')
+    .eq('user_id', userId)
+    .eq('provider', SUUNTO_PROVIDER)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+};
+
 export function useSuuntoConnection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -20,14 +54,7 @@ export function useSuuntoConnection() {
     queryKey: [...QUERY_KEY, user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from('user_connections')
-        .select('id, created_at, last_synced_at, status')
-        .eq('user_id', user.id)
-        .eq('provider', SUUNTO_PROVIDER)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return getSuuntoConnection(user.id);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,
@@ -46,7 +73,7 @@ export function useSuuntoConnection() {
   const connectMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('User not authenticated');
-      const redirectUri = 'alzan://oauth/success';
+      const redirectUri = getSuuntoRedirectUri();
       const { data } = await Providers.getAuthorizationUrl({
         path: { provider: SUUNTO_PROVIDER },
         query: { user_id: user.id, redirect_uri: redirectUri },
@@ -55,7 +82,15 @@ export function useSuuntoConnection() {
       const result = await WebBrowser.openAuthSessionAsync(data.authorization_url, redirectUri, {
         showInRecents: true,
       });
-      if (result.type !== 'success') throw new Error('OAuth flow was cancelled or failed.');
+      const oauthError = getOAuthErrorMessage(result.type === 'success' ? result.url : undefined);
+      if (oauthError) throw new Error(oauthError);
+      if (result.type !== 'success' && !(Platform.OS === 'web' && result.type === 'dismiss')) {
+        throw new Error('OAuth flow was cancelled or failed.');
+      }
+      if (Platform.OS === 'web') {
+        const connection = await getSuuntoConnection(user.id);
+        if (!connection) throw new Error('OAuth flow was cancelled or failed.');
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
