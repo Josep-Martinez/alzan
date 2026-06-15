@@ -29,7 +29,7 @@ import {
   Macros,
   MealComponent,
 } from '../../modules/nutrition/types/ingredients';
-import { MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
+import { MEAL_TYPE_LABELS, MIN_INGREDIENT_QUANTITY_G } from '../../modules/nutrition/constants';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
@@ -81,8 +81,16 @@ const MEAL_RECIPE_PAGE_SIZE = 5;
 const INGREDIENT_AMOUNT_DECIMALS = 1;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const roundIngredientAmount = (amount: number): number =>
-  Math.round(amount * 10 ** INGREDIENT_AMOUNT_DECIMALS) / 10 ** INGREDIENT_AMOUNT_DECIMALS;
+const roundIngredientAmount = (amount: number): number => {
+  if (amount <= 0) return 0;
+  const rounded = Math.round(amount * 10 ** INGREDIENT_AMOUNT_DECIMALS) / 10 ** INGREDIENT_AMOUNT_DECIMALS;
+  // A positive amount that rounds below the storable minimum (e.g. 0.02 g) is bumped
+  // up so the form shows the same value that will be saved to meal_items.
+  if (rounded < MIN_INGREDIENT_QUANTITY_G) {
+    return MIN_INGREDIENT_QUANTITY_G;
+  }
+  return rounded;
+};
 
 const parseIngredientAmountInput = (input: string): number | null => {
   const normalized = input.trim().replace(',', '.');

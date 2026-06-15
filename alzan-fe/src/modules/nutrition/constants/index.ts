@@ -45,3 +45,9 @@ export const DEFAULT_MACROS = {
   carbs_g: 200,
   fats_g: 65,
 };
+
+// Minimum quantity (in grams) accepted when storing a meal ingredient.
+// The DB enforces `meal_items_quantity_g_check` (quantity_g > 0), so any positive
+// amount that would round down to 0 (e.g. saffron at 0.02 g) is bumped up to this
+// minimum instead of failing the insert. Macro impact at this size is negligible.
+export const MIN_INGREDIENT_QUANTITY_G = 0.1;

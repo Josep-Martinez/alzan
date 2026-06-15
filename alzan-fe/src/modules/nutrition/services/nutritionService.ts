@@ -17,8 +17,16 @@ import {
 import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
 import { Locale } from '../../../i18n';
+import { MIN_INGREDIENT_QUANTITY_G } from '../constants';
 
-const roundIngredientQuantity = (quantity: number): number => Math.round(quantity * 10) / 10;
+// Final gate before inserting into meal_items: any positive quantity is clamped to
+// at least MIN_INGREDIENT_QUANTITY_G so we never violate the quantity_g > 0 constraint,
+// regardless of what the caller sent.
+const roundIngredientQuantity = (quantity: number): number => {
+  if (quantity <= 0) return MIN_INGREDIENT_QUANTITY_G;
+  const rounded = Math.round(quantity * 10) / 10;
+  return rounded < MIN_INGREDIENT_QUANTITY_G ? MIN_INGREDIENT_QUANTITY_G : rounded;
+};
 
 interface IngredientNameLookupRow {
   id: string;
