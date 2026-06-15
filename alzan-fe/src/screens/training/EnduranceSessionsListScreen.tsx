@@ -22,7 +22,7 @@ import { useEnduranceSessions } from '../../hooks/useEnduranceSessions';
 import { Activity, Calendar, Trash2, Dumbbell, Filter, X, Route } from 'lucide-react-native';
 import { RouteMap } from '../../components/common/RouteMap';
 import { format, subDays, subMonths, startOfDay } from 'date-fns';
-import { SPORTS_CONFIG, formatDuration } from '../../constants/sports';
+import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ActivitySession } from '../../types/requests.types';
@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { ActivityCalendarView, type ActivityCalendarViewState } from './components/ActivityCalendarView';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 type FilterPreset = 'all' | 'week' | 'month' | 'three_months' | 'custom';
 
@@ -41,7 +42,7 @@ interface DateFilter {
 }
 
 type ActivityView = 'calendar' | 'history';
-type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'];
+type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'] | 'volleyball' | 'trail' | 'golf' | 'hyrox';
 const HISTORY_PAGE_SIZE = 10;
 
 interface HistorySummaryTotals {
@@ -126,6 +127,7 @@ export const EnduranceSessionsListScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const { convertDistanceToUi, convertSpeedToUi, convertWeightToUi } = useUnitConversion();
+  const { getOptionLabel } = useSportCatalog();
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState<DateFilter>({ preset: 'all' });
@@ -238,10 +240,15 @@ export const EnduranceSessionsListScreen = () => {
       { id: 'cycling' as const, label: t('constants.cycling') },
       { id: 'swimming' as const, label: t('constants.swimming') },
       { id: 'hiking' as const, label: t('constants.hiking') },
+      { id: 'trail' as const, label: t('constants.trail') },
       { id: 'football' as const, label: t('constants.football') },
       { id: 'basketball' as const, label: t('constants.basketball') },
       { id: 'tennis' as const, label: t('constants.tennis') },
       { id: 'padel' as const, label: t('constants.padel') },
+      { id: 'skiing' as const, label: t('constants.skiing') },
+      { id: 'snowboard' as const, label: t('constants.snowboard') },
+      { id: 'golf' as const, label: t('constants.golf') },
+      { id: 'hyrox' as const, label: t('constants.hyrox') },
       { id: 'gym' as const, label: t('constants.strength') },
       { id: 'other' as const, label: t('constants.other') },
     ],
@@ -341,7 +348,7 @@ export const EnduranceSessionsListScreen = () => {
   };
 
   const handleOpenSportHistoryFromCalendar = (payload: {
-    sportType: 'gym' | ActivitySession['sport_type'];
+    sportType: HistorySportFilter;
     sportLabel: string;
     rangeStart: string;
     rangeEnd: string;
@@ -887,12 +894,14 @@ export const EnduranceSessionsListScreen = () => {
                 // Build metrics array dynamically
                 const metrics: Array<{ value: string; label: string; unit?: string }> = [];
 
-                metrics.push({
-                  value: session.duration_s ? formatDuration(session.duration_s) : isActive ? '--:--' : '-',
-                  label: t('training.timeAllCaps'),
-                });
+                if (isActive || (session.duration_s != null && session.duration_s > 0)) {
+                  metrics.push({
+                    value: session.duration_s ? formatDuration(session.duration_s) : '--:--',
+                    label: t('training.timeAllCaps'),
+                  });
+                }
 
-                if (!isGym && session.distance_m !== null) {
+                if (!isGym && session.distance_m != null && session.distance_m > 0) {
                   metrics.push({
                     value: String(distanceDisplay),
                     label: t('training.distanceParenAllCaps'),
@@ -908,14 +917,18 @@ export const EnduranceSessionsListScreen = () => {
                 }
 
                 if (isGym) {
-                  metrics.push({
-                    value: session.total_sets ? String(session.total_sets) : '-',
-                    label: t('training.setsAllCaps'),
-                  });
-                  metrics.push({
-                    value: typeof session.calories_kcal === 'number' ? String(Math.round(session.calories_kcal)) : '-',
-                    label: t('training.caloriesKcal'),
-                  });
+                  if (session.total_sets != null && session.total_sets > 0) {
+                    metrics.push({
+                      value: String(session.total_sets),
+                      label: t('training.setsAllCaps'),
+                    });
+                  }
+                  if (typeof session.calories_kcal === 'number' && session.calories_kcal > 0) {
+                    metrics.push({
+                      value: String(Math.round(session.calories_kcal)),
+                      label: t('training.caloriesKcal'),
+                    });
+                  }
                 }
 
                 return (
@@ -943,7 +956,10 @@ export const EnduranceSessionsListScreen = () => {
                           </View>
                           <View style={styles.headerInfo}>
                             <Text style={[styles.sessionTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                              {session.name || (isGym ? t('training.strengthWorkout') : t(config.defaultTitle))}
+                              {session.name ||
+                                (isGym
+                                  ? t('training.strengthWorkout')
+                                  : t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype)))}
                             </Text>
                             <View style={styles.sessionSubRow}>
                               {isActive && (
@@ -968,6 +984,72 @@ export const EnduranceSessionsListScreen = () => {
                                     })
                                   : ''}
                               </Text>
+                              {session.sport_subtype && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(session.sport_type, session.sport_subtype, 'modality')}
+                                  </Text>
+                                </View>
+                              )}
+                              {session.base_load && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(session.sport_type, session.base_load, 'base_load')}
+                                  </Text>
+                                </View>
+                              )}
+                              {session.contact_level && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    {
+                                      backgroundColor: isDark ? 'rgba(214,75,127,0.16)' : 'rgba(214,75,127,0.1)',
+                                    },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: SPORT_COLORS.martial_arts }]}>
+                                    {getOptionLabel(session.sport_type, session.contact_level, 'contact_level')}
+                                  </Text>
+                                </View>
+                              )}
+                              {'golf_club_focus' in session && typeof session.golf_club_focus === 'string' && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(session.sport_type, session.golf_club_focus, 'golf_club_focus')}
+                                  </Text>
+                                </View>
+                              )}
+                              {'hyrox_station_focus' in session && typeof session.hyrox_station_focus === 'string' && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(
+                                      session.sport_type,
+                                      session.hyrox_station_focus,
+                                      'hyrox_station_focus',
+                                    )}
+                                  </Text>
+                                </View>
+                              )}
                               {hasRoute && (
                                 <View
                                   style={[
@@ -1009,36 +1091,38 @@ export const EnduranceSessionsListScreen = () => {
                       )}
 
                       {/* Metrics row */}
-                      <View style={styles.metricsRow}>
-                        {metrics.map((metric, index) => (
-                          <React.Fragment key={metric.label}>
-                            {index > 0 && (
-                              <View
-                                style={[
-                                  styles.metricDivider,
-                                  {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                  },
-                                ]}
-                              />
-                            )}
-                            <View style={styles.metricItem}>
-                              <Text style={[styles.metricValue, { color: themeColors.textPrimary }]}>
-                                {metric.value}
-                                {metric.unit ? (
-                                  <Text style={[styles.metricUnit, { color: themeColors.textSecondary }]}>
-                                    {' '}
-                                    {metric.unit}
-                                  </Text>
-                                ) : null}
-                              </Text>
-                              <Text style={[styles.metricLabel, { color: themeColors.textSecondary }]}>
-                                {metric.label}
-                              </Text>
-                            </View>
-                          </React.Fragment>
-                        ))}
-                      </View>
+                      {metrics.length > 0 && (
+                        <View style={styles.metricsRow}>
+                          {metrics.map((metric, index) => (
+                            <React.Fragment key={metric.label}>
+                              {index > 0 && (
+                                <View
+                                  style={[
+                                    styles.metricDivider,
+                                    {
+                                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                    },
+                                  ]}
+                                />
+                              )}
+                              <View style={styles.metricItem}>
+                                <Text style={[styles.metricValue, { color: themeColors.textPrimary }]}>
+                                  {metric.value}
+                                  {metric.unit ? (
+                                    <Text style={[styles.metricUnit, { color: themeColors.textSecondary }]}>
+                                      {' '}
+                                      {metric.unit}
+                                    </Text>
+                                  ) : null}
+                                </Text>
+                                <Text style={[styles.metricLabel, { color: themeColors.textSecondary }]}>
+                                  {metric.label}
+                                </Text>
+                              </View>
+                            </React.Fragment>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 );
@@ -1210,6 +1294,15 @@ const styles = StyleSheet.create({
   activeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  subtypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  subtypeBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   routeBadge: {
     width: 20,

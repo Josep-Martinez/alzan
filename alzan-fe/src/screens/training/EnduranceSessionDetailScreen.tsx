@@ -21,7 +21,7 @@ import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../type
 import { GlassCard } from '../../components/GlassCard';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
-import { SPORTS_CONFIG, formatDuration } from '../../constants/sports';
+import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
 import { format } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
@@ -51,27 +51,33 @@ import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useUploadPolyline } from '../../hooks/useActivityPolyline';
-import { useApplyStrengthActivityImport, usePickStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
+import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
 import { Tooltip } from '../../components/common/Tooltip';
 import { RouteMap } from '../../components/common/RouteMap';
-import {
-  ImportedStrengthActivitySummary,
-  STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG,
-  StrengthActivityProvider,
-} from '../../services/strengthActivityImportService';
+import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
+import { ImportReviewBlocks } from './components/ImportReviewBlocks';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabaseClient';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { SPORT_COLORS } from '../../theme/sportColors';
+
+const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
+const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
+const HYROX_SPORT_TYPE = 'hyrox' as ActivitySession['sport_type'];
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceSessionDetail'>>();
-  const { session: initialSession } = route.params || {};
+  const { session: initialSession, sessionId: sessionIdParam } = route.params || {};
   const [session, setSession] = useState<ActivitySession | undefined>(initialSession);
+  const queryClient = useQueryClient();
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
+  const { getOptionLabel } = useSportCatalog();
   const updateSet = useUpdateWorkoutSet();
-  const pickStrengthActivityImport = usePickStrengthActivityImport();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
 
   // State for editing sets (gym only)
@@ -84,9 +90,13 @@ export const EnduranceSessionDetailScreen = () => {
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
 
+  // Rename modal state (always-available Strava-like editing)
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+
   const [routePolyline, setRoutePolyline] = useState<string | null>(session?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
-  const [pendingStrengthImport, setPendingStrengthImport] = useState<ImportedStrengthActivitySummary | null>(null);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
@@ -97,6 +107,45 @@ export const EnduranceSessionDetailScreen = () => {
   const uploadPolyline = useUploadPolyline({
     onPolylineUploaded: polyline => setRoutePolyline(polyline),
   });
+
+  // Fresh session row — keeps import-review state (duplicates, suggestions,
+  // pending watch metrics) in sync after review actions.
+  const activeSessionId = session?.id ?? sessionIdParam;
+  const { data: freshSession } = useQuery({
+    queryKey: ['activitySession', activeSessionId],
+    queryFn: async (): Promise<ActivitySession | null> => {
+      if (!activeSessionId) return null;
+      const { data, error } = await supabase
+        .from('activity_sessions')
+        .select('*')
+        .eq('id', activeSessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeSessionId,
+  });
+  useEffect(() => {
+    if (freshSession) {
+      setSession(freshSession);
+      setRoutePolyline(current => freshSession.route_polyline ?? current);
+    }
+  }, [freshSession]);
+
+  // Opening an imported activity acknowledges its "new activity" review
+  // summary so the home banner/sheet stops surfacing it (hard conflicts keep
+  // showing until resolved via their own columns).
+  useEffect(() => {
+    if (!freshSession?.id || freshSession.imported_at == null || freshSession.import_review_seen_at != null) return;
+    void supabase
+      .from('activity_sessions')
+      .update({ import_review_seen_at: new Date().toISOString() })
+      .eq('id', freshSession.id)
+      .is('import_review_seen_at', null)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      });
+  }, [freshSession?.id, freshSession?.imported_at, freshSession?.import_review_seen_at, queryClient]);
 
   // Fetch workout sets for gym sessions
   const { data: sessionDetail } = useSessionDetail(session?.sport_type === 'strength' ? session?.id : undefined);
@@ -110,6 +159,34 @@ export const EnduranceSessionDetailScreen = () => {
   const { data: laps } = useSessionLaps(session?.id);
   const { data: heartRateZones } = useSessionHeartRateZones(session?.id);
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(session?.id);
+
+  // Fetch template details to get surface and environment type
+  const { data: template } = useQuery({
+    queryKey: ['enduranceTemplateDetail', session?.endurance_template_id],
+    queryFn: async () => {
+      if (!session?.endurance_template_id) return null;
+      const { data, error } = await supabase
+        .from('endurance_workout_templates')
+        .select('*')
+        .eq('id', session.endurance_template_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!session?.endurance_template_id,
+  });
+
+  const getEnvironmentDisplayLabel = (type?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, type, 'modality');
+
+  const getSurfaceDisplayLabel = (surf?: string | null) =>
+    getOptionLabel(template?.sport_type || session?.sport_type, surf, 'terrain');
+
+  const getBaseLoadDisplayLabel = (load?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, load, 'base_load');
+
+  const getContactLevelDisplayLabel = (level?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, level, 'contact_level');
 
   const formatSplitDistanceBucketLabel = useCallback((splitDistanceM: number) => {
     const distanceKm = splitDistanceM / 1000;
@@ -284,88 +361,75 @@ export const EnduranceSessionDetailScreen = () => {
     [],
   );
 
-  const formatMaybeDate = useCallback(
-    (value: string | null | undefined) =>
-      value
-        ? format(new Date(value), 'd MMM yyyy · HH:mm', {
-            locale: getDateFnsLocale(),
-          })
-        : '-',
-    [],
-  );
+  const openRenameModal = useCallback(() => {
+    if (!session) return;
+    setRenameValue(session.name ?? '');
+    setRenameVisible(true);
+  }, [session]);
 
-  const getProviderLabel = useCallback(
-    (provider: StrengthActivityProvider) => {
-      switch (provider) {
-        case 'suunto':
-          return 'Suunto';
-        case 'strava':
-          return 'Strava';
-        case 'garmin':
-          return 'Garmin';
-        case 'polar':
-          return 'Polar';
-        case 'unknown':
-          return t('training.unknownProvider');
-      }
-    },
-    [t],
-  );
+  const handleRenameSave = useCallback(async () => {
+    if (!session) return;
+    const trimmed = renameValue.trim();
+    setRenameSaving(true);
+    const { error } = await supabase
+      .from('activity_sessions')
+      .update({ name: trimmed || null })
+      .eq('id', session.id);
+    setRenameSaving(false);
+    if (error) {
+      Alert.alert(t('common.error'), t('training.importReviewActionError'));
+      return;
+    }
+    setSession(current => (current ? { ...current, name: trimmed || null } : current));
+    setRenameVisible(false);
+    queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+    queryClient.invalidateQueries({ queryKey: ['activitySession', session.id] });
+  }, [session, renameValue, queryClient, t]);
 
   const handlePickStrengthActivityFile = useCallback(() => {
-    pickStrengthActivityImport.mutate(undefined, {
-      onSuccess: summary => setPendingStrengthImport(summary),
-      onError: (error: Error) => {
-        if (error.message === 'CANCELLED') return;
-
-        const message =
-          error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
-            ? t('training.strengthActivityUnsupportedError')
-            : t('training.strengthActivityParseError');
-        Alert.alert(t('training.uploadActivityFile'), message);
-      },
-    });
-  }, [pickStrengthActivityImport, t]);
-
-  const handleApplyStrengthActivityImport = useCallback(() => {
-    if (!session || !pendingStrengthImport) return;
+    if (!session) return;
 
     applyStrengthActivityImport.mutate(
       {
         sessionId: session.id,
-        summary: pendingStrengthImport,
       },
       {
-        onSuccess: () => {
+        onSuccess: summary => {
           setSession(current => {
             if (!current) return current;
             return {
               ...current,
-              provider: pendingStrengthImport.provider === 'unknown' ? 'other' : pendingStrengthImport.provider,
+              provider: summary.provider === 'unknown' ? 'other' : summary.provider,
               imported_at: new Date().toISOString(),
-              start_time: pendingStrengthImport.startedAt ?? current.start_time,
-              end_time: pendingStrengthImport.endedAt ?? current.end_time,
-              duration_s: pendingStrengthImport.durationSeconds ?? current.duration_s,
-              calories_kcal: pendingStrengthImport.caloriesKcal ?? current.calories_kcal,
-              avg_heart_rate: pendingStrengthImport.avgHeartRate ?? current.avg_heart_rate,
-              max_heart_rate: pendingStrengthImport.maxHeartRate ?? current.max_heart_rate,
-              min_heart_rate: pendingStrengthImport.minHeartRate ?? current.min_heart_rate,
-              tss_hr: pendingStrengthImport.tss ?? current.tss_hr,
-              epoc: pendingStrengthImport.epoc ?? current.epoc,
-              pte: pendingStrengthImport.pte ?? current.pte,
-              total_steps: pendingStrengthImport.totalSteps ?? current.total_steps,
-              recovery_time_s: pendingStrengthImport.recoveryTimeSeconds ?? current.recovery_time_s,
+              start_time: summary.startedAt ?? current.start_time,
+              end_time: summary.endedAt ?? current.end_time,
+              duration_s: summary.durationSeconds ?? current.duration_s,
+              calories_kcal: summary.caloriesKcal ?? current.calories_kcal,
+              avg_heart_rate: summary.avgHeartRate ?? current.avg_heart_rate,
+              max_heart_rate: summary.maxHeartRate ?? current.max_heart_rate,
+              min_heart_rate: summary.minHeartRate ?? current.min_heart_rate,
+              tss_hr: summary.tss ?? current.tss_hr,
+              epoc: summary.epoc ?? current.epoc,
+              pte: summary.pte ?? current.pte,
+              total_steps: summary.totalSteps ?? current.total_steps,
+              recovery_time_s: summary.recoveryTimeSeconds ?? current.recovery_time_s,
             };
           });
-          setPendingStrengthImport(null);
           Alert.alert(t('training.uploadActivityFile'), t('training.importedFileApplied'));
         },
-        onError: () => {
-          Alert.alert(t('training.uploadActivityFile'), t('training.importActivityFileError'));
+        onError: (error: Error) => {
+          if (error.message === 'CANCELLED') return;
+          const message =
+            error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
+              ? t('training.strengthActivityUnsupportedError')
+              : error.message === 'STRENGTH_ACTIVITY_PARSE_ERROR'
+                ? t('training.strengthActivityParseError')
+                : t('training.importActivityFileError');
+          Alert.alert(t('training.uploadActivityFile'), message);
         },
       },
     );
-  }, [applyStrengthActivityImport, pendingStrengthImport, session, t]);
+  }, [applyStrengthActivityImport, session, t]);
 
   if (!session) return null;
 
@@ -533,42 +597,42 @@ export const EnduranceSessionDetailScreen = () => {
 
   const secondaryMetrics: Array<{ key: string; label: string; value: string }> = [];
   if (!isGymSession) {
-    if (session.avg_heart_rate != null) {
+    if (session.avg_heart_rate != null && session.avg_heart_rate > 0) {
       secondaryMetrics.push({
         key: 'avg-heart-rate',
         label: t('health.heartRate'),
         value: `${session.avg_heart_rate}${t('health.unitBpm')}`,
       });
     }
-    if (session.elev_gain_m != null) {
+    if (session.elev_gain_m != null && session.elev_gain_m > 0) {
       secondaryMetrics.push({
         key: 'elevation-gain',
         label: t('training.elevationM'),
         value: `${Math.round(session.elev_gain_m)} m`,
       });
     }
-    if (session.elev_loss_m != null) {
+    if (session.elev_loss_m != null && session.elev_loss_m > 0) {
       secondaryMetrics.push({
         key: 'elevation-loss',
         label: t('training.elevationLossM'),
         value: `${Math.round(session.elev_loss_m)} m`,
       });
     }
-    if (session.rpe != null) {
+    if (session.rpe != null && session.rpe > 0) {
       secondaryMetrics.push({
         key: 'rpe',
         label: t('training.effortRpe'),
         value: `${Math.round(session.rpe)}/10`,
       });
     }
-    if (session.vo2_max != null) {
+    if (session.vo2_max != null && session.vo2_max > 0) {
       secondaryMetrics.push({
         key: 'vo2',
         label: t('training.vo2Max'),
         value: `${session.vo2_max.toFixed(1)}`,
       });
     }
-    if (session.total_steps != null) {
+    if (session.total_steps != null && session.total_steps > 0) {
       secondaryMetrics.push({
         key: 'steps',
         label: t('training.totalSteps'),
@@ -581,6 +645,248 @@ export const EnduranceSessionDetailScreen = () => {
         label: t('training.recoveryTime'),
         value: `${recoveryHours} h`,
       });
+    }
+    if (session.sport_type === 'football') {
+      if (session.football_session_type) {
+        secondaryMetrics.push({
+          key: 'football-session-type',
+          label: t('training.sessionTypeLabel'),
+          value:
+            session.football_session_type === 'match'
+              ? t('training.matchLabel')
+              : session.football_session_type === 'training'
+                ? t('training.trainingLabel')
+                : t('training.pachangaLabel'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'football-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      if (session.rival) {
+        secondaryMetrics.push({
+          key: 'football-rival',
+          label: t('training.rivalLabel'),
+          value: session.rival,
+        });
+      }
+      secondaryMetrics.push({
+        key: 'football-boots',
+        label: t('training.bootsLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
+    if (session.sport_type === 'climbing') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'climbing-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      if (session.climbing_grade) {
+        secondaryMetrics.push({
+          key: 'climbing-grade',
+          label: t('training.gradeLabel'),
+          value: getOptionLabel(session.sport_type, session.climbing_grade, 'climbing_grade'),
+        });
+      }
+    }
+    if (session.sport_type === VOLLEYBALL_SPORT_TYPE) {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'volleyball-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'volleyball-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (session.sport_type === TRAIL_SPORT_TYPE) {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'trail-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.surface) {
+        secondaryMetrics.push({
+          key: 'trail-surface',
+          label: t('training.surfaceLabel'),
+          value: getOptionLabel(session.sport_type, session.surface, 'terrain'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'trail-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (session.sport_type === 'tennis') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'tennis-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      secondaryMetrics.push({
+        key: 'tennis-racket',
+        label: t('training.racketLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
+    if (session.sport_type === 'padel') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'padel-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      secondaryMetrics.push({
+        key: 'padel-racket',
+        label: t('training.palaLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
+    if (session.sport_type === 'hiking') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'hiking-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      secondaryMetrics.push({
+        key: 'hiking-boots',
+        label: t('training.shoesLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
+    if (session.sport_type === 'skiing') {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'skiing-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.ski_type) {
+        secondaryMetrics.push({
+          key: 'skiing-ski-type',
+          label: t('training.skiLabel'),
+          value: getOptionLabel(session.sport_type, session.ski_type, 'ski_type'),
+        });
+      }
+      if (session.slope_type) {
+        secondaryMetrics.push({
+          key: 'skiing-slope-type',
+          label: t('training.slopeLabel'),
+          value: getOptionLabel(session.sport_type, session.slope_type, 'slope_type'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'skiing-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (session.sport_type === 'snowboard') {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'snowboard-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.snowboard_type) {
+        secondaryMetrics.push({
+          key: 'snowboard-snowboard-type',
+          label: t('training.snowboardLabel'),
+          value: getOptionLabel(session.sport_type, session.snowboard_type, 'snowboard_type'),
+        });
+      }
+      if (session.slope_type) {
+        secondaryMetrics.push({
+          key: 'snowboard-slope-type',
+          label: t('training.slopeLabel'),
+          value: getOptionLabel(session.sport_type, session.slope_type, 'slope_type'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'snowboard-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (String(session.sport_type) === 'golf') {
+      const golfClubFocus =
+        'golf_club_focus' in session && typeof session.golf_club_focus === 'string' ? session.golf_club_focus : null;
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'golf-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (golfClubFocus) {
+        secondaryMetrics.push({
+          key: 'golf-club-focus',
+          label: t('training.golfClubFocusLabel'),
+          value: getOptionLabel(session.sport_type, golfClubFocus, 'golf_club_focus'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'golf-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (session.sport_type === HYROX_SPORT_TYPE) {
+      const hyroxStationFocus =
+        'hyrox_station_focus' in session && typeof session.hyrox_station_focus === 'string'
+          ? session.hyrox_station_focus
+          : null;
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'hyrox-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (hyroxStationFocus) {
+        secondaryMetrics.push({
+          key: 'hyrox-station-focus',
+          label: t('training.hyroxStationFocusLabel'),
+          value: getOptionLabel(session.sport_type, hyroxStationFocus, 'hyrox_station_focus'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'hyrox-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
     }
   }
 
@@ -653,68 +959,93 @@ export const EnduranceSessionDetailScreen = () => {
 
   const strengthImportedMetrics: Array<{ key: string; label: string; value: string; hasInfo?: boolean }> = [];
   if (isGymSession && session.imported_at) {
-    const numberWithUnitOrDash = (value: number | null | undefined, unit: string) =>
-      value != null ? `${Math.round(value)} ${unit}` : '-';
+    const formatPositiveNumberWithUnit = (value: number | null | undefined, unit: string) =>
+      value != null && value > 0 ? `${Math.round(value)} ${unit}` : null;
 
-    strengthImportedMetrics.push(
-      {
+    if (session.duration_s != null && session.duration_s > 0) {
+      strengthImportedMetrics.push({
         key: 'duration',
         label: t('training.duration'),
-        value: session.duration_s != null ? formatMaybeDuration(session.duration_s) : '-',
+        value: formatMaybeDuration(session.duration_s),
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const caloriesLabel = formatPositiveNumberWithUnit(importedCalories, t('nutrition.kcal'));
+    if (caloriesLabel) {
+      strengthImportedMetrics.push({
         key: 'calories',
         label: t('nutrition.kcal'),
-        value: numberWithUnitOrDash(importedCalories, t('nutrition.kcal')),
+        value: caloriesLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const avgHeartRateLabel = formatPositiveNumberWithUnit(importedAvgHr, t('health.unitBpm'));
+    if (avgHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'avg-heart-rate',
         label: t('training.avgHeartRate'),
-        value: numberWithUnitOrDash(importedAvgHr, t('health.unitBpm')),
+        value: avgHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const maxHeartRateLabel = formatPositiveNumberWithUnit(importedMaxHr, t('health.unitBpm'));
+    if (maxHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'max-heart-rate',
         label: t('training.maxHeartRate'),
-        value: numberWithUnitOrDash(importedMaxHr, t('health.unitBpm')),
+        value: maxHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const minHeartRateLabel = formatPositiveNumberWithUnit(importedMinHr, t('health.unitBpm'));
+    if (minHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'min-heart-rate',
         label: t('training.minHeartRate'),
-        value: numberWithUnitOrDash(importedMinHr, t('health.unitBpm')),
+        value: minHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedTss != null && importedTss > 0) {
+      strengthImportedMetrics.push({
         key: 'tss',
         label: t('training.tssHr'),
-        value: importedTss != null ? `${Math.round(importedTss)}` : '-',
+        value: `${Math.round(importedTss)}`,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedEpoc != null && importedEpoc > 0) {
+      strengthImportedMetrics.push({
         key: 'epoc',
         label: t('training.epoc'),
-        value: importedEpoc != null ? `${Math.round(importedEpoc)}` : '-',
+        value: `${Math.round(importedEpoc)}`,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedPte != null && importedPte > 0) {
+      strengthImportedMetrics.push({
         key: 'pte',
         label: t('training.pte'),
-        value: importedPte != null ? importedPte.toFixed(1).replace('.', ',') : '-',
+        value: importedPte.toFixed(1).replace('.', ','),
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedRecoverySeconds != null && importedRecoverySeconds > 0) {
+      strengthImportedMetrics.push({
         key: 'recovery',
         label: t('training.recoveryTime'),
-        value:
-          importedRecoverySeconds != null && importedRecoverySeconds >= 0
-            ? formatMaybeDuration(importedRecoverySeconds)
-            : '-',
+        value: formatMaybeDuration(importedRecoverySeconds),
         hasInfo: true,
-      },
-    );
+      });
+    }
   }
 
   const renderProgrammedWorkoutSection = () => {
@@ -867,10 +1198,10 @@ export const EnduranceSessionDetailScreen = () => {
                       handlePickStrengthActivityFile();
                     }
                   }}
-                  disabled={pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending}
+                  disabled={applyStrengthActivityImport.isPending}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  {pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending ? (
+                  {applyStrengthActivityImport.isPending ? (
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Upload size={16} color={themeColors.primary} />
@@ -886,12 +1217,135 @@ export const EnduranceSessionDetailScreen = () => {
             <View style={[styles.iconContainer, dynamicStyles.iconContainer]}>
               <Icon size={32} color={themeColors.primary} sport={session.sport_type} />
             </View>
-            <Text style={[styles.activityName, dynamicStyles.title]}>{session.name || t(config.defaultTitle)}</Text>
+            <TouchableOpacity
+              onPress={openRenameModal}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}
+              accessibilityLabel={t('training.importRenameActivity')}
+            >
+              <Text style={[styles.activityName, dynamicStyles.title]}>
+                {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+              </Text>
+              <Pencil size={16} color={themeColors.textSecondary} />
+            </TouchableOpacity>
             <Text style={[styles.date, dynamicStyles.subtitle]}>
               {format(new Date(session.start_time), 'EEEE d MMMM, yyyy \u00B7 HH:mm', {
                 locale: getDateFnsLocale(),
               })}
             </Text>
+            {(session.sport_subtype ||
+              session.surface ||
+              session.base_load ||
+              session.contact_level ||
+              ('hyrox_station_focus' in session && session.hyrox_station_focus) ||
+              template?.surface ||
+              template?.environment_type ||
+              template?.base_load ||
+              template?.contact_level ||
+              ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus)) && (
+              <View style={styles.metadataTagsContainer}>
+                {(session.sport_subtype || template?.environment_type) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(0,122,255,0.15)' : 'rgba(0,122,255,0.08)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.primary }]}>
+                      {getEnvironmentDisplayLabel(session.sport_subtype || template?.environment_type)}
+                    </Text>
+                  </View>
+                )}
+                {(session.surface || template?.surface) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getSurfaceDisplayLabel(session.surface || template?.surface)}
+                    </Text>
+                  </View>
+                )}
+                {(session.base_load || template?.base_load) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getBaseLoadDisplayLabel(session.base_load || template?.base_load)}
+                    </Text>
+                  </View>
+                )}
+                {(session.contact_level || template?.contact_level) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(214,75,127,0.16)' : 'rgba(214,75,127,0.1)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: SPORT_COLORS.martial_arts }]}>
+                      {getContactLevelDisplayLabel(session.contact_level || template?.contact_level)}
+                    </Text>
+                  </View>
+                )}
+                {(session.sport_type || template?.sport_type) === 'swimming' &&
+                  (session.pool_type || template?.pool_type) && (
+                    <View
+                      style={[
+                        styles.metadataTag,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      ]}
+                    >
+                      <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                        {getOptionLabel(
+                          session.sport_type || template?.sport_type,
+                          session.pool_type || template?.pool_type,
+                          'pool_type',
+                        )}
+                      </Text>
+                    </View>
+                  )}
+                {(session.sport_type || template?.sport_type) === 'swimming' &&
+                  (session.stroke || template?.stroke) && (
+                    <View
+                      style={[
+                        styles.metadataTag,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      ]}
+                    >
+                      <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                        {getOptionLabel(
+                          session.sport_type || template?.sport_type,
+                          session.stroke || template?.stroke,
+                          'stroke',
+                        )}
+                      </Text>
+                    </View>
+                  )}
+                {(('hyrox_station_focus' in session && session.hyrox_station_focus) ||
+                  ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus)) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getOptionLabel(
+                        session.sport_type,
+                        ('hyrox_station_focus' in session && session.hyrox_station_focus) ||
+                          ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus) ||
+                          null,
+                        'hyrox_station_focus',
+                      )}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Route Map — shown only for endurance sessions with a polyline */}
@@ -1050,6 +1504,27 @@ export const EnduranceSessionDetailScreen = () => {
                     <Text style={[styles.secondaryMetricValue, dynamicStyles.title]}>{metric.value}</Text>
                   </View>
                 ))}
+              </GlassCard>
+            </View>
+          )}
+
+          {/* Import review: duplicates, watch conflicts, suggestions and template association */}
+          <ImportReviewBlocks
+            session={session}
+            hasSets={exerciseGroups.length > 0}
+            onCompleteExercises={() => navigation.navigate('CompleteExercises', { sessionId: session.id })}
+            onSessionReplaced={newSessionId =>
+              navigation.replace('EnduranceSessionDetail', { sessionId: newSessionId })
+            }
+          />
+
+          {!isGymSession && (session.notes || template?.notes) && (
+            <View style={styles.sectionContainer}>
+              <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('training.notesLabel')}</Text>
+              <GlassCard style={[styles.stepsCard, dynamicStyles.glassCard, { padding: spacing.m }]}>
+                <Text style={{ color: themeColors.textPrimary, fontSize: 14, lineHeight: 20 }}>
+                  {session.notes || template?.notes}
+                </Text>
               </GlassCard>
             </View>
           )}
@@ -1412,115 +1887,57 @@ export const EnduranceSessionDetailScreen = () => {
         </ScrollView>
       </SafeAreaView>
 
-      <Modal
-        visible={!!pendingStrengthImport}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPendingStrengthImport(null)}
-      >
+      {/* Rename Activity Modal */}
+      <Modal visible={renameVisible} transparent animationType="fade" onRequestClose={() => setRenameVisible(false)}>
         <View style={styles.modalContainer}>
           <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={isDark ? 'dark' : 'light'} />
-
-          <TouchableWithoutFeedback onPress={() => setPendingStrengthImport(null)}>
+          <TouchableWithoutFeedback onPress={() => setRenameVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
-
-          <View style={styles.modalKeyboard}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
             <View
               style={[
-                styles.importPreviewCard,
+                styles.modalCard,
                 {
-                  backgroundColor: isDark ? 'rgba(28,28,30,0.96)' : 'rgba(255,255,255,0.96)',
-                  shadowColor: isDark ? '#000' : themeColors.primary,
+                  backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                  shadowColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)',
                 },
               ]}
             >
               <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setPendingStrengthImport(null)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => setRenameVisible(false)}
+                style={[
+                  styles.modalCloseButton,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                ]}
               >
-                <X size={18} color={themeColors.textSecondary} />
+                <X size={20} color={themeColors.textSecondary} />
               </TouchableOpacity>
-
-              <Text style={[styles.importPreviewTitle, { color: themeColors.textPrimary }]}>
-                {t('training.importedActivityPreview')}
+              <Text style={[styles.modalLabel, { color: themeColors.textSecondary }]}>
+                {t('training.importRenameActivity').toUpperCase()}
               </Text>
-
-              {pendingStrengthImport && (
-                <View style={styles.importPreviewRows}>
-                  {(
-                    [
-                      { label: t('training.provider'), value: getProviderLabel(pendingStrengthImport.provider) },
-                      { label: t('training.startDate'), value: formatMaybeDate(pendingStrengthImport.startedAt) },
-                      {
-                        label: t('training.duration'),
-                        value: formatMaybeDuration(pendingStrengthImport.durationSeconds),
-                      },
-                      {
-                        label: t('nutrition.kcal'),
-                        value:
-                          pendingStrengthImport.caloriesKcal != null
-                            ? `${pendingStrengthImport.caloriesKcal} ${t('nutrition.kcal')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.avgHeartRate'),
-                        value:
-                          pendingStrengthImport.avgHeartRate != null
-                            ? `${pendingStrengthImport.avgHeartRate} ${t('health.unitBpm')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.maxHeartRate'),
-                        value:
-                          pendingStrengthImport.maxHeartRate != null
-                            ? `${pendingStrengthImport.maxHeartRate} ${t('health.unitBpm')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.totalSteps'),
-                        value: pendingStrengthImport.totalSteps != null ? `${pendingStrengthImport.totalSteps}` : '-',
-                      },
-                      {
-                        label: t('training.recoveryTime'),
-                        value:
-                          pendingStrengthImport.recoveryTimeSeconds != null
-                            ? formatMaybeDuration(pendingStrengthImport.recoveryTimeSeconds)
-                            : '-',
-                      },
-                      {
-                        label: t('training.device'),
-                        value:
-                          [pendingStrengthImport.device?.name, pendingStrengthImport.device?.model]
-                            .filter((value): value is string => !!value)
-                            .join(' · ') || '-',
-                      },
-                    ] satisfies Array<{ label: string; value: string }>
-                  ).map(row => (
-                    <View key={row.label} style={styles.importPreviewRow}>
-                      <Text style={[styles.secondaryMetricLabel, dynamicStyles.sublabel]}>{row.label}</Text>
-                      <Text style={[styles.secondaryMetricValue, dynamicStyles.title]}>{row.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
+              <TextInput
+                style={[styles.renameInput, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                placeholder={t('training.importRenamePlaceholder')}
+                placeholderTextColor={themeColors.textSecondary}
+                autoFocus
+                selectTextOnFocus
+              />
               <TouchableOpacity
                 style={[
                   styles.modalSaveButton,
                   { backgroundColor: themeColors.primary, shadowColor: themeColors.primary },
-                  applyStrengthActivityImport.isPending && styles.modalSaveDisabled,
+                  renameSaving && styles.modalSaveDisabled,
                 ]}
-                onPress={handleApplyStrengthActivityImport}
-                disabled={applyStrengthActivityImport.isPending}
+                onPress={handleRenameSave}
+                disabled={renameSaving}
               >
-                <Text style={styles.modalSaveText}>
-                  {applyStrengthActivityImport.isPending ? '...' : t('training.applyImportedActivity')}
-                </Text>
+                <Text style={styles.modalSaveText}>{renameSaving ? '...' : t('common.save')}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1645,6 +2062,21 @@ const styles = StyleSheet.create({
   mainHeader: {
     alignItems: 'center',
     marginBottom: spacing.l,
+  },
+  metadataTagsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  metadataTag: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.s,
+  },
+  metadataTagText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   iconContainer: {
     backgroundColor: colors.surface,
@@ -1959,6 +2391,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 0,
     includeFontPadding: false,
+  },
+  renameInput: {
+    fontSize: 18,
+    fontWeight: '600',
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    marginBottom: spacing.m,
   },
   modalInputUnit: {
     fontSize: 14,

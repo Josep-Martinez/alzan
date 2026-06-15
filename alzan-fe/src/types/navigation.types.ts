@@ -125,6 +125,7 @@ export type TrainingStackParamList = {
       }
     | undefined;
   EnduranceSessionDetail: { sessionId?: string; session?: ActivitySession };
+  CompleteExercises: { sessionId: string };
   EnduranceWorkoutBuilder: { templateId?: string; sportType?: SportType } | undefined;
   SportTemplatesList: { assignToDate?: string } | undefined;
   WeeklyPlan: { date?: string } | undefined;
@@ -138,9 +139,7 @@ export type TrainingStackParamList = {
 // ============================================================================
 
 export type NutritionStackParamList = {
-  NutritionHome: {
-    returnDate?: string; // Optional date to return to after adding a meal
-  };
+  NutritionHome: undefined;
   NutritionSettings: undefined;
   MealLogForm: {
     date: string;
@@ -190,6 +189,7 @@ export type SettingsStackParamList = {
   DeleteAccount: undefined;
   TrainingSettings: undefined;
   NutritionSettings: undefined;
+  HealthSettings: undefined;
   StatsGlobal: undefined;
 };
 

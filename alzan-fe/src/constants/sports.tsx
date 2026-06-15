@@ -14,6 +14,15 @@ const BasketballIcon = (props: SportIconProps) => <SportIcon {...props} sport="b
 const TennisIcon = (props: SportIconProps) => <SportIcon {...props} sport="tennis" />;
 const OtherIcon = (props: SportIconProps) => <SportIcon {...props} sport="other" />;
 const PadelIcon = (props: SportIconProps) => <SportIcon {...props} sport="padel" />;
+const MartialArtsIcon = (props: SportIconProps) => <SportIcon {...props} sport="martial_arts" />;
+const ClimbingIcon = (props: SportIconProps) => <SportIcon {...props} sport="climbing" />;
+const SurfIcon = (props: SportIconProps) => <SportIcon {...props} sport="surf" />;
+const VolleyballIcon = (props: SportIconProps) => <SportIcon {...props} sport="volleyball" />;
+const TrailIcon = (props: SportIconProps) => <SportIcon {...props} sport="trail" />;
+const SkiingIcon = (props: SportIconProps) => <SportIcon {...props} sport="skiing" />;
+const SnowboardIcon = (props: SportIconProps) => <SportIcon {...props} sport="snowboard" />;
+const GolfIcon = (props: SportIconProps) => <SportIcon {...props} sport="golf" />;
+const HyroxIcon = (props: SportIconProps) => <SportIcon {...props} sport="hyrox" />;
 
 export type SportConfig = {
   id: SportType;
@@ -69,6 +78,38 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
     fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
     defaultTitle: 'constants.hikingTitle',
   },
+  martial_arts: {
+    id: 'martial_arts',
+    label: 'constants.martialArts',
+    icon: MartialArtsIcon,
+    units: {},
+    fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.martialArtsTitle',
+  },
+  climbing: {
+    id: 'climbing',
+    label: 'constants.climbing',
+    icon: ClimbingIcon,
+    units: {},
+    fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.climbingTitle',
+  },
+  volleyball: {
+    id: 'volleyball' as SportType,
+    label: 'constants.volleyball',
+    icon: VolleyballIcon,
+    units: {},
+    fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.volleyballTitle',
+  },
+  trail: {
+    id: 'trail' as SportType,
+    label: 'constants.trail',
+    icon: TrailIcon,
+    units: { distance: 'km', speed: 'min/km' },
+    fields: { distance: true, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.trailTitle',
+  },
   football: {
     id: 'football',
     label: 'constants.football',
@@ -117,9 +158,49 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
     fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: false },
     defaultTitle: 'constants.gymTitle',
   },
+  surf: {
+    id: 'surf',
+    label: 'constants.surf',
+    icon: SurfIcon,
+    units: { distance: 'km' },
+    fields: { distance: true, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.surfTitle',
+  },
+  skiing: {
+    id: 'skiing' as SportType,
+    label: 'constants.skiing',
+    icon: SkiingIcon,
+    units: { distance: 'km', speed: 'km/h' },
+    fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.skiingTitle',
+  },
+  snowboard: {
+    id: 'snowboard' as SportType,
+    label: 'constants.snowboard',
+    icon: SnowboardIcon,
+    units: { distance: 'km', speed: 'km/h' },
+    fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.snowboardTitle',
+  },
+  golf: {
+    id: 'golf' as SportType,
+    label: 'constants.golf',
+    icon: GolfIcon,
+    units: {},
+    fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.golfTitle',
+  },
+  hyrox: {
+    id: 'hyrox' as SportType,
+    label: 'constants.hyrox',
+    icon: HyroxIcon,
+    units: { distance: 'km', speed: 'min/km' },
+    fields: { distance: true, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.hyroxTitle',
+  },
 };
 
-export const SPORT_GOALS: Record<SportType, string[]> = {
+export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail' | 'golf' | 'hyrox', string[]>> = {
   running: ['5 km', '10 km', '15 km', '21 km', '42 km'],
   cycling: ['50 km', '80 km', '100 km', '180 km', '250 km'],
   swimming: ['400 m', '800 m', '1500 m', '1900 m', '3800 m'],
@@ -129,9 +210,48 @@ export const SPORT_GOALS: Record<SportType, string[]> = {
   tennis: [],
   padel: ['1 set', '2 sets', '3 sets'],
   hiking: [],
+  martial_arts: [],
+  climbing: [],
+  volleyball: [],
+  trail: [],
   other: [],
   strength: [],
   gym: [],
+  surf: [],
+  skiing: [],
+  snowboard: [],
+  golf: [],
+  hyrox: [],
+};
+
+// Subtype-specific default titles, used when an imported/manual session has no name
+// and the generic sport title would be misleading (e.g. "Ruta en bici" for an indoor ride).
+const SPORT_SUBTYPE_TITLES: Partial<Record<string, Partial<Record<string, TranslationKey>>>> = {
+  cycling: {
+    indoor_trainer: 'constants.cyclingIndoorTitle',
+    spinning: 'constants.cyclingSpinningTitle',
+    mtb: 'constants.cyclingMtbTitle',
+    gravel: 'constants.cyclingGravelTitle',
+    urban: 'constants.cyclingUrbanTitle',
+  },
+  running: {
+    treadmill: 'constants.runningTreadmillTitle',
+    track: 'constants.runningTrackTitle',
+  },
+  swimming: {
+    open_water: 'constants.swimmingOpenWaterTitle',
+  },
+};
+
+export const getSportDefaultTitleKey = (
+  sportType: string | null | undefined,
+  sportSubtype?: string | null,
+): TranslationKey => {
+  const subtypeTitle = sportType && sportSubtype ? SPORT_SUBTYPE_TITLES[sportType]?.[sportSubtype] : undefined;
+  if (subtypeTitle) return subtypeTitle;
+  // Gym sessions (including watch imports) use sport_type 'strength', which has no SPORTS_CONFIG entry.
+  if (sportType === 'strength') return 'constants.gymTitle';
+  return SPORTS_CONFIG[sportType ?? '']?.defaultTitle ?? 'constants.otherTitle';
 };
 
 export const formatDuration = (seconds: number) => {
@@ -145,8 +265,8 @@ export const formatDuration = (seconds: number) => {
 export const calculatePace = (distanceM: number, durationS: number, sport: string): string => {
   if (distanceM <= 0 || durationS <= 0) return '-';
 
-  if (sport === 'cycling') {
-    // km/h for cycling
+  if (sport === 'cycling' || sport === 'skiing' || sport === 'snowboard') {
+    // km/h for cycling, skiing, and snowboard
     const distanceKm = distanceM / 1000;
     const hours = durationS / 3600;
     return `${(distanceKm / hours).toFixed(1)} km/h`;

@@ -34,6 +34,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_files: {
+        Row: {
+          file_hash: string | null
+          file_type: string
+          id: string
+          imported_at: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id: string | null
+          session_id: string | null
+          size_bytes: number | null
+          source_channel: string | null
+          source_package: string | null
+          storage_bucket: string | null
+          storage_path: string | null
+          user_id: string
+        }
+        Insert: {
+          file_hash?: string | null
+          file_type: string
+          id?: string
+          imported_at?: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id?: string | null
+          session_id?: string | null
+          size_bytes?: number | null
+          source_channel?: string | null
+          source_package?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          user_id: string
+        }
+        Update: {
+          file_hash?: string | null
+          file_type?: string
+          id?: string
+          imported_at?: string
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id?: string | null
+          session_id?: string | null
+          size_bytes?: number | null
+          source_channel?: string | null
+          source_package?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_files_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_files_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_files_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_heart_rate_zones: {
         Row: {
           created_at: string
@@ -131,6 +201,148 @@ export type Database = {
           },
         ]
       }
+      activity_provider_fields: {
+        Row: {
+          created_at: string
+          fields: Json
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_metadata: Json | null
+          session_id: string
+          source_channel: string | null
+          source_package: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fields?: Json
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_metadata?: Json | null
+          session_id: string
+          source_channel?: string | null
+          source_package?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fields?: Json
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_metadata?: Json | null
+          session_id?: string
+          source_channel?: string | null
+          source_package?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_provider_fields_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_provider_fields_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_route_points: {
+        Row: {
+          altitude_m: number | null
+          created_at: string
+          distance_m: number | null
+          horizontal_accuracy_m: number | null
+          id: string
+          lat: number
+          lon: number
+          offset_s: number | null
+          point_index: number
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          session_id: string
+          source: string | null
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
+          speed_mps: number | null
+          timestamp: string | null
+          user_id: string
+          vertical_accuracy_m: number | null
+        }
+        Insert: {
+          altitude_m?: number | null
+          created_at?: string
+          distance_m?: number | null
+          horizontal_accuracy_m?: number | null
+          id?: string
+          lat: number
+          lon: number
+          offset_s?: number | null
+          point_index: number
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          session_id: string
+          source?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          speed_mps?: number | null
+          timestamp?: string | null
+          user_id: string
+          vertical_accuracy_m?: number | null
+        }
+        Update: {
+          altitude_m?: number | null
+          created_at?: string
+          distance_m?: number | null
+          horizontal_accuracy_m?: number | null
+          id?: string
+          lat?: number
+          lon?: number
+          offset_s?: number | null
+          point_index?: number
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          session_id?: string
+          source?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          speed_mps?: number | null
+          timestamp?: string | null
+          user_id?: string
+          vertical_accuracy_m?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_route_points_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_route_points_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_route_points_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_session_superset_links: {
         Row: {
           created_at: string
@@ -223,11 +435,21 @@ export type Database = {
           avg_power_w: number | null
           avg_speed_m_per_s: number | null
           avg_temp_c: number | null
+          base_load: string | null
+          board: string | null
+          boots_used: string | null
           calories_kcal: number | null
+          climbing_grade: string | null
+          contact_level: string | null
           created_at: string
           description: string | null
           device_id: string | null
           distance_m: number | null
+          duplicate_of_session_id: string | null
+          duplicate_resolution:
+            | Database["public"]["Enums"]["import_duplicate_resolution_enum"]
+            | null
+          duplicate_score: number | null
           duration_s: number | null
           elev_gain_m: number | null
           elev_loss_m: number | null
@@ -235,7 +457,11 @@ export type Database = {
           ended_at_local: string | null
           endurance_template_id: string | null
           epoc: number | null
+          football_session_type: string | null
+          golf_club_focus: string | null
+          hyrox_station_focus: string | null
           id: string
+          import_review_seen_at: string | null
           imported_at: string | null
           max_cadence: number | null
           max_heart_rate: number | null
@@ -243,20 +469,40 @@ export type Database = {
           max_temp_c: number | null
           min_heart_rate: number | null
           name: string | null
+          needs_strength_review: boolean
+          notes: string | null
+          pending_watch_metrics: Json | null
+          pool_type: string | null
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
           pte: number | null
+          racket_used: string | null
+          raw_payload_id: string | null
           recovery_time_s: number | null
+          rival: string | null
           route_polyline: string | null
           rpe: number | null
+          ski_type: string | null
+          slope_type: string | null
+          snowboard_type: string | null
           source: Database["public"]["Enums"]["activity_source_enum"]
-          sport_subtype:
-            | Database["public"]["Enums"]["sport_subtype_enum"]
-            | null
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
+          sport_subtype: string | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
           start_time: string
           started_at_local: string | null
           status: Database["public"]["Enums"]["activity_status_enum"]
+          stroke: string | null
+          suggested_endurance_template_id: string | null
+          surface: string | null
+          template_match_method:
+            | Database["public"]["Enums"]["import_match_method_enum"]
+            | null
+          template_match_score: number | null
           timezone: string | null
           total_reps: number | null
           total_sets: number | null
@@ -267,6 +513,7 @@ export type Database = {
           user_id: string
           visibility: Database["public"]["Enums"]["visibility_enum"] | null
           vo2_max: number | null
+          wetsuit: string | null
           workout_template_id: string | null
         }
         Insert: {
@@ -275,11 +522,21 @@ export type Database = {
           avg_power_w?: number | null
           avg_speed_m_per_s?: number | null
           avg_temp_c?: number | null
+          base_load?: string | null
+          board?: string | null
+          boots_used?: string | null
           calories_kcal?: number | null
+          climbing_grade?: string | null
+          contact_level?: string | null
           created_at?: string
           description?: string | null
           device_id?: string | null
           distance_m?: number | null
+          duplicate_of_session_id?: string | null
+          duplicate_resolution?:
+            | Database["public"]["Enums"]["import_duplicate_resolution_enum"]
+            | null
+          duplicate_score?: number | null
           duration_s?: number | null
           elev_gain_m?: number | null
           elev_loss_m?: number | null
@@ -287,7 +544,11 @@ export type Database = {
           ended_at_local?: string | null
           endurance_template_id?: string | null
           epoc?: number | null
+          football_session_type?: string | null
+          golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
+          import_review_seen_at?: string | null
           imported_at?: string | null
           max_cadence?: number | null
           max_heart_rate?: number | null
@@ -295,20 +556,40 @@ export type Database = {
           max_temp_c?: number | null
           min_heart_rate?: number | null
           name?: string | null
+          needs_strength_review?: boolean
+          notes?: string | null
+          pending_watch_metrics?: Json | null
+          pool_type?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
+          racket_used?: string | null
+          raw_payload_id?: string | null
           recovery_time_s?: number | null
+          rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
+          ski_type?: string | null
+          slope_type?: string | null
+          snowboard_type?: string | null
           source?: Database["public"]["Enums"]["activity_source_enum"]
-          sport_subtype?:
-            | Database["public"]["Enums"]["sport_subtype_enum"]
-            | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          sport_subtype?: string | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
           start_time?: string
           started_at_local?: string | null
           status?: Database["public"]["Enums"]["activity_status_enum"]
+          stroke?: string | null
+          suggested_endurance_template_id?: string | null
+          surface?: string | null
+          template_match_method?:
+            | Database["public"]["Enums"]["import_match_method_enum"]
+            | null
+          template_match_score?: number | null
           timezone?: string | null
           total_reps?: number | null
           total_sets?: number | null
@@ -319,6 +600,7 @@ export type Database = {
           user_id: string
           visibility?: Database["public"]["Enums"]["visibility_enum"] | null
           vo2_max?: number | null
+          wetsuit?: string | null
           workout_template_id?: string | null
         }
         Update: {
@@ -327,11 +609,21 @@ export type Database = {
           avg_power_w?: number | null
           avg_speed_m_per_s?: number | null
           avg_temp_c?: number | null
+          base_load?: string | null
+          board?: string | null
+          boots_used?: string | null
           calories_kcal?: number | null
+          climbing_grade?: string | null
+          contact_level?: string | null
           created_at?: string
           description?: string | null
           device_id?: string | null
           distance_m?: number | null
+          duplicate_of_session_id?: string | null
+          duplicate_resolution?:
+            | Database["public"]["Enums"]["import_duplicate_resolution_enum"]
+            | null
+          duplicate_score?: number | null
           duration_s?: number | null
           elev_gain_m?: number | null
           elev_loss_m?: number | null
@@ -339,7 +631,11 @@ export type Database = {
           ended_at_local?: string | null
           endurance_template_id?: string | null
           epoc?: number | null
+          football_session_type?: string | null
+          golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
+          import_review_seen_at?: string | null
           imported_at?: string | null
           max_cadence?: number | null
           max_heart_rate?: number | null
@@ -347,20 +643,40 @@ export type Database = {
           max_temp_c?: number | null
           min_heart_rate?: number | null
           name?: string | null
+          needs_strength_review?: boolean
+          notes?: string | null
+          pending_watch_metrics?: Json | null
+          pool_type?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
+          racket_used?: string | null
+          raw_payload_id?: string | null
           recovery_time_s?: number | null
+          rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
+          ski_type?: string | null
+          slope_type?: string | null
+          snowboard_type?: string | null
           source?: Database["public"]["Enums"]["activity_source_enum"]
-          sport_subtype?:
-            | Database["public"]["Enums"]["sport_subtype_enum"]
-            | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          sport_subtype?: string | null
           sport_type?: Database["public"]["Enums"]["sport_type_enum"]
           start_time?: string
           started_at_local?: string | null
           status?: Database["public"]["Enums"]["activity_status_enum"]
+          stroke?: string | null
+          suggested_endurance_template_id?: string | null
+          surface?: string | null
+          template_match_method?:
+            | Database["public"]["Enums"]["import_match_method_enum"]
+            | null
+          template_match_score?: number | null
           timezone?: string | null
           total_reps?: number | null
           total_sets?: number | null
@@ -371,6 +687,7 @@ export type Database = {
           user_id?: string
           visibility?: Database["public"]["Enums"]["visibility_enum"] | null
           vo2_max?: number | null
+          wetsuit?: string | null
           workout_template_id?: string | null
         }
         Relationships: [
@@ -382,8 +699,29 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "activity_sessions_duplicate_of_session_id_fkey"
+            columns: ["duplicate_of_session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "activity_sessions_endurance_template_id_fkey"
             columns: ["endurance_template_id"]
+            isOneToOne: false
+            referencedRelation: "endurance_workout_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_sessions_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_sessions_suggested_endurance_template_id_fkey"
+            columns: ["suggested_endurance_template_id"]
             isOneToOne: false
             referencedRelation: "endurance_workout_templates"
             referencedColumns: ["id"]
@@ -404,14 +742,94 @@ export type Database = {
           },
         ]
       }
+      activity_stream_samples: {
+        Row: {
+          created_at: string
+          id: string
+          offset_s: number | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          session_id: string
+          source: string | null
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
+          stream_type: Database["public"]["Enums"]["stream_type_enum"]
+          timestamp: string | null
+          unit: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          offset_s?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          session_id: string
+          source?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          stream_type: Database["public"]["Enums"]["stream_type_enum"]
+          timestamp?: string | null
+          unit?: string | null
+          user_id: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          offset_s?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          session_id?: string
+          source?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          stream_type?: Database["public"]["Enums"]["stream_type_enum"]
+          timestamp?: string | null
+          unit?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_stream_samples_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_stream_samples_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_stream_samples_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_streams: {
         Row: {
           created_at: string
           data: Json
           id: string
+          raw_payload_id: string | null
           sample_hz: number | null
           session_id: string
           source: string
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
           stream_type: Database["public"]["Enums"]["stream_type_enum"]
           unit: string | null
           user_id: string | null
@@ -420,9 +838,13 @@ export type Database = {
           created_at?: string
           data: Json
           id?: string
+          raw_payload_id?: string | null
           sample_hz?: number | null
           session_id: string
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
           stream_type: Database["public"]["Enums"]["stream_type_enum"]
           unit?: string | null
           user_id?: string | null
@@ -431,14 +853,25 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+          raw_payload_id?: string | null
           sample_hz?: number | null
           session_id?: string
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
           stream_type?: Database["public"]["Enums"]["stream_type_enum"]
           unit?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "activity_streams_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "activity_streams_session_id_fkey"
             columns: ["session_id"]
@@ -508,6 +941,296 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "daily_hydration_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_recovery: {
+        Row: {
+          ans_charge: number | null
+          avg_hrv_ms: number | null
+          body_battery_end: number | null
+          body_battery_max: number | null
+          body_battery_min: number | null
+          body_battery_start: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          hrv_balance_score: number | null
+          id: string
+          nightly_recharge_score: number | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          readiness_score: number | null
+          recommendation: string | null
+          recovery_label: string | null
+          recovery_score: number | null
+          respiratory_rate_rpm: number | null
+          resting_hr_bpm: number | null
+          sleep_charge: number | null
+          sleep_score: number | null
+          sleep_session_id: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          spo2_avg_pct: number | null
+          strain_score: number | null
+          synced_at: string
+          temp_deviation_c: number | null
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ans_charge?: number | null
+          avg_hrv_ms?: number | null
+          body_battery_end?: number | null
+          body_battery_max?: number | null
+          body_battery_min?: number | null
+          body_battery_start?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          hrv_balance_score?: number | null
+          id?: string
+          nightly_recharge_score?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          readiness_score?: number | null
+          recommendation?: string | null
+          recovery_label?: string | null
+          recovery_score?: number | null
+          respiratory_rate_rpm?: number | null
+          resting_hr_bpm?: number | null
+          sleep_charge?: number | null
+          sleep_score?: number | null
+          sleep_session_id?: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          spo2_avg_pct?: number | null
+          strain_score?: number | null
+          synced_at?: string
+          temp_deviation_c?: number | null
+          timezone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ans_charge?: number | null
+          avg_hrv_ms?: number | null
+          body_battery_end?: number | null
+          body_battery_max?: number | null
+          body_battery_min?: number | null
+          body_battery_start?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          hrv_balance_score?: number | null
+          id?: string
+          nightly_recharge_score?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          readiness_score?: number | null
+          recommendation?: string | null
+          recovery_label?: string | null
+          recovery_score?: number | null
+          respiratory_rate_rpm?: number | null
+          resting_hr_bpm?: number | null
+          sleep_charge?: number | null
+          sleep_score?: number | null
+          sleep_session_id?: string | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          spo2_avg_pct?: number | null
+          strain_score?: number | null
+          synced_at?: string
+          temp_deviation_c?: number | null
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_recovery_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_recovery_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_recovery_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_steps: {
+        Row: {
+          active_calories_kcal: number | null
+          active_distance_m: number | null
+          active_steps: number | null
+          calories_kcal: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          device_id: string | null
+          distance_m: number | null
+          elevation_gain_m: number | null
+          fairly_active_min: number | null
+          first_step_at: string | null
+          floors_climbed: number | null
+          goal_achieved: boolean | null
+          id: string
+          is_manual: boolean
+          last_step_at: string | null
+          lightly_active_min: number | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          running_steps: number | null
+          sedentary_minutes: number | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_created_at: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
+          step_goal: number | null
+          synced_at: string
+          timezone: string
+          total_steps: number
+          updated_at: string
+          user_id: string
+          very_active_min: number | null
+          walking_steps: number | null
+        }
+        Insert: {
+          active_calories_kcal?: number | null
+          active_distance_m?: number | null
+          active_steps?: number | null
+          calories_kcal?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          device_id?: string | null
+          distance_m?: number | null
+          elevation_gain_m?: number | null
+          fairly_active_min?: number | null
+          first_step_at?: string | null
+          floors_climbed?: number | null
+          goal_achieved?: boolean | null
+          id?: string
+          is_manual?: boolean
+          last_step_at?: string | null
+          lightly_active_min?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          running_steps?: number | null
+          sedentary_minutes?: number | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_created_at?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          step_goal?: number | null
+          synced_at?: string
+          timezone: string
+          total_steps: number
+          updated_at?: string
+          user_id: string
+          very_active_min?: number | null
+          walking_steps?: number | null
+        }
+        Update: {
+          active_calories_kcal?: number | null
+          active_distance_m?: number | null
+          active_steps?: number | null
+          calories_kcal?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          device_id?: string | null
+          distance_m?: number | null
+          elevation_gain_m?: number | null
+          fairly_active_min?: number | null
+          first_step_at?: string | null
+          floors_climbed?: number | null
+          goal_achieved?: boolean | null
+          id?: string
+          is_manual?: boolean
+          last_step_at?: string | null
+          lightly_active_min?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          running_steps?: number | null
+          sedentary_minutes?: number | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_created_at?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          step_goal?: number | null
+          synced_at?: string
+          timezone?: string
+          total_steps?: number
+          updated_at?: string
+          user_id?: string
+          very_active_min?: number | null
+          walking_steps?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_steps_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_steps_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_steps_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -732,12 +1455,16 @@ export type Database = {
           distance_m: number | null
           duration_s: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key: string | null
+          hyrox_step_type: string | null
           id: string
           is_group: boolean | null
+          load_kg: number | null
           order_index: number
           parent_step_id: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
           repetitions: number | null
+          reps: number | null
           target_max: number | null
           target_min: number | null
           target_type: Database["public"]["Enums"]["target_type_enum"]
@@ -749,12 +1476,16 @@ export type Database = {
           distance_m?: number | null
           duration_s?: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key?: string | null
+          hyrox_step_type?: string | null
           id?: string
           is_group?: boolean | null
+          load_kg?: number | null
           order_index: number
           parent_step_id?: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
           repetitions?: number | null
+          reps?: number | null
           target_max?: number | null
           target_min?: number | null
           target_type?: Database["public"]["Enums"]["target_type_enum"]
@@ -766,12 +1497,16 @@ export type Database = {
           distance_m?: number | null
           duration_s?: number | null
           duration_type?: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key?: string | null
+          hyrox_step_type?: string | null
           id?: string
           is_group?: boolean | null
+          load_kg?: number | null
           order_index?: number
           parent_step_id?: string | null
           phase_type?: Database["public"]["Enums"]["phase_type_enum"]
           repetitions?: number | null
+          reps?: number | null
           target_max?: number | null
           target_min?: number | null
           target_type?: Database["public"]["Enums"]["target_type_enum"]
@@ -797,43 +1532,103 @@ export type Database = {
       }
       endurance_workout_templates: {
         Row: {
+          base_load: string | null
           base_name: string
+          board: string | null
+          boots_used: string | null
+          climbing_grade: string | null
+          contact_level: string | null
           created_at: string
           description: string | null
+          elev_gain_m: number | null
+          environment_type: string | null
+          football_session_type: string | null
+          golf_club_focus: string | null
+          hyrox_station_focus: string | null
           id: string
+          notes: string | null
+          pool_type: string | null
+          racket_used: string | null
+          rival: string | null
           scheduled_day: number | null
+          ski_type: string | null
+          slope_type: string | null
+          snowboard_type: string | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          stroke: string | null
+          surface: string | null
           total_distance_m: number | null
           total_duration_s: number | null
           updated_at: string
           user_id: string
-          workout_goal: Database["public"]["Enums"]["workout_goal_enum"] | null
+          wetsuit: string | null
+          workout_goal: string | null
         }
         Insert: {
+          base_load?: string | null
           base_name: string
+          board?: string | null
+          boots_used?: string | null
+          climbing_grade?: string | null
+          contact_level?: string | null
           created_at?: string
           description?: string | null
+          elev_gain_m?: number | null
+          environment_type?: string | null
+          football_session_type?: string | null
+          golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
+          notes?: string | null
+          pool_type?: string | null
+          racket_used?: string | null
+          rival?: string | null
           scheduled_day?: number | null
+          ski_type?: string | null
+          slope_type?: string | null
+          snowboard_type?: string | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          stroke?: string | null
+          surface?: string | null
           total_distance_m?: number | null
           total_duration_s?: number | null
           updated_at?: string
           user_id: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          wetsuit?: string | null
+          workout_goal?: string | null
         }
         Update: {
+          base_load?: string | null
           base_name?: string
+          board?: string | null
+          boots_used?: string | null
+          climbing_grade?: string | null
+          contact_level?: string | null
           created_at?: string
           description?: string | null
+          elev_gain_m?: number | null
+          environment_type?: string | null
+          football_session_type?: string | null
+          golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
+          notes?: string | null
+          pool_type?: string | null
+          racket_used?: string | null
+          rival?: string | null
           scheduled_day?: number | null
+          ski_type?: string | null
+          slope_type?: string | null
+          snowboard_type?: string | null
           sport_type?: Database["public"]["Enums"]["sport_type_enum"]
+          stroke?: string | null
+          surface?: string | null
           total_distance_m?: number | null
           total_duration_s?: number | null
           updated_at?: string
           user_id?: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          wetsuit?: string | null
+          workout_goal?: string | null
         }
         Relationships: [
           {
@@ -1183,6 +1978,208 @@ export type Database = {
           },
         ]
       }
+      external_raw_payloads_v2: {
+        Row: {
+          created_at: string
+          id: string
+          object_type: string
+          payload: Json | null
+          payload_hash: string
+          processed_at: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          received_at: string
+          related_id: string | null
+          related_table: string | null
+          size_bytes: number | null
+          source_channel: string
+          source_package: string | null
+          source_record_id: string | null
+          storage_bucket: string | null
+          storage_path: string | null
+          trace_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          object_type: string
+          payload?: Json | null
+          payload_hash: string
+          processed_at?: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          received_at?: string
+          related_id?: string | null
+          related_table?: string | null
+          size_bytes?: number | null
+          source_channel: string
+          source_package?: string | null
+          source_record_id?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          trace_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          object_type?: string
+          payload?: Json | null
+          payload_hash?: string
+          processed_at?: string | null
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          received_at?: string
+          related_id?: string | null
+          related_table?: string | null
+          size_bytes?: number | null
+          source_channel?: string
+          source_package?: string | null
+          source_record_id?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          trace_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_raw_payloads_v2_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_connect_provider_selection: {
+        Row: {
+          origin_id: string
+          selected_at: string
+          selected_package_name: string
+          selected_provider_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          origin_id: string
+          selected_at?: string
+          selected_package_name: string
+          selected_provider_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          origin_id?: string
+          selected_at?: string
+          selected_package_name?: string
+          selected_provider_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_connect_provider_selection_origin_user_fkey"
+            columns: ["origin_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "provider_data_origins"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "health_connect_provider_selection_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_metric_samples: {
+        Row: {
+          activity_session_id: string | null
+          created_at: string
+          id: string
+          local_date: string | null
+          metric_type: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          recorded_at: string
+          sleep_session_id: string | null
+          source_channel: string
+          source_package: string | null
+          source_record_id: string | null
+          timezone: string | null
+          unit: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          activity_session_id?: string | null
+          created_at?: string
+          id?: string
+          local_date?: string | null
+          metric_type: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          recorded_at: string
+          sleep_session_id?: string | null
+          source_channel: string
+          source_package?: string | null
+          source_record_id?: string | null
+          timezone?: string | null
+          unit: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          activity_session_id?: string | null
+          created_at?: string
+          id?: string
+          local_date?: string | null
+          metric_type?: string
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          recorded_at?: string
+          sleep_session_id?: string | null
+          source_channel?: string
+          source_package?: string | null
+          source_record_id?: string | null
+          timezone?: string | null
+          unit?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_metric_samples_activity_session_id_fkey"
+            columns: ["activity_session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_metric_samples_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_metric_samples_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_metric_samples_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredient_import_batches: {
         Row: {
           batch_number: number | null
@@ -1334,6 +2331,71 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      integration_sync_state: {
+        Row: {
+          anchor_token: string | null
+          created_at: string
+          cursor_token: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_record_at: string | null
+          last_success_at: string | null
+          metadata: Json | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string
+          source_package: string | null
+          status: string
+          sync_domain: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anchor_token?: string | null
+          created_at?: string
+          cursor_token?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_record_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string
+          source_package?: string | null
+          status?: string
+          sync_domain: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anchor_token?: string | null
+          created_at?: string
+          cursor_token?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_record_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json | null
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string
+          source_package?: string | null
+          status?: string
+          sync_domain?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_sync_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meal_items: {
         Row: {
@@ -1573,6 +2635,129 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_connection_tokens: {
+        Row: {
+          access_token: string
+          connection_id: string
+          created_at: string
+          id: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          refresh_token: string | null
+          scope: string | null
+          token_expires_at: string | null
+          token_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connection_id: string
+          created_at?: string
+          id?: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
+          token_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connection_id?: string
+          created_at?: string
+          id?: string
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
+          token_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_connection_tokens_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: true
+            referencedRelation: "user_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_connection_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_data_origins: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          display_name: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          platform: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload: Json | null
+          source_channel: string
+          source_package: string | null
+          source_provider_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          display_name?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload?: Json | null
+          source_channel: string
+          source_package?: string | null
+          source_provider_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          display_name?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string | null
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload?: Json | null
+          source_channel?: string
+          source_package?: string | null
+          source_provider_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_data_origins_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_data_origins_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -1888,25 +3073,50 @@ export type Database = {
         Row: {
           id: string
           measured_at: string
+          raw_payload_id: string | null
           resting_hr_bpm: number
           source: string
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
           user_id: string
         }
         Insert: {
           id?: string
           measured_at?: string
+          raw_payload_id?: string | null
           resting_hr_bpm: number
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
           user_id: string
         }
         Update: {
           id?: string
           measured_at?: string
+          raw_payload_id?: string | null
           resting_hr_bpm?: number
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "resting_hr_logs_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "resting_hr_logs_user_id_fkey"
             columns: ["user_id"]
@@ -1973,6 +3183,82 @@ export type Database = {
           },
         ]
       }
+      sleep_biomarker_samples: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          metric_type: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
+          timestamp: string
+          unit: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          metric_type: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          timestamp: string
+          unit: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          metric_type?: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          sleep_session_id?: string
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          timestamp?: string
+          unit?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_biomarker_samples_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_biomarker_samples_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_biomarker_samples_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sleep_logs: {
         Row: {
           date: string
@@ -2007,6 +3293,308 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sleep_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sleep_sessions: {
+        Row: {
+          after_wakeup_min: number | null
+          avg_heart_rate_bpm: number | null
+          avg_hrv_ms: number | null
+          avg_respiratory_rpm: number | null
+          avg_skin_temp_c: number | null
+          avg_spo2_pct: number | null
+          awake_in_bed_min: number | null
+          awake_min: number | null
+          bedtime_end: string | null
+          bedtime_start: string | null
+          confidence: number | null
+          core_sleep_min: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          deep_sleep_min: number | null
+          device_id: string | null
+          duration_in_bed_min: number | null
+          end_time: string
+          hrv_rmssd_ms: number | null
+          id: string
+          is_main_sleep: boolean
+          is_manual: boolean
+          is_nap: boolean
+          light_sleep_min: number | null
+          max_heart_rate_bpm: number | null
+          max_respiratory_rpm: number | null
+          min_heart_rate_bpm: number | null
+          min_respiratory_rpm: number | null
+          min_spo2_pct: number | null
+          nap_type: string | null
+          number_of_awakenings: number | null
+          out_of_bed_min: number | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          rem_sleep_min: number | null
+          resting_hr_bpm: number | null
+          restless_min: number | null
+          restless_periods: number | null
+          skin_temp_deviation_c: number | null
+          sleep_efficiency_pct: number | null
+          sleep_end: string | null
+          sleep_latency_min: number | null
+          sleep_quality_label: string | null
+          sleep_score: number | null
+          sleep_start: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_created_at: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_sleep_id: string | null
+          source_updated_at: string | null
+          start_time: string
+          synced_at: string
+          timezone: string
+          total_sleep_min: number | null
+          unknown_sleep_min: number | null
+          updated_at: string
+          user_id: string
+          waso_min: number | null
+        }
+        Insert: {
+          after_wakeup_min?: number | null
+          avg_heart_rate_bpm?: number | null
+          avg_hrv_ms?: number | null
+          avg_respiratory_rpm?: number | null
+          avg_skin_temp_c?: number | null
+          avg_spo2_pct?: number | null
+          awake_in_bed_min?: number | null
+          awake_min?: number | null
+          bedtime_end?: string | null
+          bedtime_start?: string | null
+          confidence?: number | null
+          core_sleep_min?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          deep_sleep_min?: number | null
+          device_id?: string | null
+          duration_in_bed_min?: number | null
+          end_time: string
+          hrv_rmssd_ms?: number | null
+          id?: string
+          is_main_sleep?: boolean
+          is_manual?: boolean
+          is_nap?: boolean
+          light_sleep_min?: number | null
+          max_heart_rate_bpm?: number | null
+          max_respiratory_rpm?: number | null
+          min_heart_rate_bpm?: number | null
+          min_respiratory_rpm?: number | null
+          min_spo2_pct?: number | null
+          nap_type?: string | null
+          number_of_awakenings?: number | null
+          out_of_bed_min?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          rem_sleep_min?: number | null
+          resting_hr_bpm?: number | null
+          restless_min?: number | null
+          restless_periods?: number | null
+          skin_temp_deviation_c?: number | null
+          sleep_efficiency_pct?: number | null
+          sleep_end?: string | null
+          sleep_latency_min?: number | null
+          sleep_quality_label?: string | null
+          sleep_score?: number | null
+          sleep_start?: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_created_at?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_sleep_id?: string | null
+          source_updated_at?: string | null
+          start_time: string
+          synced_at?: string
+          timezone: string
+          total_sleep_min?: number | null
+          unknown_sleep_min?: number | null
+          updated_at?: string
+          user_id: string
+          waso_min?: number | null
+        }
+        Update: {
+          after_wakeup_min?: number | null
+          avg_heart_rate_bpm?: number | null
+          avg_hrv_ms?: number | null
+          avg_respiratory_rpm?: number | null
+          avg_skin_temp_c?: number | null
+          avg_spo2_pct?: number | null
+          awake_in_bed_min?: number | null
+          awake_min?: number | null
+          bedtime_end?: string | null
+          bedtime_start?: string | null
+          confidence?: number | null
+          core_sleep_min?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          deep_sleep_min?: number | null
+          device_id?: string | null
+          duration_in_bed_min?: number | null
+          end_time?: string
+          hrv_rmssd_ms?: number | null
+          id?: string
+          is_main_sleep?: boolean
+          is_manual?: boolean
+          is_nap?: boolean
+          light_sleep_min?: number | null
+          max_heart_rate_bpm?: number | null
+          max_respiratory_rpm?: number | null
+          min_heart_rate_bpm?: number | null
+          min_respiratory_rpm?: number | null
+          min_spo2_pct?: number | null
+          nap_type?: string | null
+          number_of_awakenings?: number | null
+          out_of_bed_min?: number | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          rem_sleep_min?: number | null
+          resting_hr_bpm?: number | null
+          restless_min?: number | null
+          restless_periods?: number | null
+          skin_temp_deviation_c?: number | null
+          sleep_efficiency_pct?: number | null
+          sleep_end?: string | null
+          sleep_latency_min?: number | null
+          sleep_quality_label?: string | null
+          sleep_score?: number | null
+          sleep_start?: string | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_created_at?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_sleep_id?: string | null
+          source_updated_at?: string | null
+          start_time?: string
+          synced_at?: string
+          timezone?: string
+          total_sleep_min?: number | null
+          unknown_sleep_min?: number | null
+          updated_at?: string
+          user_id?: string
+          waso_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_sessions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_sessions_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sleep_stage_intervals: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          duration_min: number
+          end_time: string
+          id: string
+          provider_stage: string | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
+          stage: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          duration_min: number
+          end_time: string
+          id?: string
+          provider_stage?: string | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          stage: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          duration_min?: number
+          end_time?: string
+          id?: string
+          provider_stage?: string | null
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          sleep_session_id?: string
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          stage?: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_stage_intervals_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_stage_intervals_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_stage_intervals_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -2053,6 +3641,173 @@ export type Database = {
           },
         ]
       }
+      sport_catalog_options: {
+        Row: {
+          created_at: string
+          group_label_en: string | null
+          group_label_es: string | null
+          group_translation_key: string
+          id: string
+          is_active: boolean
+          is_template_selectable: boolean
+          label_en: string | null
+          label_es: string | null
+          option_key: string
+          option_type: string
+          sort_order: number
+          sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          translation_key: string
+        }
+        Insert: {
+          created_at?: string
+          group_label_en?: string | null
+          group_label_es?: string | null
+          group_translation_key: string
+          id?: string
+          is_active?: boolean
+          is_template_selectable?: boolean
+          label_en?: string | null
+          label_es?: string | null
+          option_key: string
+          option_type: string
+          sort_order?: number
+          sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          translation_key: string
+        }
+        Update: {
+          created_at?: string
+          group_label_en?: string | null
+          group_label_es?: string | null
+          group_translation_key?: string
+          id?: string
+          is_active?: boolean
+          is_template_selectable?: boolean
+          label_en?: string | null
+          label_es?: string | null
+          option_key?: string
+          option_type?: string
+          sort_order?: number
+          sport_type?: Database["public"]["Enums"]["sport_type_enum"]
+          translation_key?: string
+        }
+        Relationships: []
+      }
+      step_intervals: {
+        Row: {
+          activity_type: string | null
+          cadence_spm: number | null
+          calories_kcal: number | null
+          context: string | null
+          created_at: string
+          daily_steps_id: string | null
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id: string | null
+          distance_m: number | null
+          end_time: string
+          id: string
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          speed_mps: number | null
+          start_time: string
+          steps: number
+          synced_at: string
+          timezone: string
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          cadence_spm?: number | null
+          calories_kcal?: number | null
+          context?: string | null
+          created_at?: string
+          daily_steps_id?: string | null
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id?: string | null
+          distance_m?: number | null
+          end_time: string
+          id?: string
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          speed_mps?: number | null
+          start_time: string
+          steps: number
+          synced_at?: string
+          timezone: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          cadence_spm?: number | null
+          calories_kcal?: number | null
+          context?: string | null
+          created_at?: string
+          daily_steps_id?: string | null
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id?: string | null
+          distance_m?: number | null
+          end_time?: string
+          id?: string
+          raw_payload?: Json | null
+          raw_payload_id?: string | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          speed_mps?: number | null
+          start_time?: string
+          steps?: number
+          synced_at?: string
+          timezone?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_intervals_daily_steps_id_fkey"
+            columns: ["daily_steps_id"]
+            isOneToOne: false
+            referencedRelation: "daily_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_intervals_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_intervals_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_intervals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           color: string | null
@@ -2090,41 +3845,56 @@ export type Database = {
       }
       user_connections: {
         Row: {
-          access_token: string
+          access_token: string | null
+          connection_kind: string
           created_at: string
           id: string
+          last_error: string | null
+          last_synced_at: string | null
           provider: Database["public"]["Enums"]["wearable_provider_enum"]
           provider_user_id: string | null
           provider_username: string | null
           refresh_token: string | null
+          revoked_at: string | null
           scope: string | null
-          token_expires_at: string
+          status: string
+          token_expires_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
+          connection_kind?: string
           created_at?: string
           id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
           provider: Database["public"]["Enums"]["wearable_provider_enum"]
           provider_user_id?: string | null
           provider_username?: string | null
           refresh_token?: string | null
+          revoked_at?: string | null
           scope?: string | null
-          token_expires_at: string
+          status?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
+          connection_kind?: string
           created_at?: string
           id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
           provider?: Database["public"]["Enums"]["wearable_provider_enum"]
           provider_user_id?: string | null
           provider_username?: string | null
           refresh_token?: string | null
+          revoked_at?: string | null
           scope?: string | null
-          token_expires_at?: string
+          status?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2280,6 +4050,8 @@ export type Database = {
           distance_unit: Database["public"]["Enums"]["user_preferences_distance_unit"]
           energy_unit: Database["public"]["Enums"]["user_preferences_energy_unit"]
           health_data_consent: boolean
+          health_data_consent_at: string | null
+          health_data_consent_version: string | null
           import_health_metrics: boolean
           language_code: Database["public"]["Enums"]["user_preferences_language_code"]
           notification_settings: Json | null
@@ -2296,6 +4068,8 @@ export type Database = {
           distance_unit?: Database["public"]["Enums"]["user_preferences_distance_unit"]
           energy_unit?: Database["public"]["Enums"]["user_preferences_energy_unit"]
           health_data_consent?: boolean
+          health_data_consent_at?: string | null
+          health_data_consent_version?: string | null
           import_health_metrics?: boolean
           language_code?: Database["public"]["Enums"]["user_preferences_language_code"]
           notification_settings?: Json | null
@@ -2312,6 +4086,8 @@ export type Database = {
           distance_unit?: Database["public"]["Enums"]["user_preferences_distance_unit"]
           energy_unit?: Database["public"]["Enums"]["user_preferences_energy_unit"]
           health_data_consent?: boolean
+          health_data_consent_at?: string | null
+          health_data_consent_version?: string | null
           import_health_metrics?: boolean
           language_code?: Database["public"]["Enums"]["user_preferences_language_code"]
           notification_settings?: Json | null
@@ -2375,13 +4151,83 @@ export type Database = {
         }
         Relationships: []
       }
+      vo2_max_logs: {
+        Row: {
+          activity_session_id: string | null
+          created_at: string
+          id: string
+          measured_at: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id: string | null
+          source_channel: string | null
+          source_package: string | null
+          source_record_id: string | null
+          user_id: string
+          value_ml_kg_min: number
+        }
+        Insert: {
+          activity_session_id?: string | null
+          created_at?: string
+          id?: string
+          measured_at: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          user_id: string
+          value_ml_kg_min: number
+        }
+        Update: {
+          activity_session_id?: string | null
+          created_at?: string
+          id?: string
+          measured_at?: string
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          raw_payload_id?: string | null
+          source_channel?: string | null
+          source_package?: string | null
+          source_record_id?: string | null
+          user_id?: string
+          value_ml_kg_min?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vo2_max_logs_activity_session_id_fkey"
+            columns: ["activity_session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vo2_max_logs_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vo2_max_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weight_logs: {
         Row: {
           bodyfat_percent: number | null
           id: string
           measured_at: string
           muscle_mass_kg: number | null
+          raw_payload_id: string | null
           source: string
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
           user_id: string
           weight_kg: number
         }
@@ -2390,7 +4236,13 @@ export type Database = {
           id?: string
           measured_at?: string
           muscle_mass_kg?: number | null
+          raw_payload_id?: string | null
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
           user_id: string
           weight_kg: number
         }
@@ -2399,11 +4251,24 @@ export type Database = {
           id?: string
           measured_at?: string
           muscle_mass_kg?: number | null
+          raw_payload_id?: string | null
           source?: string
+          source_channel?: string | null
+          source_package?: string | null
+          source_provider_key?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
           user_id?: string
           weight_kg?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "weight_logs_raw_payload_id_fkey"
+            columns: ["raw_payload_id"]
+            isOneToOne: false
+            referencedRelation: "external_raw_payloads_v2"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "weight_logs_user_id_fkey"
             columns: ["user_id"]
@@ -2689,33 +4554,36 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          modality: string | null
           source: string
           suggested_day_of_week: number | null
           updated_at: string
           user_id: string
-          workout_goal: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal: string | null
         }
         Insert: {
           base_name: string
           created_at?: string
           description?: string | null
           id?: string
+          modality?: string | null
           source?: string
           suggested_day_of_week?: number | null
           updated_at?: string
           user_id: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal?: string | null
         }
         Update: {
           base_name?: string
           created_at?: string
           description?: string | null
           id?: string
+          modality?: string | null
           source?: string
           suggested_day_of_week?: number | null
           updated_at?: string
           user_id?: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal?: string | null
         }
         Relationships: [
           {
@@ -2732,6 +4600,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      absorb_and_delete_session: {
+        Args: { p_source: string; p_target: string }
+        Returns: undefined
+      }
       check_username: { Args: { username_input: string }; Returns: boolean }
       delete_user_account: { Args: never; Returns: undefined }
       duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string }
@@ -2782,10 +4654,28 @@ export type Database = {
         | "polar"
         | "gym_session"
       activity_status_enum: "active" | "completed" | "paused" | "cancelled"
+      biomarker_type_enum:
+        | "heart_rate"
+        | "hrv_rmssd"
+        | "hrv_sdnn"
+        | "spo2"
+        | "respiratory_rate"
+        | "skin_temperature"
+        | "body_temperature"
+        | "movement"
+        | "stress"
       daily_activity_enum: "sedentary" | "active" | "physical"
       daily_hydration_source: "manual" | "imported" | "ai"
       duration_type_enum: "time" | "distance" | "lap_button"
       exercise_load_type: "assisted" | "bodyweight" | "external" | "mixed"
+      health_data_quality_enum:
+        | "complete"
+        | "partial"
+        | "estimated"
+        | "manual"
+        | "unknown"
+      import_duplicate_resolution_enum: "pending" | "merged" | "kept_both"
+      import_match_method_enum: "structural" | "totals"
       ingredients_category:
         | "proteina_animal"
         | "proteina_vegetal"
@@ -2842,10 +4732,24 @@ export type Database = {
         | "fitbit"
         | "other"
         | "suunto"
+        | "coros"
+        | "apple_health"
+        | "whoop"
+        | "health_connect"
       recipe_items_unit: "g" | "ml"
       recipe_source_enum: "system" | "user"
       recipe_usage_context_enum: "meal_log" | "planner" | "quick_add"
       recipe_visibility_enum: "private" | "public"
+      sleep_stage_enum:
+        | "unknown"
+        | "awake"
+        | "awake_in_bed"
+        | "out_of_bed"
+        | "sleeping"
+        | "light"
+        | "deep"
+        | "rem"
+        | "core"
       sport_subtype_enum:
         | "road"
         | "trail"
@@ -2854,6 +4758,16 @@ export type Database = {
         | "outdoor"
         | "pool"
         | "open_water"
+        | "race"
+        | "walk"
+        | "gravel"
+        | "spinning"
+        | "urban"
+        | "surf"
+        | "longboard"
+        | "shortboard"
+        | "bodyboard"
+        | "paddle_surf"
       sport_type_enum:
         | "basketball"
         | "padel"
@@ -2866,6 +4780,15 @@ export type Database = {
         | "tennis"
         | "other"
         | "gym"
+        | "martial_arts"
+        | "climbing"
+        | "surf"
+        | "volleyball"
+        | "trail"
+        | "skiing"
+        | "snowboard"
+        | "golf"
+        | "hyrox"
       stream_type_enum:
         | "heart_rate"
         | "cadence"
@@ -2913,6 +4836,10 @@ export type Database = {
         | "oura"
         | "fitbit"
         | "ultrahuman"
+        | "apple_health"
+        | "health_connect"
+        | "manual"
+        | "coros"
       workout_goal_enum:
         | "resistencia"
         | "fuerza"
@@ -3060,10 +4987,30 @@ export const Constants = {
         "gym_session",
       ],
       activity_status_enum: ["active", "completed", "paused", "cancelled"],
+      biomarker_type_enum: [
+        "heart_rate",
+        "hrv_rmssd",
+        "hrv_sdnn",
+        "spo2",
+        "respiratory_rate",
+        "skin_temperature",
+        "body_temperature",
+        "movement",
+        "stress",
+      ],
       daily_activity_enum: ["sedentary", "active", "physical"],
       daily_hydration_source: ["manual", "imported", "ai"],
       duration_type_enum: ["time", "distance", "lap_button"],
       exercise_load_type: ["assisted", "bodyweight", "external", "mixed"],
+      health_data_quality_enum: [
+        "complete",
+        "partial",
+        "estimated",
+        "manual",
+        "unknown",
+      ],
+      import_duplicate_resolution_enum: ["pending", "merged", "kept_both"],
+      import_match_method_enum: ["structural", "totals"],
       ingredients_category: [
         "proteina_animal",
         "proteina_vegetal",
@@ -3124,11 +5071,26 @@ export const Constants = {
         "fitbit",
         "other",
         "suunto",
+        "coros",
+        "apple_health",
+        "whoop",
+        "health_connect",
       ],
       recipe_items_unit: ["g", "ml"],
       recipe_source_enum: ["system", "user"],
       recipe_usage_context_enum: ["meal_log", "planner", "quick_add"],
       recipe_visibility_enum: ["private", "public"],
+      sleep_stage_enum: [
+        "unknown",
+        "awake",
+        "awake_in_bed",
+        "out_of_bed",
+        "sleeping",
+        "light",
+        "deep",
+        "rem",
+        "core",
+      ],
       sport_subtype_enum: [
         "road",
         "trail",
@@ -3137,6 +5099,16 @@ export const Constants = {
         "outdoor",
         "pool",
         "open_water",
+        "race",
+        "walk",
+        "gravel",
+        "spinning",
+        "urban",
+        "surf",
+        "longboard",
+        "shortboard",
+        "bodyboard",
+        "paddle_surf",
       ],
       sport_type_enum: [
         "basketball",
@@ -3150,6 +5122,15 @@ export const Constants = {
         "tennis",
         "other",
         "gym",
+        "martial_arts",
+        "climbing",
+        "surf",
+        "volleyball",
+        "trail",
+        "skiing",
+        "snowboard",
+        "golf",
+        "hyrox",
       ],
       stream_type_enum: [
         "heart_rate",
@@ -3202,6 +5183,10 @@ export const Constants = {
         "oura",
         "fitbit",
         "ultrahuman",
+        "apple_health",
+        "health_connect",
+        "manual",
+        "coros",
       ],
       workout_goal_enum: [
         "resistencia",

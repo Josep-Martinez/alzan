@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
-import { DurationType, PhaseType, SportType, TargetType, WorkoutGoal } from '../types/requests.types';
+import { DurationType, PhaseType, SportType, TargetType } from '../types/requests.types';
+import { Database } from '../types/database.types';
 
 export interface BuilderStep {
   id: string; // temp or real id
@@ -17,17 +18,45 @@ export interface BuilderStep {
   parent_step_id?: string | null;
   is_group: boolean;
   children?: BuilderStep[];
+  hyrox_step_type?: string | null;
+  hyrox_station_key?: string | null;
+  load_kg?: number | null;
+  reps?: number | null;
 }
 
 export interface BuilderTemplateData {
   base_name: string;
   description?: string;
   sport_type: SportType;
-  workout_goal?: WorkoutGoal;
+  workout_goal?: string | null;
   total_duration_s?: number;
   total_distance_m?: number;
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
+  environment_type?: string | null;
+  surface?: string | null;
+  pool_type?: string | null;
+  stroke?: string | null;
+  football_session_type?: string | null;
+  base_load?: string | null;
+  contact_level?: string | null;
+  boots_used?: string | null;
+  racket_used?: string | null;
+  climbing_grade?: string | null;
+  wetsuit?: string | null;
+  board?: string | null;
+  rival?: string | null;
+  notes?: string | null;
+  elev_gain_m?: number | null;
+  ski_type?: string | null;
+  slope_type?: string | null;
+  snowboard_type?: string | null;
+  golf_club_focus?: string | null;
+  hyrox_station_focus?: string | null;
 }
+
+type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'];
+
+type EnduranceWorkoutTemplateUpdatePatch = Database['public']['Tables']['endurance_workout_templates']['Update'];
 
 export const useEnduranceWorkoutBuilder = () => {
   const { user } = useAuth();
@@ -57,19 +86,40 @@ export const useEnduranceWorkoutBuilder = () => {
         let finalTemplateId: string;
 
         if (isEditMode) {
+          const updatePayload: EnduranceWorkoutTemplateUpdatePatch = {
+            base_name: data.base_name,
+            description: data.description,
+            sport_type: data.sport_type,
+            total_duration_s: data.total_duration_s,
+            total_distance_m: data.total_distance_m,
+            workout_goal: data.workout_goal,
+            scheduled_day: data.scheduled_day,
+            environment_type: data.environment_type,
+            surface: data.surface,
+            pool_type: data.pool_type,
+            stroke: data.stroke,
+            football_session_type: data.football_session_type,
+            base_load: data.base_load,
+            contact_level: data.contact_level,
+            boots_used: data.boots_used,
+            racket_used: data.racket_used,
+            climbing_grade: data.climbing_grade,
+            wetsuit: data.wetsuit,
+            board: data.board,
+            ski_type: data.ski_type,
+            slope_type: data.slope_type,
+            snowboard_type: data.snowboard_type,
+            golf_club_focus: data.golf_club_focus,
+            hyrox_station_focus: data.hyrox_station_focus,
+            rival: data.rival,
+            notes: data.notes,
+            elev_gain_m: data.elev_gain_m,
+            updated_at: new Date().toISOString(),
+          };
           // UPDATE existing template
           const { error: updateError } = await supabase
             .from('endurance_workout_templates')
-            .update({
-              base_name: data.base_name,
-              description: data.description,
-              sport_type: data.sport_type,
-              total_duration_s: data.total_duration_s,
-              total_distance_m: data.total_distance_m,
-              workout_goal: data.workout_goal,
-              scheduled_day: data.scheduled_day,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq('id', templateId);
 
           if (updateError) {
@@ -83,19 +133,40 @@ export const useEnduranceWorkoutBuilder = () => {
           finalTemplateId = templateId;
           console.log('[useEnduranceWorkoutBuilder.save] Template actualizado - id:', templateId);
         } else {
+          const insertPayload: EnduranceWorkoutTemplateInsertPatch = {
+            user_id: user.id,
+            base_name: data.base_name,
+            description: data.description,
+            sport_type: data.sport_type,
+            total_duration_s: data.total_duration_s,
+            total_distance_m: data.total_distance_m,
+            workout_goal: data.workout_goal,
+            scheduled_day: data.scheduled_day,
+            environment_type: data.environment_type,
+            surface: data.surface,
+            pool_type: data.pool_type,
+            stroke: data.stroke,
+            football_session_type: data.football_session_type,
+            base_load: data.base_load,
+            contact_level: data.contact_level,
+            boots_used: data.boots_used,
+            racket_used: data.racket_used,
+            climbing_grade: data.climbing_grade,
+            wetsuit: data.wetsuit,
+            board: data.board,
+            ski_type: data.ski_type,
+            slope_type: data.slope_type,
+            snowboard_type: data.snowboard_type,
+            golf_club_focus: data.golf_club_focus,
+            hyrox_station_focus: data.hyrox_station_focus,
+            rival: data.rival,
+            notes: data.notes,
+            elev_gain_m: data.elev_gain_m,
+          };
           // INSERT new template
           const { data: template, error: tError } = await supabase
             .from('endurance_workout_templates')
-            .insert({
-              user_id: user.id,
-              base_name: data.base_name,
-              description: data.description,
-              sport_type: data.sport_type,
-              total_duration_s: data.total_duration_s,
-              total_distance_m: data.total_distance_m,
-              workout_goal: data.workout_goal,
-              scheduled_day: data.scheduled_day,
-            })
+            .insert(insertPayload)
             .select()
             .single();
 
@@ -127,6 +198,10 @@ export const useEnduranceWorkoutBuilder = () => {
                 repetitions: step.repetitions,
                 is_group: step.is_group,
                 parent_step_id: parentId,
+                hyrox_step_type: step.hyrox_step_type ?? null,
+                hyrox_station_key: step.hyrox_station_key ?? null,
+                load_kg: step.load_kg ?? null,
+                reps: step.reps ?? null,
               })
               .select()
               .single();

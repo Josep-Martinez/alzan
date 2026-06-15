@@ -36,7 +36,7 @@ import { ThemeColors } from '../../../context/ThemeContext';
 import { useEnduranceSessions } from '../../../hooks/useEnduranceSessions';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
-import { SPORTS_CONFIG } from '../../../constants/sports';
+import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../../constants/sports';
 import { borderRadius, colors, spacing, typography } from '../../../theme';
 import { SPORT_COLORS } from '../../../theme/sportColors';
 import { ActivitySession } from '../../../types/requests.types';
@@ -74,9 +74,15 @@ interface SessionWithDate {
   startDate: Date;
 }
 
-type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym';
+type SummarySportType =
+  | Exclude<ActivitySession['sport_type'], 'strength'>
+  | 'gym'
+  | 'volleyball'
+  | 'trail'
+  | 'golf'
+  | 'hyrox';
 
-type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation';
+type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation' | 'calories';
 
 interface SportSummaryCardData {
   sportType: SummarySportType;
@@ -132,15 +138,23 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     return 'sets';
   }
 
+  if (sportType === 'martial_arts' || sportType === 'climbing' || sportType === 'volleyball' || sportType === 'golf') {
+    return 'calories';
+  }
+
   if (
     sportType === 'running' ||
     sportType === 'cycling' ||
     sportType === 'swimming' ||
     sportType === 'hiking' ||
+    sportType === 'trail' ||
     sportType === 'football' ||
     sportType === 'basketball' ||
     sportType === 'tennis' ||
-    sportType === 'padel'
+    sportType === 'padel' ||
+    sportType === 'skiing' ||
+    sportType === 'snowboard' ||
+    sportType === 'hyrox'
   ) {
     return 'distance';
   }
@@ -528,6 +542,9 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
         } else if (group.totalElevationGainMeters > 0) {
           middleMetricValue = Math.round(group.totalElevationGainMeters).toLocaleString();
           middleMetricLabel = t('training.elevationM');
+        } else if (preferredMiddleMetric === 'calories' && group.totalCalories > 0) {
+          middleMetricValue = Math.round(group.totalCalories).toLocaleString();
+          middleMetricLabel = t('training.caloriesKcal');
         }
         const color = SPORT_COLORS[group.sportType] ?? SPORT_COLORS.other;
 
@@ -719,8 +736,11 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
     const colorKey = normalizeSportTypeForColor(session.sport_type);
     const color = SPORT_COLORS[colorKey] ?? SPORT_COLORS.other;
     const isStrength = session.sport_type === 'strength';
-    const sessionConfig = SPORTS_CONFIG[session.sport_type] || SPORTS_CONFIG.other;
-    const sessionTitle = session.name || (isStrength ? t('training.strengthWorkout') : t(sessionConfig.defaultTitle));
+    const sessionTitle =
+      session.name ||
+      (isStrength
+        ? t('training.strengthWorkout')
+        : t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype)));
     const durationSeconds = getSessionDurationSeconds(session);
     const distanceObj = convertDistanceToUi(session.distance_m, 1);
     const distanceLabel =

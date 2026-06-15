@@ -1,0 +1,870 @@
+[
+  {
+    "id": "garmin-running-json",
+    "provider": "garmin",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/garmin/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/activity-api/",
+    "expectedSummary": {
+      "durationSeconds": 1800,
+      "caloriesKcal": 260,
+      "distanceM": 5000,
+      "avgHeartRate": 145,
+      "maxHeartRate": 172
+    },
+    "expectedStreams": {
+      "positionMinCount": 2,
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "garminActivityType": "running"
+    }
+  },
+  {
+    "id": "garmin-running-fit-user-redacted",
+    "provider": "garmin",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/garmin/running-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://developer.garmin.com/fit/overview/",
+    "tolerance": 0.01,
+    "expectedSummary": {
+      "durationSeconds": 4577,
+      "elapsedSeconds": 4577,
+      "caloriesKcal": 928,
+      "distanceM": 13008.57,
+      "avgHeartRate": 168,
+      "maxHeartRate": 189,
+      "minHeartRate": 93,
+      "maxSpeedMps": 2.842,
+      "avgCadence": 83,
+      "maxCadence": 88,
+      "elevationGainM": 224,
+      "elevationLossM": 220,
+      "totalSteps": 6402
+    },
+    "expectedStreams": {
+      "positionMinCount": 1045,
+      "heartRateMinCount": 1045,
+      "speedMinCount": 1045,
+      "distanceMinCount": 1045,
+      "altitudeMinCount": 1045,
+      "cadenceMinCount": 1045
+    },
+    "expectedProviderFields": {
+      "garminFitSport": 1,
+      "garminFitSubSport": 0,
+      "garminManufacturer": 1,
+      "garminProduct": 3869
+    },
+    "expectedDevice": {
+      "name": "Garmin"
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 57,
+        "percentage": 1
+      },
+      {
+        "zone": 2,
+        "durationSeconds": 74,
+        "percentage": 2
+      },
+      {
+        "zone": 3,
+        "durationSeconds": 2374,
+        "percentage": 52
+      },
+      {
+        "zone": 4,
+        "durationSeconds": 1704,
+        "percentage": 37
+      },
+      {
+        "zone": 5,
+        "durationSeconds": 368,
+        "percentage": 8
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 14,
+      "items": [
+        {
+          "lapIndex": 1,
+          "distanceM": 1000,
+          "durationSeconds": 363.42,
+          "avgHeartRate": 151,
+          "maxHeartRate": 165
+        }
+      ]
+    },
+    "expectedRoute": {
+      "positionExactCount": 1045
+    }
+  },
+  {
+    "id": "garmin-cycling-json",
+    "provider": "garmin",
+    "sportType": "cycling",
+    "sportSubtype": "road",
+    "format": "json",
+    "file": "providers/garmin/cycling.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/activity-api/",
+    "expectedSummary": {
+      "durationSeconds": 3600,
+      "caloriesKcal": 620,
+      "distanceM": 28000,
+      "avgHeartRate": 132,
+      "maxHeartRate": 166,
+      "avgPowerW": 185,
+      "maxPowerW": 460
+    },
+    "expectedStreams": {
+      "positionMinCount": 2,
+      "heartRateMinCount": 2,
+      "powerMinCount": 2
+    },
+    "expectedProviderFields": {
+      "garminActivityType": "cycling"
+    }
+  },
+  {
+    "id": "garmin-swimming-json",
+    "provider": "garmin",
+    "sportType": "swimming",
+    "sportSubtype": "pool",
+    "format": "json",
+    "file": "providers/garmin/swimming.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/activity-api/",
+    "expectedSummary": {
+      "durationSeconds": 2400,
+      "caloriesKcal": 410,
+      "distanceM": 1500,
+      "avgHeartRate": 124,
+      "maxHeartRate": 151
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "garminActivityType": "pool swimming"
+    }
+  },
+  {
+    "id": "suunto-strength-json",
+    "provider": "suunto",
+    "sportType": "strength",
+    "sportSubtype": "indoor",
+    "format": "json",
+    "file": "providers/suunto/strength.json",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "expectedSummary": {
+      "durationSeconds": 3882,
+      "caloriesKcal": 347,
+      "avgHeartRate": 83,
+      "maxHeartRate": 112,
+      "minHeartRate": 66,
+      "totalSteps": 346,
+      "recoveryTimeSeconds": 10800,
+      "epoc": 4,
+      "pte": 1.3,
+      "tss": 34
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "suuntoActivityId": 23
+    }
+  },
+  {
+    "id": "suunto-running-json",
+    "provider": "suunto",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/suunto/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://us.suunto.com/pages/what-type-of-files-can-i-export-from-the-suunto-app",
+    "expectedSummary": {
+      "durationSeconds": 2733,
+      "caloriesKcal": 510,
+      "distanceM": 6890,
+      "avgHeartRate": 151,
+      "maxHeartRate": 181
+    },
+    "expectedStreams": {
+      "positionMinCount": 2,
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "suuntoActivityId": 1
+    }
+  },
+  {
+    "id": "polar-running-json",
+    "provider": "polar",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/polar/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://support.polar.com/en/export-training-sessions-flow",
+    "expectedSummary": {
+      "durationSeconds": 2100,
+      "caloriesKcal": 390,
+      "distanceM": 6200,
+      "avgHeartRate": 148,
+      "maxHeartRate": 176
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "sourceProvider": "polar"
+    }
+  },
+  {
+    "id": "strava-running-json",
+    "provider": "strava",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/strava/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developers.strava.com/docs/reference/",
+    "expectedSummary": {
+      "durationSeconds": 1680,
+      "caloriesKcal": 305,
+      "distanceM": 5200,
+      "avgHeartRate": 142,
+      "maxHeartRate": 169
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "strava"
+    }
+  },
+  {
+    "id": "strava-trail-json",
+    "provider": "strava",
+    "sportType": "trail",
+    "sportSubtype": "trail_running",
+    "format": "json",
+    "file": "providers/strava/trail.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developers.strava.com/docs/reference/",
+    "expectedSummary": {
+      "durationSeconds": 7200,
+      "caloriesKcal": 1240,
+      "distanceM": 18000,
+      "avgHeartRate": 151,
+      "maxHeartRate": 184,
+      "elevationGainM": 900
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "strava"
+    }
+  },
+  {
+    "id": "strava-cycling-json",
+    "provider": "strava",
+    "sportType": "cycling",
+    "sportSubtype": "road",
+    "format": "json",
+    "file": "providers/strava/cycling.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developers.strava.com/docs/uploads/",
+    "expectedSummary": {
+      "durationSeconds": 4200,
+      "caloriesKcal": 720,
+      "distanceM": 32000,
+      "avgHeartRate": 136,
+      "maxHeartRate": 171
+    },
+    "expectedStreams": {
+      "positionMinCount": 2
+    },
+    "expectedProviderFields": {
+      "sourceProvider": "strava"
+    }
+  },
+  {
+    "id": "fitbit-workout-json",
+    "provider": "fitbit",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/fitbit/workout.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://dev.fitbit.com/build/reference/web-api/activity/get-activity-log-list/",
+    "expectedSummary": {
+      "durationSeconds": 1500,
+      "caloriesKcal": 240,
+      "distanceM": 4200,
+      "avgHeartRate": 139,
+      "maxHeartRate": 162,
+      "totalSteps": 5100
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "fitbit"
+    }
+  },
+  {
+    "id": "whoop-workout-json",
+    "provider": "whoop",
+    "sportType": "strength",
+    "sportSubtype": "indoor",
+    "format": "json",
+    "file": "providers/whoop/workout.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.whoop.com/api/",
+    "expectedSummary": {
+      "durationSeconds": 3600,
+      "caloriesKcal": 420,
+      "avgHeartRate": 118,
+      "maxHeartRate": 164
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "whoop"
+    }
+  },
+  {
+    "id": "oura-workout-json",
+    "provider": "oura",
+    "sportType": "hiking",
+    "sportSubtype": "trail",
+    "format": "json",
+    "file": "providers/oura/workout.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://cloud.ouraring.com/docs/",
+    "expectedSummary": {
+      "durationSeconds": 5400,
+      "caloriesKcal": 530,
+      "distanceM": 7100,
+      "avgHeartRate": 116
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "oura"
+    }
+  },
+  {
+    "id": "ultrahuman-daily-metrics-json",
+    "provider": "ultrahuman",
+    "sportType": "other",
+    "sportSubtype": null,
+    "format": "json",
+    "file": "providers/ultrahuman/daily-metrics.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://blog.ultrahuman.com/blog/accessing-the-ultrahuman-partnership-api/",
+    "expectedSummary": {
+      "caloriesKcal": 660,
+      "totalSteps": 9400,
+      "avgHeartRate": 61,
+      "vo2Max": 48
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "ultrahuman"
+    }
+  },
+  {
+    "id": "apple-health-workout-json",
+    "provider": "apple_health",
+    "sportType": "tennis",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/apple_health/workout.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.apple.com/documentation/healthkit/hkworkoutactivitytype",
+    "expectedSummary": {
+      "durationSeconds": 3300,
+      "caloriesKcal": 480,
+      "avgHeartRate": 128,
+      "maxHeartRate": 168
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2
+    },
+    "expectedProviderFields": {
+      "sourceProvider": "apple_health"
+    }
+  },
+  {
+    "id": "health-connect-exercise-session-json",
+    "provider": "health_connect",
+    "sportType": "basketball",
+    "sportSubtype": "indoor",
+    "format": "json",
+    "file": "providers/health_connect/exercise-session.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developer.android.com/reference/androidx/health/connect/client/records/ExerciseSessionRecord",
+    "expectedSummary": {
+      "durationSeconds": 2700,
+      "caloriesKcal": 520,
+      "avgHeartRate": 134,
+      "maxHeartRate": 178,
+      "totalSteps": 4200
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "health_connect"
+    }
+  },
+  {
+    "id": "coros-running-json",
+    "provider": "coros",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/coros/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://support.coros.com/hc/en-us/articles/360040257251-Run",
+    "expectedSummary": {
+      "durationSeconds": 600,
+      "distanceM": 2200,
+      "caloriesKcal": 180,
+      "avgHeartRate": 140,
+      "maxHeartRate": 172,
+      "avgCadence": 168,
+      "avgPowerW": 255,
+      "elevationGainM": 24
+    },
+    "expectedStreams": {
+      "positionMinCount": 2,
+      "heartRateMinCount": 3,
+      "cadenceMinCount": 3,
+      "powerMinCount": 3
+    },
+    "expectedProviderFields": {
+      "sourceProvider": "coros",
+      "corosSport": "Run"
+    }
+  },
+  {
+    "id": "unknown-padel-json",
+    "provider": "other",
+    "sportType": "padel",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "sports/padel/unknown-padel.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": null,
+    "expectedSummary": {
+      "durationSeconds": 3600,
+      "caloriesKcal": 580,
+      "avgHeartRate": 126,
+      "maxHeartRate": 171
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "unknown"
+    }
+  },
+  {
+    "id": "unknown-football-json",
+    "provider": "other",
+    "sportType": "football",
+    "sportSubtype": "football_11",
+    "format": "json",
+    "file": "sports/football/unknown-football.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": null,
+    "expectedSummary": {
+      "durationSeconds": 5400,
+      "caloriesKcal": 740,
+      "distanceM": 8200,
+      "avgHeartRate": 141,
+      "maxHeartRate": 186
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "unknown"
+    }
+  },
+  {
+    "id": "unknown-gym-json",
+    "provider": "other",
+    "sportType": "gym",
+    "sportSubtype": "indoor",
+    "format": "json",
+    "file": "sports/gym/unknown-gym.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": null,
+    "expectedSummary": {
+      "durationSeconds": 3000,
+      "caloriesKcal": 360,
+      "avgHeartRate": 105,
+      "maxHeartRate": 149
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "unknown"
+    }
+  },
+  {
+    "id": "suunto-running-json-user-redacted",
+    "provider": "suunto",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "json",
+    "file": "providers/suunto/running-user-redacted.json",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://us.suunto.com/pages/what-type-of-files-can-i-export-from-the-suunto-app",
+    "tolerance": 0.01,
+    "expectedSummary": {
+      "durationSeconds": 2638,
+      "caloriesKcal": 884,
+      "distanceM": 8023,
+      "avgHeartRate": 163,
+      "maxHeartRate": 176,
+      "minHeartRate": 87,
+      "totalSteps": 6164,
+      "recoveryTimeSeconds": 71520,
+      "epoc": 132.7,
+      "pte": 4.6,
+      "tss": 172.7,
+      "vo2Max": 49.3
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2600,
+      "speedMinCount": 2500,
+      "distanceMinCount": 2500,
+      "altitudeMinCount": 2500,
+      "cadenceMinCount": 2500
+    },
+    "expectedProviderFields": {
+      "suuntoActivityId": 3
+    },
+    "expectedDevice": {
+      "name": "Suunto Redacted",
+      "serial": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 66,
+        "percentage": 2
+      },
+      {
+        "zone": 2,
+        "durationSeconds": 348,
+        "percentage": 13
+      },
+      {
+        "zone": 3,
+        "durationSeconds": 1814,
+        "percentage": 68
+      },
+      {
+        "zone": 4,
+        "durationSeconds": 421,
+        "percentage": 16
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 9,
+      "items": [
+        {
+          "lapIndex": 1,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 316.7,
+          "avgPaceSecondsPerKm": 316.7
+        },
+        {
+          "lapIndex": 2,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 318.2,
+          "avgPaceSecondsPerKm": 318.2
+        },
+        {
+          "lapIndex": 3,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 321.9,
+          "avgPaceSecondsPerKm": 321.9
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-indoor-cycling-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "cycling",
+    "sportSubtype": "indoor_trainer",
+    "format": "fit",
+    "file": "providers/suunto/indoor-cycling-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3676,
+      "caloriesKcal": 400,
+      "avgHeartRate": 88,
+      "maxHeartRate": 113,
+      "minHeartRate": 69
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3600
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 2,
+      "suuntoFitSubSport": 6
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 3675,
+        "percentage": 100
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 7,
+      "items": [
+        {
+          "lapIndex": 1,
+          "durationSeconds": 600,
+          "avgHeartRate": 82
+        },
+        {
+          "lapIndex": 7,
+          "durationSeconds": 75.7,
+          "maxHeartRate": 113
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-running-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "running",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/running-fit-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 2634,
+      "elapsedSeconds": 2734,
+      "distanceM": 6890,
+      "caloriesKcal": 788,
+      "avgHeartRate": 153,
+      "maxHeartRate": 181,
+      "minHeartRate": 88,
+      "totalSteps": 2755,
+      "maxSpeedMps": 2.615,
+      "avgCadence": 68,
+      "maxCadence": 78,
+      "elevationLossM": 140
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2600,
+      "speedMinCount": 2600,
+      "distanceMinCount": 2600,
+      "altitudeMinCount": 2600,
+      "cadenceMinCount": 2600
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 1,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 15,
+      "items": [
+        {
+          "lapIndex": 1,
+          "distanceM": 1681,
+          "durationSeconds": 600
+        },
+        {
+          "lapIndex": 2,
+          "distanceM": 400,
+          "durationSeconds": 94.9
+        },
+        {
+          "lapIndex": 3,
+          "distanceM": 110.4,
+          "durationSeconds": 90
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-football-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "football",
+    "sportSubtype": "football_11",
+    "format": "fit",
+    "file": "providers/suunto/football-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3474,
+      "distanceM": 3435,
+      "caloriesKcal": 998,
+      "avgHeartRate": 147,
+      "maxHeartRate": 177,
+      "minHeartRate": 88,
+      "totalSteps": 2249,
+      "maxSpeedMps": 0.989,
+      "avgCadence": 58,
+      "maxCadence": 100,
+      "elevationLossM": 26
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3400,
+      "speedMinCount": 3400,
+      "distanceMinCount": 3400,
+      "altitudeMinCount": 3400,
+      "cadenceMinCount": 3400
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 7,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-gym-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "strength",
+    "sportSubtype": "indoor",
+    "format": "fit",
+    "file": "providers/suunto/gym-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3197,
+      "caloriesKcal": 267,
+      "avgHeartRate": 82,
+      "maxHeartRate": 102,
+      "minHeartRate": 63,
+      "totalSteps": 129
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3100,
+      "altitudeMinCount": 3100
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 10,
+      "suuntoFitSubSport": 20
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 3197,
+        "percentage": 100
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-padel-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "padel",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/padel-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 4584,
+      "caloriesKcal": 810,
+      "avgHeartRate": 121,
+      "maxHeartRate": 145,
+      "minHeartRate": 88,
+      "totalSteps": 882
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 4500,
+      "altitudeMinCount": 4500
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 64,
+      "suuntoFitSubSport": 85
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-tennis-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "tennis",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/tennis-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3531,
+      "distanceM": 1320,
+      "caloriesKcal": 702,
+      "avgHeartRate": 127,
+      "maxHeartRate": 153,
+      "minHeartRate": 84,
+      "totalSteps": 1913,
+      "maxSpeedMps": 0.374,
+      "elevationGainM": 11,
+      "elevationLossM": 14
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3500,
+      "speedMinCount": 3500,
+      "distanceMinCount": 3500,
+      "altitudeMinCount": 3500
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 8,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  }
+]
