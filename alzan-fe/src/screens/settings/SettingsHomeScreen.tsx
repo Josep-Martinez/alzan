@@ -18,6 +18,7 @@ import {
   Apple,
   Heart,
   ChevronLeft,
+  Home,
   LucideIcon,
 } from 'lucide-react-native';
 import { spacing, typography, borderRadius, shadows } from '../../theme';
@@ -169,6 +170,12 @@ export const SettingsHomeScreen = () => {
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, dynamicStyles.sectionHeader]}>{t('settings.contentAllCaps')}</Text>
             <View style={[styles.card, dynamicStyles.card]}>
+              <SettingsItem
+                icon={Home}
+                label={t('tabs.home')}
+                onPress={() => navigation.navigate('HomeSettings')}
+                {...itemProps}
+              />
               <SettingsItem
                 icon={Dumbbell}
                 label={t('settings.workout')}

@@ -3,7 +3,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { ExerciseWithDetails } from './training';
 import { PopulatedEnduranceWorkoutTemplate } from '../screens/training/EnduranceSessionFormScreen';
-import { ActivitySession, MeasurementType, SportType } from './requests.types';
+import { ActivitySession, MealType, MeasurementType, SportType } from './requests.types';
 import { MetricType } from '../modules/health/components/HealthInteractiveChart';
 
 // ============================================================================
@@ -27,6 +27,7 @@ export type RootStackParamList = {
 
   // Modal Screens
   WeightAdd: { date?: string } | undefined;
+  StepsAdd: { date?: string } | undefined;
 
   // Social Screens
   OtherUserProfile: { userId: string };
@@ -91,6 +92,7 @@ export type TrainingStackParamList = {
     onExerciseSelected?: (exercise: ExerciseWithDetails) => void;
     fromScreen?: string;
     routineId?: string;
+    selectionMode?: 'single' | 'multi';
   };
   StartWorkout: { templateId: string; date?: string; planId?: string };
   ActiveWorkout: { sessionId: string };
@@ -139,12 +141,15 @@ export type TrainingStackParamList = {
 // ============================================================================
 
 export type NutritionStackParamList = {
-  NutritionHome: undefined;
+  NutritionHome: { date?: string } | undefined;
   NutritionSettings: undefined;
+  RecipeLibrary: { date: string; mealType?: MealType } | undefined;
   MealLogForm: {
     date: string;
-    mealItem?: { id?: string; name?: string; [key: string]: unknown };
+    mealItem?: { id?: string; name?: string; mealType?: MealType; [key: string]: unknown };
     isExtra?: boolean;
+    presetRecipeId?: string;
+    presetRecipeName?: string;
   };
 };
 
@@ -169,6 +174,7 @@ export type HealthStackParamList = {
   SleepList: undefined;
   SleepAdd: undefined;
   RestingHRList: undefined;
+  StepsStatistics: undefined;
 };
 
 // ============================================================================
@@ -190,6 +196,8 @@ export type SettingsStackParamList = {
   TrainingSettings: undefined;
   NutritionSettings: undefined;
   HealthSettings: undefined;
+  HomeSettings: undefined;
+  HomeCards: undefined;
   StatsGlobal: undefined;
 };
 
@@ -224,7 +232,7 @@ export type NutritionScreenNavigationProp = CompositeNavigationProp<
 // Health screens can navigate within health stack AND to Tab Navigator
 export type HealthScreenNavigationProp = CompositeNavigationProp<
   StackNavigationProp<HealthStackParamList>,
-  BottomTabNavigationProp<TabParamList>
+  CompositeNavigationProp<BottomTabNavigationProp<TabParamList>, StackNavigationProp<RootStackParamList>>
 >;
 
 // Settings screens can navigate within settings stack

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings } from 'lucide-react-native';
-import { format } from 'date-fns';
+import { Settings, Plus, BookOpen } from 'lucide-react-native';
+import { format, isValid, parseISO } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
 import { MealSection } from '../../modules/nutrition/components/MealSection';
@@ -12,13 +12,14 @@ import { WaterTracker } from '../../modules/nutrition/components/WaterTracker';
 import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLogic';
 import { useUpsertMealLog, useDeleteMealLog, useWaterIntake } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
-import { MEAL_TYPES, MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
+import { MEAL_TYPES, MEAL_TYPE_LABELS, getMealTypeByHour } from '../../modules/nutrition/constants';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
-import { NutritionScreenNavigationProp, TabParamList } from '../../types/navigation.types';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
+import { MealType } from '../../types/requests.types';
+import { BottomTabNavigationProp, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
 
@@ -49,8 +50,10 @@ const groupMealsByType = (meals: DailyMealItem[]) => {
 export const NutritionHomeScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
+  const route = useRoute<RouteProp<NutritionStackParamList, 'NutritionHome'>>();
   const { convertEnergyToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -66,6 +69,24 @@ export const NutritionHomeScreen = () => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const routeDate = route.params?.date;
+      if (!routeDate) return;
+
+      const nextDate = parseISO(routeDate);
+      if (isValid(nextDate)) {
+        setSelectedDate(nextDate);
+        requestAnimationFrame(() => {
+          daySwitcherRef.current?.scrollToDate(nextDate);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        });
+      }
+
+      navigation.setParams({ date: undefined });
+    }, [navigation, route.params?.date]),
+  );
 
   // Keep visible week aligned with the selected day whenever this screen gains focus
   useFocusEffect(
@@ -121,14 +142,7 @@ export const NutritionHomeScreen = () => {
   const macroDisplay = preferences?.nutrition_prefs?.macro_display || 'per_meal';
 
   // Default meal types in order
-  const defaultMealTypes = [
-    MEAL_TYPES.BREAKFAST,
-    MEAL_TYPES.ALMUERZO,
-    MEAL_TYPES.LUNCH,
-    MEAL_TYPES.MERIENDA,
-    MEAL_TYPES.DINNER,
-    MEAL_TYPES.SNACK,
-  ];
+  const defaultMealTypes: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
 
   // Filter meal types based on enabled_meals preferences
   const displayMealTypes = enabledMeals
@@ -142,8 +156,16 @@ export const NutritionHomeScreen = () => {
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
 
+  // The floating "+" defaults the meal slot to the current time of day so the
+  // user lands in the right section without scrolling to find it. Falls back to
+  // an enabled slot if the time-of-day pick is hidden by preferences.
+  const pickDefaultMealType = (): MealType => {
+    const preferred = getMealTypeByHour();
+    return displayMealTypes.includes(preferred) ? preferred : displayMealTypes[0] || 'snack';
+  };
+
   // Handlers
-  const handleAddFood = (type: string) => {
+  const handleAddFood = (type: MealType) => {
     navigation.navigate('MealLogForm', {
       date: formattedDate,
       isExtra: true,
@@ -236,6 +258,9 @@ export const NutritionHomeScreen = () => {
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('tabs.nutrition')}</Text>
           <View style={styles.topActions}>
+            <TouchableOpacity onPress={() => navigation.navigate('RecipeLibrary', { date: formattedDate })}>
+              <BookOpen color={themeColors.textPrimary} size={24} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
               <Settings color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
@@ -245,7 +270,10 @@ export const NutritionHomeScreen = () => {
         {/* Day Switcher - Removed external wrapper styles to let component handle margin */}
         <DaySwitcher ref={daySwitcherRef} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 96 }]}
+        >
           {/* Calorie Summary Header */}
           <CalorieEquationHeader
             calories={{
@@ -294,6 +322,17 @@ export const NutritionHomeScreen = () => {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
+        <TouchableOpacity
+          style={[styles.fab, { bottom: tabBarHeight + 28, backgroundColor: themeColors.primary }]}
+          onPress={() => handleAddFood(pickDefaultMealType())}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('nutrition.addMeal')}
+        >
+          <Plus color="#FFFFFF" size={26} strokeWidth={2.6} />
+        </TouchableOpacity>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -317,6 +356,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   dateSection: {
     // marginBottom: 8 // Removed since DaySwitcher has its own spacing
@@ -324,5 +366,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

@@ -21,12 +21,27 @@ All commands run from the repo root with pnpm. Per-package variants use `pnpm --
 - Quality gate (required after any code change): `pnpm format` then `pnpm run lint:check`. Only a non-zero exit code from lint is a failure; warnings are OK.
 - `pnpm typecheck` — `tsc --noEmit` for both packages.
 - `pnpm --prefix alzan-fe build` triggers `expo prebuild`; avoid unless strictly necessary.
+- Cloud dev environment: the `:cloud` script variants (`pnpm start:web:cloud`, `pnpm ios:cloud`, `pnpm android:cloud`) run against cloud Supabase. They are gated by `scripts/guard-cloud.js` and sync env via `env:sync:cloud`; use only when explicitly targeting the cloud environment.
+
+### Local Supabase loop
+
+The app needs a running database. The Supabase CLI ships as a repo dependency — invoke it with `pnpm supabase ...` (Docker must be running).
+
+1. `pnpm supabase start` — Postgres + Auth + Studio (API `54321`, Studio `54323`, DB `54322`).
+2. `pnpm supabase db reset` — rebuild the DB by applying `supabase/migrations/` then the ordered `supabase/seeds/*.sql`. Run on first setup or after a schema change.
+3. `pnpm run supabase:types` — regenerate DB types from the now-current local instance (see "Generated code").
+4. `pnpm start` (or `start:be` / `start:fe`) to run the app; `pnpm supabase stop` when done.
+
+Gotchas:
+- Never create `alzan-fe/.env.local` (or any `.env.<x>`). Expo prioritizes it over the `env:sync`-generated `.env`, silently pointing the app at the wrong Supabase. The cloud guard refuses to start if it finds one.
+- Cloud variants are **blocked** when your branch adds migrations not yet in `origin/main` (they deploy via the manual `Deploy Database Migrations` workflow, not on merge); `git fetch` after deploy so the guard sees them.
 
 ### Tests
 
 There is no jest/vitest. Backend `*.spec.ts` files are plain ts-node scripts using `node:assert`.
 
 - Full activity-import suite: `pnpm verify:activity-import` (fixture-manifest runner; see `docs/activity-import-verification.md`).
+- Import-review suite: `pnpm verify:import-review`.
 - Single spec: `cd alzan-be && node -r ts-node/register -r tsconfig-paths/register src/components/activity-import/parsers/<name>.spec.ts`
 
 ### Generated code (never hand-edit)
