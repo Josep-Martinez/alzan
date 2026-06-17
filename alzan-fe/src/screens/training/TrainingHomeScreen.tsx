@@ -20,7 +20,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Dumbbell, Calendar, Play, List, Plus, Settings, Trash2 } from 'lucide-react-native';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
-import { SPORTS_CONFIG } from '../../constants/sports';
+import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../constants/sports';
 import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import { ImportReviewSurface } from './components/ImportReviewSurface';
 
@@ -64,11 +64,13 @@ interface DailyEntry {
     workout_goal?: string;
   } | null;
   sport_type?: string;
+  completedSession?: CompletedSession | null;
 }
 
 interface CompletedSession {
   id: string;
   sport_type: string;
+  sport_subtype?: string | null;
   workout_template_id: string | null;
   start_time: string;
   name: string;
@@ -425,7 +427,7 @@ export const TrainingHomeScreen = () => {
 
       const { data, error } = await supabase
         .from('activity_sessions')
-        .select('id, sport_type, workout_template_id, start_time, name, source, distance_m, duration_s')
+        .select('id, sport_type, sport_subtype, workout_template_id, start_time, name, source, distance_m, duration_s')
         .eq('user_id', user.id)
         .eq('needs_strength_review', false)
         .or(
@@ -467,7 +469,10 @@ export const TrainingHomeScreen = () => {
         }
       });
 
-      if (match) matchedSessionIds.add(match.id);
+      if (match) {
+        matchedSessionIds.add(match.id);
+        plan.completedSession = match;
+      }
     });
 
     // 2. Create "Plan-like" objects for unmatched sessions
@@ -512,6 +517,7 @@ export const TrainingHomeScreen = () => {
 
         // Helper for icon extraction
         sport_type: s.sport_type,
+        completedSession: s,
       };
     });
 
@@ -621,7 +627,17 @@ export const TrainingHomeScreen = () => {
 
                     <View style={{ flex: 1, paddingHorizontal: 12 }}>
                       <Text style={[styles.planTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {template?.base_name || t('settings.workout')}
+                        {plan.completedSession
+                          ? plan.completedSession.name ||
+                            (isGym
+                              ? t('training.strengthWorkout')
+                              : t(
+                                  getSportDefaultTitleKey(
+                                    plan.completedSession.sport_type,
+                                    plan.completedSession.sport_subtype,
+                                  ),
+                                ))
+                          : template?.base_name || t('settings.workout')}
                       </Text>
                       <Text style={[styles.planSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
                         {isGym
