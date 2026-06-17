@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { measurementApi } from '../services/measurementApi';
 import { MeasurementType } from '../../../types/requests.types';
+import { bodyCompositionService } from '../services/bodyCompositionService';
 
 export const useMeasurements = (type?: MeasurementType, limit = 100) => {
   const { user } = useAuth();
@@ -38,22 +39,25 @@ export const useAddMeasurement = () => {
 
       const result = await measurementApi.addMeasurement({
         user_id: user.id,
-        measured_at: new Date().toISOString(),
+        measured_at: targetDate.toISOString(),
         ...data,
       });
 
-      // NOTE: We intentionally do NOT recalculate existing weight logs here.
-      // Saved body composition values (BMI, body fat %, muscle %) should remain unchanged.
-      // New measurements will only be used for FUTURE weight log entries.
-      // A manual "Recalculate" button may be added in the future for users who want to update.
+      // Trigger automatic recalculation if all 5 metrics exist on this day
+      try {
+        const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+        await bodyCompositionService.checkAndTriggerRecalculateForMeasurements(user.id, dateStr);
+      } catch (err) {
+        console.error('[useAddMeasurement] Error in trigger recalculate:', err);
+      }
 
       return result;
     },
     onSuccess: () => {
-      // Invalidate measurements for this user
+      // Invalidate measurements and weight logs for this user
       queryClient.invalidateQueries({ queryKey: ['measurements', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
       queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
-      // Note: We do NOT invalidate weightLogs since saved body composition values should not change
     },
   });
 };

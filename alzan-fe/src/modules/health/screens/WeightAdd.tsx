@@ -8,12 +8,10 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { HealthScreenNavigationProp, HealthStackParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertTriangle } from 'lucide-react-native';
 import { typography, spacing } from '../../../theme';
 import { useAddWeightLog } from '../hooks/useWeight';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react-native';
@@ -55,7 +53,6 @@ export const WeightAdd = () => {
   const [weight, setWeight] = useState('');
   const [date, setDate] = useState(route.params?.date ? new Date(route.params.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   const handleSave = () => {
     const weightVal = parseFloat(weight.replace(',', '.'));
@@ -83,12 +80,6 @@ export const WeightAdd = () => {
         },
         onError: (error: unknown) => {
           const err = error as { type?: string; message?: string };
-          // Check for duplicate day error (expected case, not a real error)
-          if (err?.type === 'DUPLICATE_DAY' || err?.message === 'DUPLICATE_DAY') {
-            setShowDuplicateModal(true);
-            return;
-          }
-
           console.error('Error guardando peso:', error);
           Alert.alert(
             t('common.error'),
@@ -299,31 +290,7 @@ export const WeightAdd = () => {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Duplicate Day Modal */}
-      <Modal
-        visible={showDuplicateModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDuplicateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#2C2C2E' : '#FFFFFF' }]}>
-            <View style={[styles.modalIconContainer, { backgroundColor: '#F59E0B20' }]}>
-              <AlertTriangle size={32} color="#F59E0B" />
-            </View>
-            <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('common.recordExists')}</Text>
-            <Text style={[styles.modalMessage, { color: themeColors.textSecondary }]}>
-              {t('health.overwriteWeightDayWarning')}
-            </Text>
-            <TouchableOpacity
-              style={[styles.modalButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => setShowDuplicateModal(false)}
-            >
-              <Text style={styles.modalButtonText}>{t('common.gotIt')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Duplicate Day Modal removed */}
     </SafeAreaView>
   );
 };
