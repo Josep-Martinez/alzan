@@ -82,8 +82,15 @@ export const useHealthInsights = () => {
   /** Most recent weight log entry */
   const latestWeight = weightLogs?.[0];
 
-  /** Previous weight log for delta calculation */
-  const previousWeight = weightLogs?.[1];
+  /** Previous weight log for delta calculation (finds first weight on a different calendar day, falls back to previous log) */
+  const previousWeight = (() => {
+    if (!weightLogs || weightLogs.length < 2 || !latestWeight) return undefined;
+    const latestDateStr = new Date(latestWeight.measured_at).toDateString();
+    const diffDayLog = weightLogs.find(
+      (log, index) => index > 0 && new Date(log.measured_at).toDateString() !== latestDateStr,
+    );
+    return diffDayLog || weightLogs[1];
+  })();
 
   const latestSleep = sleepSessions?.[0];
 

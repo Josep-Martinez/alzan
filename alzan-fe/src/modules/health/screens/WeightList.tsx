@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { HealthScreenNavigationProp, HealthStackParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { useProfile } from '../../../hooks/settings/useProfile';
 import { BodyMeasurement, MeasurementType, WeightLog } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
+import { Alert } from '../../../components/common/Alert';
 
 export const WeightList = () => {
   const { t } = useTranslation();
@@ -43,11 +44,6 @@ export const WeightList = () => {
   const deleteMeasurement = useDeleteMeasurement();
 
   const handleDelete = (id: string, valueDisplay: string) => {
-    if (logs && logs.length <= 1) {
-      Alert.alert(t('health.cannotDeleteRecordTitle'), t('health.mustKeepAtLeastOneRecord'));
-      return;
-    }
-
     Alert.alert(t('common.delete'), `${t('health.confirmDeleteRecord')} (${valueDisplay})`, [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -121,10 +117,7 @@ export const WeightList = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Text style={[styles.backButtonText, { color: themeColors.primary }]}>{t('common.back')}</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, dynamicStyles.title]}>
-            {t('health.history')}
-            {label}
-          </Text>
+          <Text style={[styles.headerTitle, dynamicStyles.title]}>{`${t('health.history')} ${label}`}</Text>
 
           {/* Only show Add button for Weight for now, simpler specific UI for adding others might be needed or reused */}
           <TouchableOpacity
@@ -168,8 +161,7 @@ export const WeightList = () => {
           ListEmptyComponent={
             !isLoading ? (
               <Text style={[styles.emptyText, dynamicStyles.subtitle]}>
-                {t('health.noRecordsOf')}
-                {label.toLowerCase()}.{label.toLowerCase()}.
+                {t('health.noRecordsOf')} {label.toLowerCase()}.
               </Text>
             ) : null
           }

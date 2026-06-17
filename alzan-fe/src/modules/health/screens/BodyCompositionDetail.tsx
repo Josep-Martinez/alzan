@@ -179,7 +179,10 @@ export const BodyCompositionDetail = () => {
     }
 
     const latest = weightLogs[0];
-    const previous = weightLogs[1];
+    const latestDateStr = new Date(latest.measured_at).toDateString();
+    const previous =
+      weightLogs.find((log, index) => index > 0 && new Date(log.measured_at).toDateString() !== latestDateStr) ||
+      weightLogs[1];
     const heightM = (profile?.height_cm || 170) / 100;
 
     // BMI delta

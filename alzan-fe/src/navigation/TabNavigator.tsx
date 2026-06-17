@@ -272,10 +272,37 @@ export const TabNavigator = () => {
             // === NORMAL APP TABS ===
             <>
               <Tab.Screen name="Home" component={HomeScreen} />
-              <Tab.Screen name="Training" component={TrainingStack} />
+              <Tab.Screen
+                name="Training"
+                component={TrainingStack}
+                listeners={({ navigation }) => ({
+                  tabPress: e => {
+                    e.preventDefault();
+                    navigation.navigate('Training', { screen: 'TrainingHome' });
+                  },
+                })}
+              />
               <Tab.Screen name="AlzanToggle" component={ModeTogglePlaceholder} />
-              <Tab.Screen name="Nutrition" component={NutritionNavigator} />
-              <Tab.Screen name="Health" component={HealthNavigator} />
+              <Tab.Screen
+                name="Nutrition"
+                component={NutritionNavigator}
+                listeners={({ navigation }) => ({
+                  tabPress: e => {
+                    e.preventDefault();
+                    navigation.navigate('Nutrition', { screen: 'NutritionHome' });
+                  },
+                })}
+              />
+              <Tab.Screen
+                name="Health"
+                component={HealthNavigator}
+                listeners={({ navigation }) => ({
+                  tabPress: e => {
+                    e.preventDefault();
+                    navigation.navigate('Health', { screen: 'HealthHome' });
+                  },
+                })}
+              />
             </>
           )}
           {/* Settings always available but hidden from tab bar? 

@@ -537,7 +537,7 @@ export default {
     compositionEstimatesDisclaimer:
       'Las estimaciones de % de grasa y % de músculo son aproximaciones orientativas y no sustituyen una valoración médica o pruebas específicas.',
     remainder: 'Resto',
-    fat: 'Grasa % =',
+    fat: 'Grasa',
     muscle: 'Músculo',
     weightDistribution: 'Distribución de Peso',
     recalculateComposition: 'Recalcular composición',

@@ -174,7 +174,7 @@ export type HealthStackParamList = {
   SleepList: undefined;
   SleepAdd: undefined;
   RestingHRList: undefined;
-  StepsStatistics: undefined;
+  StepsStatistics: { fromHome?: boolean } | undefined;
 };
 
 // ============================================================================

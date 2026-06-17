@@ -175,7 +175,7 @@ export const HomeScreen = () => {
       label: t('home.steps'),
       value: todaySteps != null ? todaySteps.toLocaleString(getLocaleTag()) : '--',
       unit: t('steps.unit'),
-      onPress: () => navigation.navigate('Health', { screen: 'StepsStatistics' }),
+      onPress: () => navigation.navigate('Health', { screen: 'StepsStatistics', params: { fromHome: true } }),
     },
     workouts: {
       icon: CheckCircle,

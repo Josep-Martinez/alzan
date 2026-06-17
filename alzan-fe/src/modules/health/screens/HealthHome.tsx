@@ -121,18 +121,29 @@ export const HealthHome = () => {
 
                 {latestWeight && weightDelta && weightDelta.change !== 0 && (
                   <View style={styles.deltaInline}>
-                    <Text style={[styles.deltaValue, { color: weightDelta.change <= 0 ? '#10B981' : '#EF4444' }]}>
-                      {weightDelta.change > 0 ? '+' : '-'}
+                    <Text
+                      style={[
+                        styles.deltaValue,
+                        {
+                          color:
+                            weightDelta.change < 0
+                              ? '#10B981'
+                              : weightDelta.change > 0
+                                ? '#EF4444'
+                                : colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      {weightDelta.change > 0 ? '+' : weightDelta.change < 0 ? '-' : ''}
                       {convertWeightToUi(Math.abs(weightDelta.change)).value}
                     </Text>
                   </View>
                 )}
               </View>
 
-              {weightDelta && (
+              {weightDelta && weightDelta.change !== 0 && (
                 <Text style={[styles.comparisonText, dynamicStyles.subtitle]}>
-                  {t('health.vs')}
-                  {formatDate(weightDelta.previousDate)}
+                  {`${t('health.vs')} ${formatDate(weightDelta.previousDate)}`}
                 </Text>
               )}
             </TouchableOpacity>

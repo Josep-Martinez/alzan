@@ -530,7 +530,7 @@ const en = {
     compositionEstimatesDisclaimer:
       'Fat % and muscle % estimates are approximate and do not replace medical assessment or specific tests.',
     remainder: 'Remainder',
-    fat: 'Fat % =',
+    fat: 'Fat',
     muscle: 'Muscle',
     weightDistribution: 'Weight Distribution',
     recalculateComposition: 'Recalculate composition',
