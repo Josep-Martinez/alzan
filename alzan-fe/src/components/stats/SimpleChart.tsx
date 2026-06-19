@@ -82,18 +82,23 @@ export const SimpleChart: React.FC<SimpleChartProps> = ({
   const scrollRef = useRef<ScrollView>(null);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
-    setContainerWidth(event.nativeEvent.layout.width);
+    const nextWidth = Math.round(event.nativeEvent.layout.width);
+    setContainerWidth(previousWidth => (previousWidth === nextWidth ? previousWidth : nextWidth));
   }, []);
 
   // Auto-scroll to end when data or range changes
   // Only scroll to end if we just loaded new data, not during interaction
   // We can assume if data length changes or range changes, we reset to end
   useEffect(() => {
-    if (scrollRef.current) {
-      setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: false });
-      }, 50);
+    if (!scrollRef.current) {
+      return;
     }
+
+    const timeoutId = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
   }, [data.length, range, containerWidth]);
 
   const getPointSpacing = () => {

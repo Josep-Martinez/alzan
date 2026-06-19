@@ -403,7 +403,16 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
   };
 
   const handleVisibleRangeChange = useCallback((nextVisibleRange: { start: Date; end: Date }) => {
-    setVisibleRange(nextVisibleRange);
+    setVisibleRange(previousRange => {
+      if (!previousRange) {
+        return nextVisibleRange;
+      }
+
+      const startDiffMs = Math.abs(previousRange.start.getTime() - nextVisibleRange.start.getTime());
+      const endDiffMs = Math.abs(previousRange.end.getTime() - nextVisibleRange.end.getTime());
+
+      return startDiffMs < 1000 && endDiffMs < 1000 ? previousRange : nextVisibleRange;
+    });
   }, []);
 
   const handleClearSelection = useCallback(() => {

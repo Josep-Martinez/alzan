@@ -1,6 +1,6 @@
-import React, { useCallback, useImperativeHandle, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { GestureResponderEvent } from 'react-native';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { GestureResponderEvent, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import {
   eachMonthOfInterval,
   endOfMonth,
@@ -11,6 +11,7 @@ import {
   subDays,
   subMonths,
 } from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { GlassCard } from '../../../components/GlassCard';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { getDateFnsLocale, getLocaleTag } from '../../../i18n/dateLocale';
@@ -22,6 +23,10 @@ type TimeRange = 'S' | 'M' | '6M' | 'A';
 const RANGES: TimeRange[] = ['S', 'M', '6M', 'A'];
 const CHART_TOP_PADDING_STEPS = 2000;
 const CHART_AXIS_STEP = 500;
+const WEEK_PAGE_DAYS = 7;
+const WEEK_PAGE_COUNT = 52;
+const MONTH_PAGE_DAYS = 30;
+const MONTH_PAGE_COUNT = 12;
 
 export type StepsChartHandle = {
   clearSelection: () => void;
@@ -40,6 +45,11 @@ type Bucket = {
   isMonthly: boolean;
 };
 
+type BucketPage = {
+  key: string;
+  buckets: Bucket[];
+};
+
 const roundDownToAxisStep = (value: number): number => Math.floor(value / CHART_AXIS_STEP) * CHART_AXIS_STEP;
 
 const formatSteps = (value: number): string => {
@@ -52,15 +62,34 @@ const formatAxis = (value: number): string => {
   return `${Math.round(value)}`;
 };
 
+const chunkBuckets = (buckets: Bucket[], pageSize: number): BucketPage[] => {
+  const pages: BucketPage[] = [];
+
+  for (let index = 0; index < buckets.length; index += pageSize) {
+    const pageBuckets = buckets.slice(index, index + pageSize);
+    const firstBucket = pageBuckets[0];
+    const lastBucket = pageBuckets[pageBuckets.length - 1];
+    pages.push({
+      key: `${firstBucket?.fullLabel ?? index}-${lastBucket?.fullLabel ?? index}`,
+      buckets: pageBuckets,
+    });
+  }
+
+  return pages;
+};
+
 export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
   const [range, setRange] = useState<TimeRange>('S');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [pageIndex, setPageIndex] = useState(Number.MAX_SAFE_INTEGER);
+  const [plotWidth, setPlotWidth] = useState(0);
+  const pageScrollRef = useRef<ScrollView>(null);
 
   const { data: rows, isLoading } = useStepsRange(366);
 
-  const buckets = useMemo<Bucket[]>(() => {
+  const chartPages = useMemo<BucketPage[]>(() => {
     const byDate = aggregateStepsByDate(rows ?? []);
     const now = new Date();
     const locale = getDateFnsLocale();
@@ -110,16 +139,20 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
 
     switch (range) {
       case 'S':
-        return dailyBuckets(7);
+        return chunkBuckets(dailyBuckets(WEEK_PAGE_DAYS * WEEK_PAGE_COUNT), WEEK_PAGE_DAYS);
       case 'M':
-        return dailyBuckets(30);
+        return chunkBuckets(dailyBuckets(MONTH_PAGE_DAYS * MONTH_PAGE_COUNT), MONTH_PAGE_DAYS);
       case '6M':
-        return monthlyBuckets(6);
+        return [{ key: '6M', buckets: monthlyBuckets(6) }];
       case 'A':
-        return monthlyBuckets(12);
+        return [{ key: 'A', buckets: monthlyBuckets(12) }];
     }
   }, [rows, range]);
 
+  const lastPageIndex = Math.max(chartPages.length - 1, 0);
+  const activePageIndex = Math.min(pageIndex, lastPageIndex);
+  const isPagedRange = chartPages.length > 1;
+  const buckets = chartPages[activePageIndex]?.buckets ?? [];
   const dataBuckets = buckets.filter(b => b.hasData);
   const isMonthly = buckets[0]?.isMonthly ?? false;
 
@@ -157,6 +190,49 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
   const barColor = themeColors.primary;
   const clearSelection = useCallback(() => setSelectedIndex(null), []);
   const stopPropagation = useCallback((event: GestureResponderEvent) => event.stopPropagation(), []);
+  const handlePlotLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = Math.round(event.nativeEvent.layout.width);
+    setPlotWidth(previousWidth => (previousWidth === nextWidth ? previousWidth : nextWidth));
+  }, []);
+  const scrollToPage = useCallback(
+    (nextPageIndex: number, animated: boolean) => {
+      if (plotWidth <= 0) {
+        return;
+      }
+
+      pageScrollRef.current?.scrollTo({ x: nextPageIndex * plotWidth, animated });
+    },
+    [plotWidth],
+  );
+  const goToPage = useCallback(
+    (nextPageIndex: number) => {
+      const clampedPageIndex = Math.min(Math.max(nextPageIndex, 0), lastPageIndex);
+      setSelectedIndex(null);
+      setPageIndex(clampedPageIndex);
+      scrollToPage(clampedPageIndex, true);
+    },
+    [lastPageIndex, scrollToPage],
+  );
+  const handlePageScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (plotWidth <= 0) {
+        return;
+      }
+
+      const nextPageIndex = Math.round(event.nativeEvent.contentOffset.x / plotWidth);
+      const clampedPageIndex = Math.min(Math.max(nextPageIndex, 0), lastPageIndex);
+      setSelectedIndex(null);
+      setPageIndex(previousPageIndex =>
+        previousPageIndex === clampedPageIndex ? previousPageIndex : clampedPageIndex,
+      );
+    },
+    [lastPageIndex, plotWidth],
+  );
+  const handleRangePress = useCallback((nextRange: TimeRange) => {
+    setRange(nextRange);
+    setSelectedIndex(null);
+    setPageIndex(Number.MAX_SAFE_INTEGER);
+  }, []);
   const selectBucket = useCallback(
     (event: GestureResponderEvent, index: number) => {
       event.stopPropagation();
@@ -166,6 +242,72 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
   );
 
   useImperativeHandle(ref, () => ({ clearSelection }), [clearSelection]);
+
+  useEffect(() => {
+    if (!isPagedRange) {
+      return;
+    }
+
+    scrollToPage(activePageIndex, false);
+  }, [activePageIndex, isPagedRange, plotWidth, range, scrollToPage]);
+
+  const canGoToPreviousPage = isPagedRange && activePageIndex > 0;
+  const canGoToNextPage = isPagedRange && activePageIndex < lastPageIndex;
+
+  const renderBars = (pageBuckets: Bucket[], isActivePage: boolean) => (
+    <View style={styles.barsRow}>
+      {pageBuckets.map((bucket, i) => {
+        const barHeight = bucket.hasData ? Math.max((bucket.value / maxValue) * plotHeight, 2) : 0;
+        const showLabel =
+          pageBuckets.length <= 7 ||
+          (isMonthly ? true : i % Math.ceil(pageBuckets.length / 6) === 0) ||
+          i === pageBuckets.length - 1;
+        const isSel = isActivePage && selectedIndex === i;
+        const isToday = !isMonthly && isSameDay(bucket.date, new Date());
+        const isThisMonth = isMonthly && isSameMonth(bucket.date, new Date());
+        const isDimmed = isActivePage && selectedIndex !== null && !isSel;
+
+        return (
+          <View key={`${bucket.fullLabel}-${i}`} style={styles.barTouch}>
+            <View style={[styles.barColumn, { height: plotHeight }]}>
+              {bucket.hasData && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${bucket.fullLabel}, ${formatSteps(bucket.value)} ${t('steps.unit')}`}
+                  onPress={event => selectBucket(event, i)}
+                  style={[styles.barHitBox, { height: Math.max(barHeight, 44) }]}
+                >
+                  <View
+                    style={[
+                      styles.bar,
+                      {
+                        height: barHeight,
+                        backgroundColor: barColor,
+                        opacity: isDimmed ? 0.35 : 1,
+                      },
+                    ]}
+                  />
+                </Pressable>
+              )}
+            </View>
+            <Text
+              style={[
+                styles.xLabel,
+                {
+                  color: isSel || isToday || isThisMonth ? themeColors.primary : themeColors.textSecondary,
+                  fontWeight: isSel ? '700' : '500',
+                  opacity: showLabel ? 1 : 0,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {showLabel ? bucket.label : ' '}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 
   return (
     <Pressable style={styles.container} onPress={stopPropagation}>
@@ -188,10 +330,7 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
                 styles.rangeBtn,
                 range === r && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)' },
               ]}
-              onPress={() => {
-                setRange(r);
-                setSelectedIndex(null);
-              }}
+              onPress={() => handleRangePress(r)}
             >
               <Text
                 style={[styles.rangeText, { color: themeColors.textPrimary }, range === r && { fontWeight: '600' }]}
@@ -211,7 +350,41 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
             </Text>
             <Text style={[styles.infoUnit, { color: themeColors.textSecondary }]}>{t('steps.unit')}</Text>
           </View>
-          <Text style={[styles.infoDate, { color: themeColors.textSecondary }]}>{headerSubtitle}</Text>
+          {isPagedRange ? (
+            <View style={styles.periodRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+                disabled={!canGoToPreviousPage}
+                onPress={() => goToPage(activePageIndex - 1)}
+                style={[
+                  styles.periodButton,
+                  { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
+                  !canGoToPreviousPage && styles.periodButtonDisabled,
+                ]}
+              >
+                <ChevronLeft size={22} color={themeColors.textPrimary} />
+              </Pressable>
+              <Text style={[styles.infoDate, styles.periodText, { color: themeColors.textSecondary }]}>
+                {headerSubtitle}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.next')}
+                disabled={!canGoToNextPage}
+                onPress={() => goToPage(activePageIndex + 1)}
+                style={[
+                  styles.periodButton,
+                  { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
+                  !canGoToNextPage && styles.periodButtonDisabled,
+                ]}
+              >
+                <ChevronRight size={22} color={themeColors.textPrimary} />
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={[styles.infoDate, { color: themeColors.textSecondary }]}>{headerSubtitle}</Text>
+          )}
         </View>
 
         {/* Chart */}
@@ -230,7 +403,7 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
                 ))}
               </View>
 
-              <View style={styles.plotContainer}>
+              <View style={styles.plotContainer} onLayout={handlePlotLayout}>
                 <View pointerEvents="none" style={styles.gridLayer}>
                   {yTicks.map(tick => {
                     const bottom = (tick / maxValue) * plotHeight;
@@ -246,57 +419,30 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
                   })}
                 </View>
 
-                <View style={styles.barsRow}>
-                  {buckets.map((bucket, i) => {
-                    const barHeight = bucket.hasData ? Math.max((bucket.value / maxValue) * plotHeight, 2) : 0;
-                    const showLabel =
-                      buckets.length <= 7 ||
-                      (isMonthly ? true : i % Math.ceil(buckets.length / 6) === 0) ||
-                      i === buckets.length - 1;
-                    const isSel = selectedIndex === i;
-                    const isToday = !isMonthly && isSameDay(bucket.date, new Date());
-                    const isThisMonth = isMonthly && isSameMonth(bucket.date, new Date());
-
-                    return (
-                      <View key={`${bucket.fullLabel}-${i}`} style={styles.barTouch}>
-                        <View style={[styles.barColumn, { height: plotHeight }]}>
-                          {bucket.hasData && (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={`${bucket.fullLabel}, ${formatSteps(bucket.value)} ${t('steps.unit')}`}
-                              onPress={event => selectBucket(event, i)}
-                              style={[styles.barHitBox, { height: Math.max(barHeight, 44) }]}
-                            >
-                              <View
-                                style={[
-                                  styles.bar,
-                                  {
-                                    height: barHeight,
-                                    backgroundColor: barColor,
-                                    opacity: selectedIndex === null || isSel ? 1 : 0.35,
-                                  },
-                                ]}
-                              />
-                            </Pressable>
-                          )}
-                        </View>
-                        <Text
-                          style={[
-                            styles.xLabel,
-                            {
-                              color: isSel || isToday || isThisMonth ? themeColors.primary : themeColors.textSecondary,
-                              fontWeight: isSel ? '700' : '500',
-                              opacity: showLabel ? 1 : 0,
-                            },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {showLabel ? bucket.label : ' '}
-                        </Text>
+                {isPagedRange && plotWidth > 0 ? (
+                  <ScrollView
+                    ref={pageScrollRef}
+                    horizontal
+                    pagingEnabled
+                    bounces={false}
+                    showsHorizontalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={handlePageScrollEnd}
+                    style={styles.pageScroll}
+                  >
+                    {chartPages.map((page, index) => (
+                      <View
+                        key={page.key}
+                        pointerEvents={index === activePageIndex ? 'auto' : 'none'}
+                        style={[styles.page, { width: plotWidth }]}
+                      >
+                        {renderBars(page.buckets, index === activePageIndex)}
                       </View>
-                    );
-                  })}
-                </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  renderBars(buckets, true)
+                )}
               </View>
             </View>
           </Pressable>
@@ -377,6 +523,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
   },
+  periodRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  periodButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  periodButtonDisabled: {
+    opacity: 0.28,
+  },
+  periodText: {
+    flex: 1,
+    textAlign: 'center',
+  },
   chartArea: {
     width: '100%',
     justifyContent: 'center',
@@ -414,6 +582,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     width: '100%',
+    height: '100%',
+  },
+  pageScroll: {
+    width: '100%',
+    height: '100%',
+  },
+  page: {
     height: '100%',
   },
   yLabel: {
