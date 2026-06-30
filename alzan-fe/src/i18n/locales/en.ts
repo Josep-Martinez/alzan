@@ -207,6 +207,12 @@ const en = {
     dailyMealsInfoModalTitle: 'Daily meals',
     dailyMealsInfoModalBody:
       'Define which main meals are enabled in your day and the reminder time for each one.\n\nIt applies in Nutrition Home, meal logging, and automatic reminders.',
+    nutritionDayTitle: 'NUTRITION DAY',
+    nutritionDayInfoModalTitle: 'Nutrition day',
+    nutritionDayInfoModalBody:
+      'Choose when the app should switch to the next nutrition day.\n\nBefore this time, automatic meal logging still uses the previous day, which helps with late dinners or snacks after midnight.',
+    nutritionDayRolloverLabel: 'Switch day at',
+    nutritionDayRolloverHint: 'Meals logged before this time use the previous nutrition day.',
     recipePrivacyTitle: 'RECIPE PRIVACY',
     recipePrivacyInfoModalTitle: 'Recipe privacy',
     recipePrivacyInfoModalBody:
@@ -1324,7 +1330,10 @@ const en = {
     recurrenceEndDateInvalid: 'Choose an end date on or after the first planned workout.',
     weeklyProgression: 'Weekly interval progression',
     weeklyProgressionSubtitle:
-      'Adjust only the key interval values for each week. Warm-up, recovery and cooldown stay unchanged.',
+      'Adjust duration or distance and target for each week. Warm-up, recovery and cooldown stay unchanged.',
+    progressionDuration: 'Duration',
+    progressionTarget: 'Target',
+    progressionRepetitions: 'Repetitions',
     weekNumber: 'Week {{count}}',
     effortRpe: 'Effort (RPE 1-10)',
     avgHeartRate: 'Avg HR (bpm)',

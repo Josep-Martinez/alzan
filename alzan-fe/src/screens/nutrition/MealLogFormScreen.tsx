@@ -16,7 +16,7 @@ import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../ty
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark } from 'lucide-react-native';
+import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark, Eraser } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 
@@ -35,7 +35,6 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
-import { format } from 'date-fns';
 import { getCurrentAppLocale, getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
@@ -57,6 +56,10 @@ import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
 import { IngredientsCategory, MealItemsSource } from '../../types/requests.types';
 import { usePreferences } from '../../hooks/settings/usePreferences';
+import {
+  formatNutritionDayDate,
+  normalizeNutritionDayRolloverTime,
+} from '../../modules/nutrition/services/nutritionDay';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
@@ -195,7 +198,10 @@ export const MealLogFormScreen = () => {
   const { convertEnergyToUi, parseEnergyToKcal, units } = useUnitConversion();
   const mealItem = params.mealItem;
   const isEdit = !!mealItem?.log;
-  const date = params.date || format(new Date(), 'yyyy-MM-dd');
+  const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
+    preferences?.nutrition_prefs?.nutrition_day_rollover_time,
+  );
+  const date = params.date || formatNutritionDayDate(new Date(), nutritionDayRolloverTime);
   const defaultRecipeVisibility =
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
@@ -239,6 +245,7 @@ export const MealLogFormScreen = () => {
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
   const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
   const lastRecipeAggregateRefreshAtRef = useRef<number>(0);
+  const mealSearchRequestIdRef = useRef(0);
 
   // Manual Ingredient Form State
   const [manualIngName, setManualIngName] = useState('');
@@ -498,6 +505,8 @@ export const MealLogFormScreen = () => {
   // search button and the debounced auto-search effect below.
   const performMealSearch = useCallback(
     async (query: string) => {
+      const requestId = mealSearchRequestIdRef.current + 1;
+      mealSearchRequestIdRef.current = requestId;
       setIsSearchingRecipe(true);
       setSearchMessage(null);
       setMealSearchResults([]);
@@ -509,6 +518,8 @@ export const MealLogFormScreen = () => {
           recipeScope: recipeSearchScope,
           currentUserId,
         });
+
+        if (mealSearchRequestIdRef.current !== requestId) return;
 
         if (results.length > 0) {
           setMealSearchResults(results);
@@ -526,10 +537,13 @@ export const MealLogFormScreen = () => {
           });
         }
       } catch (error) {
+        if (mealSearchRequestIdRef.current !== requestId) return;
         console.error('[MealLogForm] Error in search:', error);
         setSearchMessage({ type: 'error', text: t('nutrition.searchError') });
       } finally {
-        setIsSearchingRecipe(false);
+        if (mealSearchRequestIdRef.current === requestId) {
+          setIsSearchingRecipe(false);
+        }
       }
     },
     // getCurrentUserId is a stable component-scoped helper; intentionally omitted.
@@ -1162,6 +1176,45 @@ export const MealLogFormScreen = () => {
   const computedMacros = useMemo(() => calculateTotalMacros(ingredients), [ingredients]);
   const finalMacros = ingredients.length > 0 ? computedMacros : manualMacros;
   const canRegisterMeal = !isSaving && !!name;
+  const showMealSearchButton = name.length >= 2 && !isEdit && ingredients.length === 0;
+  const showClearMealSelection = name.length > 0 || ingredients.length > 0;
+
+  const handleClearMealSelection = () => {
+    mealSearchRequestIdRef.current += 1;
+    setName('');
+    setIngredients([]);
+    setSelectedFood(null);
+    setIsSearchingRecipe(false);
+    setSearchMessage(null);
+    setMealSearchResults([]);
+    setMealSearchFilter('recipe');
+    setMealRecipePage(1);
+    setEditingSavedRecipeId(null);
+    setEditingSavedRecipeUpdatedAt(null);
+    setEditingRecipeSignature(null);
+    setManualMacros({
+      kcal: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fats_g: 0,
+    });
+    setInputMode('search');
+    setManualIngName('');
+    setAmountInput('');
+    setLastIngredientAmount(null);
+    setManualPer100g({ kcal_100: 0, protein_g_100: 0, carbs_g_100: 0, fat_g_100: 0 });
+    setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
+    setEditingIngredientId(null);
+    setEditAmountInput('');
+    setShowScanner(false);
+    setIsBarcodeLookupPending(false);
+    setShowMealDetailModal(false);
+    setSelectedMealDetail(null);
+    setMealDetailLoading(false);
+    setMealDetailIngredients([]);
+    setRecipeDetailSourceLabel(null);
+    setIsRecipeDetailSourceLoading(false);
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -1284,6 +1337,12 @@ export const MealLogFormScreen = () => {
                       {
                         color: themeColors.textPrimary,
                         backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                        paddingRight:
+                          showMealSearchButton && showClearMealSelection
+                            ? 100
+                            : showMealSearchButton || showClearMealSelection
+                              ? 58
+                              : 16,
                       },
                     ]}
                     placeholder={t('nutrition.mealName')}
@@ -1293,8 +1352,12 @@ export const MealLogFormScreen = () => {
                     autoFocus={!isEdit}
                   />
                   {/* Search Button - Apple Liquid Glass Style */}
-                  {name.length >= 2 && !isEdit && ingredients.length === 0 && (
-                    <TouchableOpacity style={styles.aiButton} onPress={handleAiSearch} disabled={isSearchingRecipe}>
+                  {showMealSearchButton && (
+                    <TouchableOpacity
+                      style={[styles.aiButton, showClearMealSelection && styles.aiButtonWithClear]}
+                      onPress={handleAiSearch}
+                      disabled={isSearchingRecipe}
+                    >
                       <LinearGradient
                         colors={['#007AFF', '#00C6FF']} // Premium Blue Gradient
                         start={{ x: 0, y: 0 }}
@@ -1307,6 +1370,18 @@ export const MealLogFormScreen = () => {
                           <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
                         )}
                       </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                  {showClearMealSelection && (
+                    <TouchableOpacity
+                      style={styles.clearMealButton}
+                      onPress={handleClearMealSelection}
+                      disabled={isSaving}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('nutrition.clear')}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Eraser size={18} color={themeColors.textSecondary} strokeWidth={2.3} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2507,6 +2582,9 @@ const styles = StyleSheet.create({
     bottom: 8,
     justifyContent: 'center',
   },
+  aiButtonWithClear: {
+    right: 52,
+  },
   aiButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2519,6 +2597,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 11,
     marginLeft: 4,
+  },
+  clearMealButton: {
+    position: 'absolute',
+    right: 4,
+    top: 5,
+    bottom: 5,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messageCard: {
     marginTop: 10,
