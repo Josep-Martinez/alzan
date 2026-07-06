@@ -93,12 +93,50 @@ export const clearVacationDraftSelection = (state: VacationDraftSelectionState):
   removeDates: new Set(state.persistedDates),
 });
 
+export const clearFutureVacationDraftSelection = (
+  state: VacationDraftSelectionState,
+  today: string,
+): VacationDraftSelectionState => {
+  const draftDates = new Set<string>();
+  const addDates = new Set<string>();
+  const removeDates = new Set(state.removeDates);
+
+  state.draftDates.forEach(date => {
+    if (date <= today) {
+      draftDates.add(date);
+    }
+  });
+
+  state.addDates.forEach(date => {
+    if (date <= today) {
+      addDates.add(date);
+    }
+  });
+
+  state.persistedDates.forEach(date => {
+    if (date > today) {
+      removeDates.add(date);
+    }
+  });
+
+  return {
+    persistedDates: new Set(state.persistedDates),
+    draftDates,
+    addDates,
+    removeDates,
+  };
+};
+
 export const getVacationDraftSelectionDiff = (
   state: VacationDraftSelectionState,
 ): { addDates: string[]; removeDates: string[] } => ({
   addDates: Array.from(state.addDates).sort(),
   removeDates: Array.from(state.removeDates).sort(),
 });
+
+export const getVacationNewDraftDateCount = (state: VacationDraftSelectionState): number => {
+  return state.addDates.size;
+};
 
 export const shouldShowPendingPlannedMeals = (isVacationDay: boolean): boolean => {
   return !isVacationDay;
