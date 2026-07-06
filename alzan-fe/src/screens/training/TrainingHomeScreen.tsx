@@ -118,6 +118,9 @@ export const TrainingHomeScreen = () => {
       setMovePlan(null);
       setMoveSelectedDate(null);
       setSelectedDate(targetDate);
+      queryClient.setQueriesData<DailyEntry[]>({ queryKey: ['dailyPlans'] }, currentPlans =>
+        currentPlans ? currentPlans.filter(plan => plan.id !== variables.plan.id) : currentPlans,
+      );
       queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
       queryClient.invalidateQueries({ queryKey: ['weekDots'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });

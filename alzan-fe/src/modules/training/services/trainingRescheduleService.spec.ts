@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildMovedWorkoutSourceSkipInsert,
   buildWorkoutPlanMoveUpdate,
   validateWorkoutPlanMove,
   type MoveWorkoutPlanInput,
@@ -18,6 +19,38 @@ assert.deepEqual(buildWorkoutPlanMoveUpdate(baseInput.toDate, '2026-07-06T10:00:
   status: 'rescheduled',
   updated_at: '2026-07-06T10:00:00.000Z',
 });
+
+assert.deepEqual(
+  buildMovedWorkoutSourceSkipInsert(
+    {
+      user_id: 'user-1',
+      gym_template_id: null,
+      endurance_template_id: 'running-template-1',
+    },
+    baseInput.fromDate,
+    '2026-07-06T10:00:00.000Z',
+  ),
+  {
+    user_id: 'user-1',
+    planned_date: '2026-07-06',
+    gym_template_id: null,
+    endurance_template_id: 'running-template-1',
+    status: 'skipped',
+    updated_at: '2026-07-06T10:00:00.000Z',
+  },
+);
+
+assert.equal(
+  buildMovedWorkoutSourceSkipInsert(
+    {
+      user_id: 'user-1',
+      gym_template_id: null,
+      endurance_template_id: null,
+    },
+    baseInput.fromDate,
+  ),
+  null,
+);
 
 assert.deepEqual(validateWorkoutPlanMove({ ...baseInput, planId: 'session-activity-1' }), {
   ok: false,

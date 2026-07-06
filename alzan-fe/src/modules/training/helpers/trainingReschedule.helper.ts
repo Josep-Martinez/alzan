@@ -1,4 +1,4 @@
-import type { WorkoutPlanUpdate } from '../../../types/requests.types';
+import type { WorkoutPlan, WorkoutPlanInsert, WorkoutPlanUpdate } from '../../../types/requests.types';
 
 export type MoveWorkoutPlanInput = {
   planId: string;
@@ -11,6 +11,8 @@ export type MoveWorkoutPlanInput = {
 export type MoveWorkoutPlanValidation =
   | { ok: true }
   | { ok: false; reason: 'completed' | 'extra_session' | 'invalid_date' | 'missing_plan' | 'same_date' };
+
+export type MovedWorkoutSourcePlan = Pick<WorkoutPlan, 'endurance_template_id' | 'gym_template_id' | 'user_id'>;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -33,3 +35,20 @@ export const buildWorkoutPlanMoveUpdate = (
   status: 'rescheduled',
   updated_at: updatedAt,
 });
+
+export const buildMovedWorkoutSourceSkipInsert = (
+  sourcePlan: MovedWorkoutSourcePlan,
+  fromDate: string,
+  updatedAt = new Date().toISOString(),
+): WorkoutPlanInsert | null => {
+  if (!sourcePlan.gym_template_id && !sourcePlan.endurance_template_id) return null;
+
+  return {
+    user_id: sourcePlan.user_id,
+    planned_date: fromDate,
+    gym_template_id: sourcePlan.gym_template_id,
+    endurance_template_id: sourcePlan.endurance_template_id,
+    status: 'skipped',
+    updated_at: updatedAt,
+  };
+};
