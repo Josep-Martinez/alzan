@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -55,7 +55,13 @@ import { useTranslation } from 'react-i18next';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { useSetNutritionVacationDates, useVacationDateSet } from '../../modules/nutrition/hooks/useNutritionData';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
-import { diffVacationDateSelection } from '../../modules/nutrition/services/nutritionVacation';
+import {
+  clearVacationDraftSelection,
+  getVacationDraftSelectionDiff,
+  mergeLoadedVacationDates,
+  toggleVacationDraftDate,
+  type VacationDraftSelectionState,
+} from '../../modules/nutrition/services/nutritionVacation';
 
 // Default meal types (fixed, not editable)
 const MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
@@ -75,6 +81,13 @@ const DEFAULT_SNACK_OPTS = {
 };
 
 const MAX_EXPORT_RANGE_DAYS = 92;
+
+const createEmptyVacationDraftSelection = (): VacationDraftSelectionState => ({
+  persistedDates: new Set(),
+  draftDates: new Set(),
+  addDates: new Set(),
+  removeDates: new Set(),
+});
 
 const getDefaultExportRange = () => {
   const end = new Date();
@@ -245,7 +258,10 @@ export const NutritionSettingsScreen = () => {
   const [nutritionDayRolloverInput, setNutritionDayRolloverInput] = useState(nutritionDayRolloverTime);
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [vacationCalendarMonth, setVacationCalendarMonth] = useState(() => startOfMonth(new Date()));
-  const [draftVacationDates, setDraftVacationDates] = useState<Set<string>>(() => new Set());
+  const [vacationDraftSelection, setVacationDraftSelection] = useState<VacationDraftSelectionState>(() =>
+    createEmptyVacationDraftSelection(),
+  );
+  const loadedVacationMonthsRef = useRef<Set<string>>(new Set());
   const vacationMonthStart = format(startOfMonth(vacationCalendarMonth), 'yyyy-MM-dd');
   const vacationMonthEnd = format(endOfMonth(vacationCalendarMonth), 'yyyy-MM-dd');
   const { data: vacationDates, isLoading: isLoadingVacationDates } = useVacationDateSet(
@@ -254,6 +270,7 @@ export const NutritionSettingsScreen = () => {
   );
   const setVacationDates = useSetNutritionVacationDates();
   const vacationMonthDays = useMemo(() => buildMonthGrid(vacationCalendarMonth), [vacationCalendarMonth]);
+  const draftVacationDates = vacationDraftSelection.draftDates;
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -338,9 +355,12 @@ export const NutritionSettingsScreen = () => {
   }, [nutritionDayRolloverTime]);
 
   useEffect(() => {
-    if (!showVacationModal) return;
-    setDraftVacationDates(new Set(vacationDates));
-  }, [showVacationModal, vacationDates]);
+    if (!showVacationModal || isLoadingVacationDates) return;
+    if (loadedVacationMonthsRef.current.has(vacationMonthStart)) return;
+
+    loadedVacationMonthsRef.current.add(vacationMonthStart);
+    setVacationDraftSelection(prev => mergeLoadedVacationDates(prev, vacationDates));
+  }, [showVacationModal, isLoadingVacationDates, vacationDates, vacationMonthStart]);
 
   const exportMinStartDate = getMinExportStartDate(exportEnd);
   const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
@@ -569,29 +589,22 @@ export const NutritionSettingsScreen = () => {
   };
 
   const openVacationModal = () => {
+    loadedVacationMonthsRef.current = new Set();
+    setVacationDraftSelection(createEmptyVacationDraftSelection());
     setVacationCalendarMonth(startOfMonth(new Date()));
-    setDraftVacationDates(new Set(vacationDates));
     setShowVacationModal(true);
   };
 
   const toggleVacationDate = (dateKey: string) => {
-    setDraftVacationDates(prev => {
-      const next = new Set(prev);
-      if (next.has(dateKey)) {
-        next.delete(dateKey);
-      } else {
-        next.add(dateKey);
-      }
-      return next;
-    });
+    setVacationDraftSelection(prev => toggleVacationDraftDate(prev, dateKey));
   };
 
   const clearVacationSelection = () => {
-    setDraftVacationDates(new Set());
+    setVacationDraftSelection(prev => clearVacationDraftSelection(prev));
   };
 
   const saveVacationSelection = async () => {
-    const { addDates, removeDates } = diffVacationDateSelection(vacationDates, draftVacationDates);
+    const { addDates, removeDates } = getVacationDraftSelectionDiff(vacationDraftSelection);
 
     try {
       await setVacationDates.mutateAsync({ addDates, removeDates });
@@ -1528,10 +1541,13 @@ export const NutritionSettingsScreen = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={saveVacationSelection}
-                    style={[styles.modalBtnConfirm, setVacationDates.isPending && { opacity: 0.45 }]}
-                    disabled={setVacationDates.isPending}
+                    style={[
+                      styles.modalBtnConfirm,
+                      (setVacationDates.isPending || isLoadingVacationDates) && { opacity: 0.45 },
+                    ]}
+                    disabled={setVacationDates.isPending || isLoadingVacationDates}
                   >
-                    {setVacationDates.isPending ? (
+                    {setVacationDates.isPending || isLoadingVacationDates ? (
                       <ActivityIndicator size="small" color={colors.white} />
                     ) : (
                       <Text style={styles.modalBtnTextConfirm}>{t('common.save')}</Text>
