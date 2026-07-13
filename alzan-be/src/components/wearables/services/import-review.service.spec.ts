@@ -26,11 +26,11 @@ type FakeRpcOperation = {
 };
 
 type FakeQueryResult = {
-  data?: Record<string, unknown> | null;
+  data?: Array<Record<string, unknown>> | Record<string, unknown> | null;
   error: FakeSupabaseError | null;
 };
 
-interface FakeSupabaseQueryClient extends PromiseLike<{ error: FakeSupabaseError | null }> {
+interface FakeSupabaseQueryClient extends PromiseLike<FakeQueryResult> {
   eq(column: string, value: unknown): FakeSupabaseQueryClient;
   maybeSingle(): Promise<FakeQueryResult>;
   select(columns: string): FakeSupabaseQueryClient;
@@ -68,14 +68,15 @@ function createQueryClient(
 ): FakeSupabaseQueryClient {
   const filters: FakeFilter[] = [];
   let payload = initialPayload;
-  const execute = (): { error: FakeSupabaseError | null } => {
+  const execute = (): FakeQueryResult => {
     if (payload) {
       client.updates.push({ filters: [...filters], payload, table });
       client.rows[table] = (client.rows[table] ?? []).map(row =>
         matchesFilters(row, filters) ? { ...row, ...payload } : row,
       );
+      return { error: null };
     }
-    return { error: null };
+    return { data: (client.rows[table] ?? []).filter(row => matchesFilters(row, filters)), error: null };
   };
   const query: FakeSupabaseQueryClient = {
     eq(column: string, value: unknown): FakeSupabaseQueryClient {
@@ -93,8 +94,8 @@ function createQueryClient(
       payload = nextPayload;
       return query;
     },
-    then<TResult1 = { error: FakeSupabaseError | null }, TResult2 = never>(
-      onfulfilled?: ((value: { error: FakeSupabaseError | null }) => TResult1 | PromiseLike<TResult1>) | null,
+    then<TResult1 = FakeQueryResult, TResult2 = never>(
+      onfulfilled?: ((value: FakeQueryResult) => TResult1 | PromiseLike<TResult1>) | null,
       onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
     ): PromiseLike<TResult1 | TResult2> {
       return Promise.resolve(execute()).then(onfulfilled, onrejected);
@@ -240,6 +241,96 @@ async function assertAssociateTemplateUsesTargetForPendingDuplicate(): Promise<v
   assert.equal(survivor?.endurance_template_id, 'template-1');
 }
 
+async function assertAssociateEnduranceTemplateCompletesExactPendingPlan(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [baseSession({ id: 'imported-run', endurance_template_id: null })],
+    endurance_workout_templates: [{ id: 'long-run-template', user_id: 'user-1', sport_type: 'running' }],
+    workout_plans: [
+      {
+        id: 'long-run-plan',
+        user_id: 'user-1',
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: 'long-run-template',
+        activity_session_id: null,
+      },
+    ],
+  });
+  const service = createService(client);
+
+  await service.associateTemplate('user-1', 'imported-run', { enduranceTemplateId: 'long-run-template' });
+
+  const plan = client.rows.workout_plans[0];
+  assert.equal(plan.status, 'completed');
+  assert.equal(plan.activity_session_id, 'imported-run');
+  assert.equal(plan.endurance_template_id, 'long-run-template');
+}
+
+async function assertAssociateEnduranceTemplateReplacesOnlyPendingSameSportPlan(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [baseSession({ id: 'imported-run', endurance_template_id: null })],
+    endurance_workout_templates: [
+      { id: 'long-run-template', user_id: 'user-1', sport_type: 'running' },
+      { id: 'soft-run-template', user_id: 'user-1', sport_type: 'running' },
+    ],
+    workout_plans: [
+      {
+        id: 'soft-run-plan',
+        user_id: 'user-1',
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: 'soft-run-template',
+        activity_session_id: null,
+      },
+    ],
+  });
+  const service = createService(client);
+
+  await service.associateTemplate('user-1', 'imported-run', { enduranceTemplateId: 'long-run-template' });
+
+  const plan = client.rows.workout_plans[0];
+  assert.equal(plan.status, 'completed');
+  assert.equal(plan.activity_session_id, 'imported-run');
+  assert.equal(plan.endurance_template_id, 'long-run-template');
+}
+
+async function assertAssociateEnduranceTemplateDoesNotReplaceAmbiguousSameSportPlans(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [baseSession({ id: 'imported-run', endurance_template_id: null })],
+    endurance_workout_templates: [
+      { id: 'long-run-template', user_id: 'user-1', sport_type: 'running' },
+      { id: 'soft-run-template', user_id: 'user-1', sport_type: 'running' },
+      { id: 'series-template', user_id: 'user-1', sport_type: 'running' },
+    ],
+    workout_plans: [
+      {
+        id: 'soft-run-plan',
+        user_id: 'user-1',
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: 'soft-run-template',
+        activity_session_id: null,
+      },
+      {
+        id: 'series-plan',
+        user_id: 'user-1',
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: 'series-template',
+        activity_session_id: null,
+      },
+    ],
+  });
+  const service = createService(client);
+
+  await service.associateTemplate('user-1', 'imported-run', { enduranceTemplateId: 'long-run-template' });
+
+  assert.equal(client.rows.workout_plans[0].status, 'planned');
+  assert.equal(client.rows.workout_plans[0].endurance_template_id, 'soft-run-template');
+  assert.equal(client.rows.workout_plans[1].status, 'planned');
+  assert.equal(client.rows.workout_plans[1].endurance_template_id, 'series-template');
+}
+
 async function assertAssignStrengthIsIdempotentWhenSourceWasDeleted(): Promise<void> {
   const client = createFakeSupabaseClient({
     activity_sessions: [baseSession({ id: 'strength-target', sport_type: 'strength' })],
@@ -333,6 +424,9 @@ async function run(): Promise<void> {
   await assertMissingSourceWithoutTargetStillFails();
   await assertAssociateTemplateUsesTargetWhenSourceWasDeleted();
   await assertAssociateTemplateUsesTargetForPendingDuplicate();
+  await assertAssociateEnduranceTemplateCompletesExactPendingPlan();
+  await assertAssociateEnduranceTemplateReplacesOnlyPendingSameSportPlan();
+  await assertAssociateEnduranceTemplateDoesNotReplaceAmbiguousSameSportPlans();
   await assertAssignStrengthIsIdempotentWhenSourceWasDeleted();
   await assertReviewNoOpsAreIdempotentOnResolvedState();
   await assertExpiredWatchMetricsCleanupKeepsCurrentWatchValues();

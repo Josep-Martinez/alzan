@@ -19,7 +19,12 @@ export const useImportReview = (sessionId?: string) => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
     queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+    queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
+    queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
+    queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
     queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+    queryClient.invalidateQueries({ queryKey: ['importReviewAssociatedTemplate'] });
+    queryClient.invalidateQueries({ queryKey: ['importReviewSuggestedTemplate'] });
     queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
     queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
     queryClient.invalidateQueries({ queryKey: ['sessionHeartRateZones'] });

@@ -12,6 +12,8 @@ import { RawPayloadService } from './raw-payload.service';
 
 type ActivitySessionRow = Row<'activity_sessions'>;
 type ActivitySessionUpdate = Update<'activity_sessions'>;
+type EnduranceTemplateRow = Row<'endurance_workout_templates'>;
+type WorkoutPlanRow = Row<'workout_plans'>;
 
 const PENDING_METRIC_COLUMNS = [
   'duration_s',
@@ -66,9 +68,13 @@ export class ImportReviewService {
         template_match_score: null,
         template_match_method: null,
       });
-      await this.completePlannedPlan(userId, localDate, session.id, {
-        endurance_template_id: input.enduranceTemplateId,
-      });
+      await this.completeOrReplacePlannedEndurancePlan(
+        userId,
+        localDate,
+        session.id,
+        input.enduranceTemplateId,
+        templateSport,
+      );
       return session.id;
     }
     if (input.workoutTemplateId) {
@@ -466,6 +472,74 @@ export class ImportReviewService {
     await this.run(query, 'PLAN_COMPLETE');
   }
 
+  private async completeOrReplacePlannedEndurancePlan(
+    userId: string,
+    localDate: string,
+    sessionId: string,
+    enduranceTemplateId: string,
+    sportType: EnduranceTemplateRow['sport_type'],
+  ): Promise<void> {
+    const plans = await this.findSameSportPendingEndurancePlans(userId, localDate, sportType);
+    const exactPlan = plans.find(plan => plan.endurance_template_id === enduranceTemplateId);
+    if (exactPlan) {
+      await this.completeEndurancePlan(exactPlan.id, sessionId, enduranceTemplateId);
+      return;
+    }
+    if (plans.length === 1) {
+      await this.completeEndurancePlan(plans[0].id, sessionId, enduranceTemplateId);
+    }
+  }
+
+  private async completeEndurancePlan(planId: string, sessionId: string, enduranceTemplateId: string): Promise<void> {
+    await this.run(
+      this.supabaseAdminService.client
+        .from('workout_plans')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          activity_session_id: sessionId,
+          endurance_template_id: enduranceTemplateId,
+        })
+        .eq('id', planId)
+        .eq('status', 'planned'),
+      'PLAN_COMPLETE',
+    );
+  }
+
+  private async findSameSportPendingEndurancePlans(
+    userId: string,
+    localDate: string,
+    sportType: EnduranceTemplateRow['sport_type'],
+  ): Promise<WorkoutPlanRow[]> {
+    const { data: plans, error: plansError } = await this.supabaseAdminService.client
+      .from('workout_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('planned_date', localDate)
+      .eq('status', 'planned');
+    if (plansError) throw new InternalServerErrorException('IMPORT_REVIEW_PLANS_READ_FAILED');
+    const pendingPlans = (plans ?? []).filter(plan => plan.endurance_template_id != null);
+    if (pendingPlans.length === 0) return [];
+    const templates = await this.findOwnedEnduranceTemplatesBySport(userId, sportType);
+    const templateIds = new Set(templates.map(template => template.id));
+    return pendingPlans.filter(
+      plan => plan.endurance_template_id != null && templateIds.has(plan.endurance_template_id),
+    );
+  }
+
+  private async findOwnedEnduranceTemplatesBySport(
+    userId: string,
+    sportType: EnduranceTemplateRow['sport_type'],
+  ): Promise<Pick<EnduranceTemplateRow, 'id'>[]> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('endurance_workout_templates')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('sport_type', sportType);
+    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_TEMPLATE_READ_FAILED');
+    return data ?? [];
+  }
+
   /** Reads the previous app metric values stored for an optional revert. */
   private readPreviousWatchMetrics(session: ActivitySessionRow): Record<string, unknown> | null {
     const raw = session.pending_watch_metrics;
@@ -568,7 +642,7 @@ export class ImportReviewService {
     userId: string,
     table: 'endurance_workout_templates',
     id: string,
-  ): Promise<string> {
+  ): Promise<EnduranceTemplateRow['sport_type']> {
     const { data, error } = await this.supabaseAdminService.client
       .from(table)
       .select('sport_type')

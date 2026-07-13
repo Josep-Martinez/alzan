@@ -6,6 +6,7 @@ import {
   buildActivityTotals,
   buildTemplateTotals,
   deriveActivityStructure,
+  deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
   EnduranceStepLike,
   POSSIBLE_MATCH,
@@ -325,18 +326,18 @@ export class ImportReconciliationService {
     if (templates.length === 0) return null;
     const stepsByTemplate = await this.findStepsByTemplateIds(templates.map(template => template.id));
 
-    const activityStructure = deriveActivityStructure(
-      laps.map(lap => ({
-        distanceM: lap.distance_m,
-        durationSeconds: lap.duration_s,
-        avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
-      })),
-    );
+    const lapLikes = laps.map(lap => ({
+      distanceM: lap.distance_m,
+      durationSeconds: lap.duration_s,
+      avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
+    }));
     const activityTotals = buildActivityTotals({ distanceM: session.distance_m, durationS: session.duration_s });
 
     let best: TemplateMatchResult | null = null;
     for (const template of templates) {
       const steps = (stepsByTemplate.get(template.id) ?? []).map(this.toStepLike);
+      const activityStructure =
+        deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps) ?? deriveActivityStructure(lapLikes);
       let score: number;
       let method: MatchMethod;
       const templateStructure = activityStructure != null ? deriveTemplateStructure(steps) : null;

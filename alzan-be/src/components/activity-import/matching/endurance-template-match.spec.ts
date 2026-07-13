@@ -4,6 +4,7 @@ import {
   buildActivityTotals,
   buildTemplateTotals,
   deriveActivityStructure,
+  deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
   EnduranceStepLike,
   POSSIBLE_MATCH,
@@ -23,6 +24,54 @@ function intervalLaps(reps: number, repDistanceM: number, repDurationS: number, 
     if (index < reps - 1) laps.push(lap(200, recoveryS));
   }
   return laps;
+}
+
+function mixedDistanceTemplateSteps(): EnduranceStepLike[] {
+  return [
+    ...templateSteps(4, 400, 240, 90),
+    {
+      id: 'group-2',
+      parentStepId: null,
+      isGroup: true,
+      repetitions: 2,
+      orderIndex: 1,
+      phaseType: 'interval',
+      durationType: 'distance',
+      durationS: null,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+    {
+      id: 'work-2',
+      parentStepId: 'group-2',
+      isGroup: false,
+      repetitions: null,
+      orderIndex: 0,
+      phaseType: 'interval',
+      durationType: 'distance',
+      durationS: null,
+      distanceM: 800,
+      targetType: 'pace',
+      targetMin: 250,
+      targetMax: 250,
+    },
+    {
+      id: 'rec-2',
+      parentStepId: 'group-2',
+      isGroup: false,
+      repetitions: null,
+      orderIndex: 1,
+      phaseType: 'recovery',
+      durationType: 'time',
+      durationS: 120,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+  ];
 }
 
 function templateSteps(
@@ -133,6 +182,79 @@ function assertTooFewLapsProduceNoStructure(): void {
   assert.equal(deriveActivityStructure([]), null);
 }
 
+function assertTemplateDistanceMatchIgnoresWarmupAndCooldown(): void {
+  const laps = [
+    lap(1600, 600),
+    lap(400, 105),
+    lap(123, 90),
+    lap(400, 109),
+    lap(121, 90),
+    lap(400, 103),
+    lap(130, 90),
+    lap(400, 106),
+    lap(136, 90),
+    lap(400, 108),
+    lap(144, 90),
+    lap(400, 100),
+    lap(1600, 600),
+    lap(675, 234),
+  ];
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(6, 400, 240, 90));
+  assert.ok(activityStructure, 'expected template-aware distance structure');
+  assert.equal(activityStructure.repCount, 6);
+  assert.equal(Math.round(activityStructure.repDistanceM ?? 0), 400);
+  const template = deriveTemplateStructure(templateSteps(6, 400, 240, 90));
+  assert.ok(template);
+  const score = scoreStructuralMatch(activityStructure, template);
+  assert.ok(score >= STRONG_MATCH, `expected strong distance-based structural match, got ${score}`);
+}
+
+function assertTemplateDistanceMatchWorksForMultipleDistances(): void {
+  const distances = [200, 400, 800, 1000];
+  for (const distance of distances) {
+    const activityStructure = deriveTemplateDistanceMatchedActivityStructure(
+      intervalLaps(5, distance, Math.max(40, distance / 4), 75),
+      templateSteps(5, distance, 240, 75),
+    );
+    assert.ok(activityStructure, `expected structure for ${distance}m intervals`);
+    assert.equal(activityStructure.repCount, 5);
+    assert.equal(Math.round(activityStructure.repDistanceM ?? 0), distance);
+  }
+}
+
+function assertTemplateDistanceMatchSupportsMixedBlocks(): void {
+  const laps = [
+    lap(1200, 420),
+    lap(398, 96),
+    lap(130, 90),
+    lap(407, 98),
+    lap(125, 90),
+    lap(392, 94),
+    lap(135, 90),
+    lap(405, 97),
+    lap(160, 120),
+    lap(790, 198),
+    lap(170, 120),
+    lap(815, 203),
+    lap(1000, 360),
+  ];
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(laps, mixedDistanceTemplateSteps());
+  assert.ok(activityStructure, 'expected mixed interval structure');
+  assert.equal(activityStructure.repCount, 6);
+  const template = deriveTemplateStructure(mixedDistanceTemplateSteps());
+  assert.ok(template);
+  const score = scoreStructuralMatch(activityStructure, template);
+  assert.ok(score >= STRONG_MATCH, `expected strong mixed structural match, got ${score}`);
+}
+
+function assertTemplateDistanceMatchRejectsDifferentSequence(): void {
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(
+    intervalLaps(6, 400, 96, 90),
+    mixedDistanceTemplateSteps(),
+  );
+  assert.equal(activityStructure, null);
+}
+
 function assertTemplateWithoutIntervalsHasNoStructure(): void {
   const steps: EnduranceStepLike[] = [
     {
@@ -193,6 +315,10 @@ assertTwoExtraRepsArePossibleMatch();
 assertDifferentWorkoutIsNoStructuralMatch();
 assertSteadyAutolapsProduceNoStructure();
 assertTooFewLapsProduceNoStructure();
+assertTemplateDistanceMatchIgnoresWarmupAndCooldown();
+assertTemplateDistanceMatchWorksForMultipleDistances();
+assertTemplateDistanceMatchSupportsMixedBlocks();
+assertTemplateDistanceMatchRejectsDifferentSequence();
 assertTemplateWithoutIntervalsHasNoStructure();
 assertTotalsBands();
 assertTotalsMissingVariablesRenormalize();

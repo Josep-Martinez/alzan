@@ -74,6 +74,8 @@ const TOTALS_BANDS: readonly Band[] = [
   [0.3, 40],
 ];
 
+const TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE = 0.2;
+const TEMPLATE_DISTANCE_MATCH_ABSOLUTE_TOLERANCE_M = 80;
 const MIN_USEFUL_LAP_DURATION_S = 10;
 const MIN_WORK_REPS = 2;
 const MIN_PACE_SPREAD = 0.1;
@@ -267,6 +269,121 @@ export function deriveTemplateStructure(steps: EnduranceStepLike[]): IntervalStr
     repDistanceM: median(workDistances),
     repPaceSecPerKm: median(workPaces),
     recoveryDurationS: median(recoveryDurations),
+  };
+}
+
+function deriveTemplateWorkDistances(steps: EnduranceStepLike[]): number[] {
+  return expandTemplateSteps(steps)
+    .filter(entry => entry.step.phaseType === 'interval')
+    .map(entry => stepDistanceM(entry.step))
+    .filter((value): value is number => value != null && value > 0);
+}
+
+function hasSingleWorkDistance(distances: number[]): boolean {
+  if (distances.length === 0) return false;
+  const firstDistance = distances[0];
+  return distances.every(distance => doesDistanceMatch(distance, firstDistance));
+}
+
+function doesDistanceMatch(actualDistanceM: number | null, targetDistanceM: number): boolean {
+  if (actualDistanceM == null || actualDistanceM <= 0 || targetDistanceM <= 0) return false;
+  const tolerance = Math.max(
+    targetDistanceM * TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE,
+    TEMPLATE_DISTANCE_MATCH_ABSOLUTE_TOLERANCE_M,
+  );
+  return Math.abs(actualDistanceM - targetDistanceM) <= tolerance;
+}
+
+function collectSameDistanceWorkLaps(
+  laps: ActivityLapLike[],
+  targetDistanceM: number,
+): Array<{ index: number; lap: ActivityLapLike }> {
+  return laps
+    .map((lap, index) => ({ index, lap }))
+    .filter(entry => doesDistanceMatch(entry.lap.distanceM, targetDistanceM));
+}
+
+function selectWorkLikeMatches(
+  matches: Array<{ index: number; lap: ActivityLapLike }>,
+  expectedCount: number,
+): Array<{ index: number; lap: ActivityLapLike }> {
+  if (matches.length <= expectedCount) return matches;
+  const pacedMatches = matches
+    .map(match => ({ ...match, pace: lapPaceSecPerKm(match.lap) }))
+    .filter((match): match is { index: number; lap: ActivityLapLike; pace: number } => match.pace != null);
+  if (pacedMatches.length !== matches.length) return matches;
+  const medianPace = median(pacedMatches.map(match => match.pace));
+  if (medianPace == null || medianPace <= 0) return matches;
+  const paceSpread =
+    (Math.max(...pacedMatches.map(match => match.pace)) - Math.min(...pacedMatches.map(match => match.pace))) /
+    medianPace;
+  if (paceSpread < MIN_WORK_RECOVERY_PACE_GAP) return matches;
+  return pacedMatches
+    .sort((left, right) => left.pace - right.pace)
+    .slice(0, expectedCount)
+    .sort((left, right) => left.index - right.index)
+    .map(({ index, lap }) => ({ index, lap }));
+}
+
+function collectOrderedWorkLaps(
+  laps: ActivityLapLike[],
+  targetDistancesM: number[],
+): Array<{ index: number; lap: ActivityLapLike }> {
+  const matches: Array<{ index: number; lap: ActivityLapLike }> = [];
+  let searchStartIndex = 0;
+  for (const targetDistanceM of targetDistancesM) {
+    const foundIndex = laps.findIndex(
+      (lap, index) => index >= searchStartIndex && doesDistanceMatch(lap.distanceM, targetDistanceM),
+    );
+    if (foundIndex < 0) return [];
+    matches.push({ index: foundIndex, lap: laps[foundIndex] });
+    searchStartIndex = foundIndex + 1;
+  }
+  return matches;
+}
+
+function readRecoveryDurationsBetweenMatches(
+  laps: ActivityLapLike[],
+  matches: Array<{ index: number; lap: ActivityLapLike }>,
+): number[] {
+  const durations: number[] = [];
+  for (let index = 0; index < matches.length - 1; index += 1) {
+    const start = matches[index].index + 1;
+    const end = matches[index + 1].index;
+    for (let lapIndex = start; lapIndex < end; lapIndex += 1) {
+      const duration = laps[lapIndex].durationSeconds;
+      if (duration != null && duration > 0) durations.push(duration);
+    }
+  }
+  return durations;
+}
+
+/**
+ * Derives an activity interval structure by matching imported laps against the
+ * expanded work distances from one specific template. This catches interval
+ * workouts where pace differs from the plan but lap distances still prove the
+ * intended structure.
+ */
+export function deriveTemplateDistanceMatchedActivityStructure(
+  laps: ActivityLapLike[],
+  templateSteps: EnduranceStepLike[],
+): IntervalStructure | null {
+  const targetDistancesM = deriveTemplateWorkDistances(templateSteps);
+  if (targetDistancesM.length < MIN_WORK_REPS) return null;
+  const matches = hasSingleWorkDistance(targetDistancesM)
+    ? selectWorkLikeMatches(collectSameDistanceWorkLaps(laps, targetDistancesM[0]), targetDistancesM.length)
+    : collectOrderedWorkLaps(laps, targetDistancesM);
+  if (matches.length < MIN_WORK_REPS) return null;
+  if (!hasSingleWorkDistance(targetDistancesM) && matches.length !== targetDistancesM.length) return null;
+  const distances = matches
+    .map(match => match.lap.distanceM)
+    .filter((value): value is number => value != null && value > 0);
+  const paces = matches.map(match => lapPaceSecPerKm(match.lap)).filter((value): value is number => value != null);
+  return {
+    repCount: matches.length,
+    repDistanceM: median(distances),
+    repPaceSecPerKm: median(paces),
+    recoveryDurationS: median(readRecoveryDurationsBetweenMatches(laps, matches)),
   };
 }
 
