@@ -104,6 +104,12 @@ const en = {
     adjust: 'Adjust',
     ml: 'ml',
     hydration: 'Hydration',
+    defaultHydrationTitle: 'HYDRATION',
+    defaultHydrationLabel: 'Default daily water',
+    defaultHydrationHint:
+      'Used as the starting value for days without a saved water record. You can edit each day later.',
+    defaultHydrationPlaceholder: 'No default',
+    defaultHydrationSaveError: 'Could not save the default hydration value.',
     checkOfficialSiteForIngredients: 'For ingredients, check the supplier’s official website.',
     onlyMacrosWarning: '⚠️ Only macros available.',
     noIngredientsFound: 'No ingredients found',
@@ -142,9 +148,12 @@ const en = {
     discoverSortWeek: 'This week',
     discoverSortMonth: 'This month',
     discoverSortSaved: 'Most saved',
+    recipeSortRecentlyUsed: 'Recently used',
+    recipeSortMostUsed: 'Most used',
+    recipeSortAlphabetical: 'A-Z',
     discoverCategoryAll: 'All',
-    discoverCategoryProtein: 'High protein',
-    discoverCategoryLowCal: 'Low calorie',
+    discoverCategoryProtein: 'Protein-rich',
+    discoverCategoryLowCal: 'Light',
     discoverCategoryCarbs: 'High carb',
     discoverRising: 'Rising',
     max1kgLabel: 'Max 1kg',
@@ -224,6 +233,9 @@ const en = {
       'Choose when the app should switch to the next nutrition day.\n\nBefore this time, automatic meal logging still uses the previous day, which helps with late dinners or snacks after midnight.',
     nutritionDayRolloverLabel: 'Switch day at',
     nutritionDayRolloverHint: 'Meals logged before this time use the previous nutrition day.',
+    defaultHydrationInfoModalTitle: 'Default hydration',
+    defaultHydrationInfoModalBody:
+      'Set a daily water value that appears by default in Nutrition.\n\nIt does not create hydration records in advance. If you edit water on a specific day, that saved day value takes priority.',
     recipePrivacyTitle: 'RECIPE PRIVACY',
     recipePrivacyInfoModalTitle: 'Recipe privacy',
     recipePrivacyInfoModalBody:
@@ -262,9 +274,12 @@ const en = {
     openRecipeLibrary: 'Open recipe library',
     recipeLibraryTitle: 'Recipe library',
     saveRecipeAction: 'Save recipe',
+    editRecipeAction: 'Edit recipe',
     updateRecipeAction: 'Update recipe',
     savingRecipeAction: 'Saving recipe...',
+    editingRecipeAction: 'Editing recipe...',
     updatingRecipeAction: 'Updating recipe...',
+    deleteRecipeAction: 'Delete recipe',
     publishRecipeAction: 'Publish',
     unpublishRecipeAction: 'Unpublish',
     duplicateRecipeAction: 'Save copy',
@@ -304,6 +319,14 @@ const en = {
     saveRecipeNeedsDatabaseIngredientsMessage: 'For now, you can only save recipes with database ingredients.',
     recipeSavedTitle: 'Recipe saved',
     recipeSavedMessage: 'Your recipe was saved successfully.',
+    recipeUpdatedTitle: 'Recipe updated',
+    recipeUpdatedMessage: 'Your recipe was updated successfully.',
+    deleteRecipeTitle: 'Delete recipe',
+    deleteRecipeMessage: 'Delete "{{name}}" from your recipes?',
+    recipeDeletedTitle: 'Recipe deleted',
+    recipeDeletedMessage: 'The recipe was removed from your recipes.',
+    recipeDeleteError: 'Could not delete this recipe.',
+    recipeEditUnavailableMessage: 'This recipe cannot be edited from your account.',
     recipeNowPublicMessage: 'Your recipe is now public.',
     recipeNowPrivateMessage: 'Your recipe is now private.',
     recipeVisibilityActionError: 'Could not change recipe visibility.',
@@ -625,6 +648,120 @@ const en = {
     yourWeight: 'Your weight',
     bmiFormula: 'BMI = Weight (kg) / Height² (m²)',
     formulaLabel: 'Formula:',
+    dataUsedLabel: 'Data used:',
+    formulaCunBaeLocalized:
+      'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female factor + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female factor - 0.02 * BMI * age - 0.005 * BMI^2 * female factor + 0.00021 * BMI^2 * age (female factor = {{femaleFactor}} because your profile is set to {{sexLabel}})',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (height / abdomen)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (height / abdomen)',
+    formulaBaiLocalized: 'BAI = (hip / heightM^1.5) - 18',
+    formulaDeurenbergLocalized:
+      'Deurenberg = 1.20 * BMI + 0.23 * age - 10.8 * male factor - 5.4 (male factor = {{maleFactor}})',
+    formulaLeeLocalized:
+      'SMM = 0.244 * weight + 7.8 * heightM - 0.098 * age + 6.6 * male factor - 3.3 (male factor = {{maleFactor}})',
+    formulaAlGindanMaleLocalized: 'SMM = 39.5 + 0.665 * weight - 0.185 * abdomen - 0.418 * hip - 0.08 * age',
+    formulaAlGindanFemaleLocalized: 'SMM = 2.89 + 0.255 * weight - 0.175 * hip - 0.038 * age + 0.118 * height',
+    calcInputWeight: 'weight',
+    calcInputHeight: 'height',
+    calcInputAge: 'age',
+    calcInputSex: 'sex',
+    calcInputStoredBodyFat: 'saved body fat value',
+    calcInputStoredMuscleMass: 'saved muscle mass value',
+    storedCalculationUnknown:
+      'Saved value. The original calculation method is not stored, so Alzan will not guess the formula.',
+    measuredCalculationNote:
+      'Imported or directly entered value. Treat it as a measurement estimate from the source, not an Alzan formula.',
+    rfmPrecisionNote:
+      'Advanced anthropometric estimate using abdomen and height. Accuracy depends on a recent, correctly taken abdomen measurement.',
+    baiPrecisionNote:
+      'Medium-confidence estimate using hip and height. It is useful when abdomen is missing, but less reliable than RFM.',
+    basicBodyFatPrecisionNote: 'Basic estimate using BMI, age, and sex because recent body measurements are missing.',
+    alGindanPrecisionNote:
+      'Advanced anthropometric muscle estimate. It needs recent abdomen and hip measurements and remains an estimate, not a clinical test.',
+    basicMusclePrecisionNote:
+      'Basic muscle estimate using weight, height, age, and sex because recent abdomen and hip measurements are missing.',
+    bodyFatOptimalPrecisionTitle: 'Optimal precision for body fat:',
+    bodyFatOptimalPrecisionBody:
+      'Keep your abdomen measurement updated; hip is not needed to improve this body fat calculation.',
+    bodyFatImprovePrecisionBody:
+      'Add abdomen to activate RFM, the most accurate body fat method currently available in Alzan.',
+    muscleOptimalPrecisionTitle: 'Optimal precision for estimated muscle:',
+    muscleOptimalPrecisionBody: 'Keep abdomen and hip updated to maintain the best muscle estimate available in Alzan.',
+    muscleImprovePrecisionBody:
+      'Add abdomen and hip to activate Al-Gindan, the most precise muscle estimate currently available in Alzan.',
+    trackingMeasurementsNote:
+      'Chest, arm, and thigh are useful to follow perimeter changes and visual progress, but they are not used by this estimate.',
+    remainderDescription:
+      'Remainder is the part of your weight that is not estimated as fat mass or skeletal muscle mass.',
+    remainderFormula: 'Remainder = total weight - fat mass - estimated muscle mass',
+    remainderComponents:
+      'It mainly includes body water, bones/minerals, organs, skin, connective tissue, blood, glycogen, and the error margin of the estimates.',
+    remainderClinicalNote:
+      'It is not a standalone clinical metric. It can change with hydration, glycogen, recent food intake, and the precision of fat and muscle estimates.',
+    abdominalHealth: 'Abdominal Health',
+    waistToHeight: 'Abdomen/height',
+    waistToHip: 'Abdomen/hip',
+    recomposition: 'Recomposition',
+    status: 'Status',
+    advancedMarkers: 'Advanced markers',
+    bri: 'BRI',
+    absi: 'ABSI',
+    abdominalCategoryLow: 'Low',
+    abdominalCategoryVeryLow: 'Very low',
+    abdominalCategoryHealthy: 'Healthy zone',
+    abdominalCategoryIncreased: 'Increased risk',
+    abdominalCategoryModerate: 'Moderate risk',
+    abdominalCategoryHigh: 'High risk',
+    waistToHeightDescription:
+      'Abdomen-to-height ratio is a simple indicator of abdominal risk. It is useful because it compares your abdomen with your body size.',
+    waistToHeightFormula: 'Abdomen/height = abdomen cm / height cm',
+    waistToHeightRule:
+      'A practical reference is to keep abdomen below half of height. It is an indicator, not a medical diagnosis.',
+    waistToHeightSummary:
+      'Shows whether your abdomen is below half of your height; lower usually reduces abdominal risk.',
+    waistToHipDescription:
+      'Abdomen-to-hip ratio helps read fat distribution and whether more weight is concentrated around the abdominal area.',
+    waistToHipFormula: 'Abdomen/hip = abdomen cm / hip cm',
+    waistToHipRule:
+      'Interpretation uses sex-specific ranges and should be read together with abdomen/height and body fat trend.',
+    waistToHipSummary:
+      'Shows how your perimeter is distributed between abdomen and hip; higher usually means more abdominal concentration.',
+    abdominalAdvancedDescription:
+      'BRI and ABSI are complementary body-shape indexes. They are useful context, but they are not main goals or medical diagnoses.',
+    briExplanation: 'BRI is an experimental abdominal-shape index based on abdomen and height.',
+    briDirection: 'A higher BRI usually means more abdominal roundness. Use it as extra context, not as a main target.',
+    absiExplanation:
+      'ABSI compares waist with BMI and height to see whether waist is larger than expected for your size.',
+    absiDirection:
+      'A higher ABSI suggests a larger waist for the same body size. Use it as a complementary risk signal.',
+    missingAbdomenForAbdominal: 'Add abdomen to calculate abdominal health markers.',
+    missingHipForWaistHip: 'Add hip to calculate abdomen/hip.',
+    recompositionDescription:
+      'Recomposition compares your recent trend in abdomen, weight, chest, arm, and thigh. It is a progress signal, not a medical formula.',
+    recompositionFormula: 'Trend = abdomen change + weight change + chest/arm/thigh preservation',
+    recompositionNoMedicalFormula:
+      'Chest, arm, and thigh help track perimeter changes and relative muscle preservation, but they do not recalculate body fat or muscle mass.',
+    pdfAbdominalHealthSection: 'Abdominal health',
+    pdfAbdominalHealthHint:
+      'These ratios help understand abdominal risk and fat distribution. They are indicators, not diagnoses.',
+    pdfAbdominalMetricPurpose: 'What it helps with',
+    recompositionPositive: 'Positive recomposition',
+    recompositionPositiveAdvice: 'Abdomen is down while key perimeters are maintained. Keep the current pace.',
+    recompositionCorrect: 'Correct progress',
+    recompositionCorrectAdvice:
+      'Weight and abdomen are down. Watch strength and perimeters to avoid excessive deficit.',
+    recompositionMuscleLossRisk: 'Possible muscle loss',
+    recompositionMuscleLossRiskAdvice:
+      'Weight dropped while chest, arm, or thigh fell noticeably. Review deficit, protein, and strength performance.',
+    recompositionAbdomenIncreased: 'Abdomen increased',
+    recompositionAbdomenIncreasedAdvice:
+      'Abdomen is trending up. Check recent intake, stress, sleep, and measurement consistency.',
+    recompositionNeutral: 'Stable trend',
+    recompositionNeutralAdvice: 'Changes are small. Keep measuring under similar conditions to make the trend clearer.',
+    recompositionInsufficient: 'Needs previous measurements',
+    recompositionNeedPrevious:
+      'Record another day with abdomen and, ideally, chest, arm, and thigh to calculate recomposition.',
+    currentTrend: 'Current trend',
+    dataCompared: 'Data compared:',
     autoCompCalcDisclaimer:
       'Body composition data is calculated automatically when recording weight. It is recommended to add body measurements first for a more accurate calculation.',
     addFirstSleepRecord: 'Tap + to add your first night',
@@ -716,7 +853,7 @@ const en = {
     wakeUp: 'I woke up',
     fellAsleep: 'I fell asleep',
     last12Weeks: 'Last 12 weeks',
-    formulaBodyComposition: 'SM = 28.9 + 0.255×weight - 0.175×hip - 0.038×age + 0.118×height',
+    formulaBodyComposition: 'SM = 2.89 + 0.255×weight - 0.175×hip - 0.038×age + 0.118×height',
     imc: 'BMI',
 
     // Sleep sessions (new schema)
@@ -1270,7 +1407,12 @@ const en = {
     completeSetInstruction: 'Press the check to complete the set.',
     onlyCompletedSetsSavedInstruction: 'Only sets marked as completed are saved.',
     supersetInstruction: 'Tap the infinity icon between two exercises to link them as a superset.',
-    warmupSetInstruction: 'Tap a set number to mark or unmark it as warm-up (W).',
+    warmupSetInstruction: 'Tap a set number to cycle normal, warm-up (W), and drop set (D).',
+    dropSetInstruction:
+      'Drop set (D): after reaching the planned reps or fatigue, lower the weight and continue with little or no rest. In templates, tap Drop set to apply it to the last set or all sets.',
+    dropSet: 'Drop set',
+    dropSetLast: 'Last',
+    dropSetAll: 'All',
     repsOrTimeGoal: 'The repetitions or time goal.',
     repsColon: 'reps',
     weightLiftedLabel: 'Weight lifted in this exercise.',
@@ -2080,6 +2222,8 @@ const en = {
     saveSessionError: 'Could not save the session.',
     loadRoutineError: 'Could not load the routine.',
     startSessionError: 'Could not start the session.',
+    activeGymSessionTitle: 'Workout already started',
+    activeGymSessionMessage: 'You already have a gym workout in progress. Finish it before starting another one.',
     updateDateError: 'Could not update the date.',
     newWorkout: 'New Workout',
     saving: 'Saving...',

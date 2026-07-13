@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -47,12 +47,93 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
+import {
+  buildGymSetModeDefaults,
+  getGymSetModeLabel,
+  getNextGymSetMode,
+  getWorkoutSetTypeForGymSetMode,
+  GymSetMode,
+  parseGymSetModeRecord,
+  parseWarmupSetRecordAsGymSetModes,
+} from './helpers/gymSetMode.helper';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
 type AutoPlayQueue = {
   exerciseId: string;
   nextSetNumber: number;
 };
+
+const ACTIVE_SESSION_DURATION_PERSIST_INTERVAL_SECONDS = 15;
+
+const ActiveWorkoutDuration = React.memo(
+  ({
+    sessionId,
+    textColor,
+    onDurationChange,
+  }: {
+    sessionId?: string;
+    textColor: string;
+    onDurationChange: (seconds: number) => void;
+  }) => {
+    const [duration, setDuration] = useState(0);
+    const durationRef = useRef(0);
+
+    useEffect(() => {
+      let mounted = true;
+
+      const loadDuration = async () => {
+        try {
+          const stored = sessionId ? await AsyncStorage.getItem(`active_session_duration_${sessionId}`) : null;
+          const nextDuration = stored ? parseInt(stored, 10) : 0;
+          if (!mounted) return;
+          const safeDuration = Number.isFinite(nextDuration) ? nextDuration : 0;
+          durationRef.current = safeDuration;
+          setDuration(safeDuration);
+          onDurationChange(safeDuration);
+        } catch (error) {
+          console.log(error);
+          if (!mounted) return;
+          durationRef.current = 0;
+          setDuration(0);
+          onDurationChange(0);
+        }
+      };
+
+      void loadDuration();
+
+      return () => {
+        mounted = false;
+      };
+    }, [onDurationChange, sessionId]);
+
+    useFocusEffect(
+      React.useCallback(() => {
+        if (!sessionId) return undefined;
+
+        const interval = setInterval(() => {
+          setDuration(prev => {
+            const nextDuration = prev + 1;
+            durationRef.current = nextDuration;
+            onDurationChange(nextDuration);
+
+            if (nextDuration % ACTIVE_SESSION_DURATION_PERSIST_INTERVAL_SECONDS === 0) {
+              void AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(nextDuration));
+            }
+
+            return nextDuration;
+          });
+        }, 1000);
+
+        return () => {
+          clearInterval(interval);
+          void AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(durationRef.current));
+        };
+      }, [onDurationChange, sessionId]),
+    );
+
+    return <WorkoutDurationTimer seconds={duration} style={{ color: textColor }} />;
+  },
+);
 
 // ... (Rest of imports or utility functions if any)
 const buildSupersetLinksFromOrderedExercises = (orderedExercises: WorkoutTemplateExerciseWithDetails[]) => {
@@ -82,30 +163,6 @@ const buildSupersetLinksFromSessionLinks = (
   return links;
 };
 
-const buildWarmupSetDefaults = (orderedExercises: WorkoutTemplateExerciseWithDetails[]) => {
-  const defaults: Record<string, boolean> = {};
-
-  orderedExercises.forEach(exercise => {
-    if (!exercise?.is_warmup) return;
-    const totalSets = Math.max(0, exercise.target_sets || 3);
-    for (let setNumber = 1; setNumber <= totalSets; setNumber += 1) {
-      defaults[`${exercise.exercise_id}-${setNumber}`] = true;
-    }
-  });
-
-  return defaults;
-};
-
-const parseWarmupSetRecord = (value: unknown): Record<string, boolean> | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-
-  const parsed: Record<string, boolean> = {};
-  Object.entries(value).forEach(([key, itemValue]) => {
-    parsed[key] = !!itemValue;
-  });
-  return parsed;
-};
-
 export const ActiveWorkoutScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
@@ -122,9 +179,8 @@ export const ActiveWorkoutScreen = () => {
 
   // Map key: `${exerciseIndex}-${setIndex}` -> { weight: string, reps: string }
   const [inputs, setInputs] = useState<Record<string, { weight: string; reps: string }>>({});
-  // Track warmup sets: key -> boolean
-  const [warmupSets, setWarmupSets] = useState<Record<string, boolean>>({});
-  const warmupSetsLoaded = useRef(false);
+  const [setModes, setSetModes] = useState<Record<string, GymSetMode>>({});
+  const setModesLoaded = useRef(false);
   const [isCompletingAll, setIsCompletingAll] = useState(false);
   const inputsLoaded = useRef(false);
 
@@ -275,30 +331,56 @@ export const ActiveWorkoutScreen = () => {
   useEffect(() => {
     const loadLocalState = async () => {
       try {
-        const [storedExtraSets, storedWarmupSets, storedAdhoc, storedHidden, storedOrder, storedSupersetLinks] =
-          await Promise.all([
-            AsyncStorage.getItem(`active_session_extra_sets_${sessionId}`),
-            AsyncStorage.getItem(`active_session_warmup_sets_${sessionId}`),
-            AsyncStorage.getItem(`active_session_adhoc_${sessionId}`),
-            AsyncStorage.getItem(`active_session_hidden_${sessionId}`),
-            AsyncStorage.getItem(`active_session_order_${sessionId}`),
-            AsyncStorage.getItem(`active_session_superset_links_${sessionId}`),
-          ]);
+        const [
+          storedExtraSets,
+          storedSetModes,
+          storedWarmupSets,
+          storedAdhoc,
+          storedHidden,
+          storedOrder,
+          storedSupersetLinks,
+        ] = await Promise.all([
+          AsyncStorage.getItem(`active_session_extra_sets_${sessionId}`),
+          AsyncStorage.getItem(`active_session_set_modes_${sessionId}`),
+          AsyncStorage.getItem(`active_session_warmup_sets_${sessionId}`),
+          AsyncStorage.getItem(`active_session_adhoc_${sessionId}`),
+          AsyncStorage.getItem(`active_session_hidden_${sessionId}`),
+          AsyncStorage.getItem(`active_session_order_${sessionId}`),
+          AsyncStorage.getItem(`active_session_superset_links_${sessionId}`),
+        ]);
 
         if (storedExtraSets) setExtraSets(JSON.parse(storedExtraSets));
-        const defaultWarmupSets = buildWarmupSetDefaults(templateExercises);
-        if (storedWarmupSets) {
-          const parsedWarmupSets = parseWarmupSetRecord(JSON.parse(storedWarmupSets));
+        const defaultSetModes = {
+          ...buildGymSetModeDefaults(templateExercises),
+          ...(activeSessionData?.completedSets || []).reduce<Record<string, GymSetMode>>((acc, set) => {
+            const key = `${set.exercise_id}-${set.set_number}`;
+            if (set.is_warmup) {
+              acc[key] = 'warmup';
+            } else if (set.set_type === 'drop_set') {
+              acc[key] = 'drop_set';
+            }
+            return acc;
+          }, {}),
+        };
+        if (storedSetModes) {
+          const parsedSetModes = parseGymSetModeRecord(JSON.parse(storedSetModes));
+          if (parsedSetModes && (Object.keys(parsedSetModes).length > 0 || Object.keys(defaultSetModes).length === 0)) {
+            setSetModes(parsedSetModes);
+          } else {
+            setSetModes(defaultSetModes);
+          }
+        } else if (storedWarmupSets) {
+          const parsedWarmupSets = parseWarmupSetRecordAsGymSetModes(JSON.parse(storedWarmupSets));
           if (
             parsedWarmupSets &&
-            (Object.keys(parsedWarmupSets).length > 0 || Object.keys(defaultWarmupSets).length === 0)
+            (Object.keys(parsedWarmupSets).length > 0 || Object.keys(defaultSetModes).length === 0)
           ) {
-            setWarmupSets(parsedWarmupSets);
+            setSetModes(parsedWarmupSets);
           } else {
-            setWarmupSets(defaultWarmupSets);
+            setSetModes(defaultSetModes);
           }
         } else {
-          setWarmupSets(defaultWarmupSets);
+          setSetModes(defaultSetModes);
         }
         if (storedAdhoc) setLocalAdhocExercises(JSON.parse(storedAdhoc));
         if (storedHidden) setHiddenExercises(new Set(JSON.parse(storedHidden)));
@@ -328,7 +410,7 @@ export const ActiveWorkoutScreen = () => {
       } catch (e) {
         console.log('Error loading local session state:', e);
       } finally {
-        warmupSetsLoaded.current = true;
+        setModesLoaded.current = true;
         supersetLinksLoaded.current = true;
       }
     };
@@ -336,7 +418,13 @@ export const ActiveWorkoutScreen = () => {
     if (activeSessionData) {
       loadLocalState();
     }
-  }, [sessionId, activeSessionData?.exercises, activeSessionData?.sessionSupersetLinks, templateExercises]);
+  }, [
+    sessionId,
+    activeSessionData?.completedSets,
+    activeSessionData?.exercises,
+    activeSessionData?.sessionSupersetLinks,
+    templateExercises,
+  ]);
 
   // Persist extraSets
   useEffect(() => {
@@ -350,18 +438,18 @@ export const ActiveWorkoutScreen = () => {
     save();
   }, [extraSets, sessionId]);
 
-  // Persist warmupSets
+  // Persist set modes
   useEffect(() => {
-    if (!warmupSetsLoaded.current) return;
+    if (!setModesLoaded.current) return;
     const save = async () => {
       try {
-        await AsyncStorage.setItem(`active_session_warmup_sets_${sessionId}`, JSON.stringify(warmupSets));
+        await AsyncStorage.setItem(`active_session_set_modes_${sessionId}`, JSON.stringify(setModes));
       } catch (e) {
-        console.log('Error saving warmupSets:', e);
+        console.log('Error saving setModes:', e);
       }
     };
     save();
-  }, [warmupSets, sessionId]);
+  }, [setModes, sessionId]);
 
   // Persist localAdhocExercises
   useEffect(() => {
@@ -833,40 +921,10 @@ export const ActiveWorkoutScreen = () => {
     triggerMoveHighlight(exerciseId, 'down');
   };
 
-  // Timer Duration Logic
-  const [duration, setDuration] = useState(0);
-
-  useEffect(() => {
-    const loadDuration = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(`active_session_duration_${sessionId}`);
-        if (stored) {
-          setDuration(parseInt(stored, 10));
-        } else {
-          setDuration(0);
-        }
-      } catch (e) {
-        console.log(e);
-        setDuration(0);
-      }
-    };
-    loadDuration();
-  }, [sessionId]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      // Timer only runs while screen is focused
-      const interval = setInterval(() => {
-        setDuration(prev => {
-          const newVal = prev + 1;
-          AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(newVal));
-          return newVal;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, [sessionId]),
-  );
+  const durationRef = useRef(0);
+  const handleDurationChange = React.useCallback((nextDuration: number) => {
+    durationRef.current = nextDuration;
+  }, []);
 
   const inputsRef = useRef(inputs);
   useEffect(() => {
@@ -914,7 +972,8 @@ export const ActiveWorkoutScreen = () => {
                 else if (item?.target_reps_min) reps = item.target_reps_min;
 
                 const weightKg = toDbWeight(weight);
-                const isWarmup = !!warmupSets[key];
+                const setMode = setModes[key] || 'normal';
+                const isWarmup = setMode === 'warmup';
 
                 savedCount++;
                 savedVolume += weightKg * reps;
@@ -929,6 +988,7 @@ export const ActiveWorkoutScreen = () => {
                       reps: reps,
                       rest_s: item?.rest_seconds,
                       is_warmup: isWarmup,
+                      set_type: getWorkoutSetTypeForGymSetMode(setMode),
                       is_pr: false,
                     })
                     .catch(e => console.error(`Error saving set ${key}:`, e)),
@@ -960,9 +1020,11 @@ export const ActiveWorkoutScreen = () => {
               links: supersetPayload,
             });
 
+            const finalDuration = durationRef.current;
+
             await finishSession.mutateAsync({
               id: sessionId,
-              duration_s: duration,
+              duration_s: finalDuration,
               rpe: 0,
               notes: '',
             });
@@ -971,6 +1033,7 @@ export const ActiveWorkoutScreen = () => {
             await AsyncStorage.removeItem(`active_session_inputs_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_completed_sets_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_extra_sets_${sessionId}`);
+            await AsyncStorage.removeItem(`active_session_set_modes_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_warmup_sets_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_adhoc_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_hidden_${sessionId}`);
@@ -986,7 +1049,7 @@ export const ActiveWorkoutScreen = () => {
                 volumeLoad: Math.round(savedVolume),
                 startTime: activeSessionData?.session?.start_time || new Date().toISOString(),
                 endTime: new Date().toISOString(),
-                durationSeconds: duration,
+                durationSeconds: finalDuration,
               },
             });
           } catch (e) {
@@ -1012,6 +1075,7 @@ export const ActiveWorkoutScreen = () => {
             await AsyncStorage.removeItem(`active_session_inputs_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_completed_sets_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_extra_sets_${sessionId}`);
+            await AsyncStorage.removeItem(`active_session_set_modes_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_warmup_sets_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_adhoc_${sessionId}`);
             await AsyncStorage.removeItem(`active_session_hidden_${sessionId}`);
@@ -1059,9 +1123,14 @@ export const ActiveWorkoutScreen = () => {
     }
 
     if (exercise.is_warmup) {
-      setWarmupSets(prev => ({
+      setSetModes(prev => ({
         ...prev,
-        [newKey]: true,
+        [newKey]: 'warmup',
+      }));
+    } else if (exercise.drop_set_mode === 'all') {
+      setSetModes(prev => ({
+        ...prev,
+        [newKey]: 'drop_set',
       }));
     }
   };
@@ -1073,6 +1142,7 @@ export const ActiveWorkoutScreen = () => {
       exercise_id: exercise.id,
       exercise: exercise,
       is_warmup: false,
+      drop_set_mode: 'none',
       target_sets: 3,
       target_reps_min: defaultTargets.target_reps_min,
       target_reps_max: defaultTargets.target_reps_max,
@@ -1214,7 +1284,11 @@ export const ActiveWorkoutScreen = () => {
               },
             ]}
           >
-            <WorkoutDurationTimer seconds={duration} style={{ color: themeColors.textPrimary }} />
+            <ActiveWorkoutDuration
+              sessionId={sessionId}
+              textColor={themeColors.textPrimary}
+              onDurationChange={handleDurationChange}
+            />
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -1240,71 +1314,86 @@ export const ActiveWorkoutScreen = () => {
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
-            {/* Loading Skeleton */}
-            {isLoading && visibleExercises.length === 0 && (
-              <>
-                {[1, 2, 3].map(n => (
-                  <GlassCard key={`skeleton-${n}`} style={[styles.exerciseCard, dynamicStyles.glassCard]}>
-                    <View style={styles.exerciseHeader}>
-                      <View
-                        style={[
-                          styles.skeletonText,
-                          {
-                            width: '60%',
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                          },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.skeletonIcon,
-                          {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                          },
-                        ]}
-                      />
-                    </View>
-                    <View
-                      style={[
-                        styles.setsHeader,
-                        {
-                          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                        },
-                      ]}
-                    >
-                      {[1, 2, 3, 4].map(col => (
+          <FlatList
+            contentContainerStyle={styles.content}
+            data={visibleExercises}
+            extraData={{
+              completedSets: activeSessionData?.completedSets,
+              deletingExerciseIds,
+              extraSets,
+              inputs,
+              movedExerciseId,
+              setModes,
+              supersetLinks,
+            }}
+            keyboardShouldPersistTaps="handled"
+            keyExtractor={(item, index) => item.id || item.exercise_id || String(index)}
+            style={{ flex: 1 }}
+            ListHeaderComponent={
+              isLoading && visibleExercises.length === 0 ? (
+                <>
+                  {[1, 2, 3].map(n => (
+                    <GlassCard key={`skeleton-${n}`} style={[styles.exerciseCard, dynamicStyles.glassCard]}>
+                      <View style={styles.exerciseHeader}>
                         <View
-                          key={col}
                           style={[
-                            styles.skeletonCol,
+                            styles.skeletonText,
                             {
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                              width: '60%',
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                             },
                           ]}
                         />
-                      ))}
-                    </View>
-                    {[1, 2, 3].map(setNum => (
-                      <View key={setNum} style={[styles.setRow, { height: 48 }]}>
+                        <View
+                          style={[
+                            styles.skeletonIcon,
+                            {
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View
+                        style={[
+                          styles.setsHeader,
+                          {
+                            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                          },
+                        ]}
+                      >
                         {[1, 2, 3, 4].map(col => (
                           <View
                             key={col}
                             style={[
-                              styles.skeletonInput,
+                              styles.skeletonCol,
                               {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                               },
                             ]}
                           />
                         ))}
                       </View>
-                    ))}
-                  </GlassCard>
-                ))}
-              </>
-            )}
-            {visibleExercises.map((item, i: number) => {
+                      {[1, 2, 3].map(setNum => (
+                        <View key={setNum} style={[styles.setRow, { height: 48 }]}>
+                          {[1, 2, 3, 4].map(col => (
+                            <View
+                              key={col}
+                              style={[
+                                styles.skeletonInput,
+                                {
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                },
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      ))}
+                    </GlassCard>
+                  ))}
+                </>
+              ) : null
+            }
+            renderItem={({ item, index: i }) => {
               const exerciseId = item.exercise_id;
               const totalSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
               const isTimeBased = isTimeBasedExerciseType(item.exercise?.exercise_type_code);
@@ -1428,6 +1517,7 @@ export const ActiveWorkoutScreen = () => {
                           const isDone = isSetCompleted(exerciseId, setNum);
                           const doneSet = getCompletedSet(exerciseId, setNum);
                           const key = `${exerciseId}-${setNum}`;
+                          const setMode = setModes[key] || 'normal';
 
                           const prData = activeSessionData?.prs?.[exerciseId];
                           const prevText = prData
@@ -1442,24 +1532,42 @@ export const ActiveWorkoutScreen = () => {
                                 isDone && {
                                   backgroundColor: isDark ? 'rgba(52, 199, 89, 0.15)' : 'rgba(52, 199, 89, 0.1)',
                                 },
-                                warmupSets[key] && {
+                                setMode === 'warmup' && {
                                   backgroundColor: isDark ? 'rgba(255, 149, 0, 0.15)' : 'rgba(255, 149, 0, 0.1)',
+                                },
+                                setMode === 'drop_set' && {
+                                  backgroundColor: isDark ? 'rgba(88, 86, 214, 0.16)' : 'rgba(88, 86, 214, 0.1)',
                                 },
                               ]}
                             >
                               <TouchableOpacity
-                                style={[styles.warmupBtn, warmupSets[key] && styles.warmupBtnActive]}
-                                onPress={() => setWarmupSets(prev => ({ ...prev, [key]: !prev[key] }))}
+                                style={[
+                                  styles.warmupBtn,
+                                  setMode === 'warmup' && styles.warmupBtnActive,
+                                  setMode === 'drop_set' && styles.dropSetBtnActive,
+                                ]}
+                                onPress={() =>
+                                  setSetModes(prev => {
+                                    const nextMode = getNextGymSetMode(prev[key] || 'normal');
+                                    const next = { ...prev };
+                                    if (nextMode === 'normal') {
+                                      delete next[key];
+                                    } else {
+                                      next[key] = nextMode;
+                                    }
+                                    return next;
+                                  })
+                                }
                                 disabled={isDone}
                               >
                                 <Text
                                   style={[
                                     styles.warmupText,
                                     { color: themeColors.textSecondary },
-                                    warmupSets[key] && styles.warmupTextActive,
+                                    setMode !== 'normal' && styles.warmupTextActive,
                                   ]}
                                 >
-                                  {warmupSets[key] ? 'W' : setNum}
+                                  {getGymSetModeLabel(setMode, setNum)}
                                 </Text>
                               </TouchableOpacity>
 
@@ -1637,36 +1745,41 @@ export const ActiveWorkoutScreen = () => {
                   )}
                 </React.Fragment>
               );
-            })}
+            }}
+            ListFooterComponent={
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.addExerciseBtn,
+                    {
+                      borderColor: themeColors.primary,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)',
+                    },
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('ExerciseSearch', {
+                      onSelect: (_exerciseId: string) => {}, // Required but not used
+                      onExerciseSelected: handleAddAdhocExercise,
+                    })
+                  }
+                >
+                  <Plus size={20} color={themeColors.primary} />
+                  <Text style={[styles.addExerciseText, { color: themeColors.primary }]}>
+                    {t('training.addExercise')}
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.addExerciseBtn,
-                {
-                  borderColor: themeColors.primary,
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)',
-                },
-              ]}
-              onPress={() =>
-                navigation.navigate('ExerciseSearch', {
-                  onSelect: (_exerciseId: string) => {}, // Required but not used
-                  onExerciseSelected: handleAddAdhocExercise,
-                })
-              }
-            >
-              <Plus size={20} color={themeColors.primary} />
-              <Text style={[styles.addExerciseText, { color: themeColors.primary }]}>{t('training.addExercise')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.completeAllExercisesBtn, { backgroundColor: themeColors.success }]}
-              onPress={handleCompleteAllExercises}
-              disabled={isCompletingAll}
-            >
-              <Check size={20} color="#FFF" />
-              <Text style={styles.completeAllExercisesText}>{t('training.completeAll')}</Text>
-            </TouchableOpacity>
-          </ScrollView>
+                <TouchableOpacity
+                  style={[styles.completeAllExercisesBtn, { backgroundColor: themeColors.success }]}
+                  onPress={handleCompleteAllExercises}
+                  disabled={isCompletingAll}
+                >
+                  <Check size={20} color="#FFF" />
+                  <Text style={styles.completeAllExercisesText}>{t('training.completeAll')}</Text>
+                </TouchableOpacity>
+              </>
+            }
+          />
 
           {executionTimerVisible && (
             <ExecutionTimer
@@ -1890,6 +2003,13 @@ export const ActiveWorkoutScreen = () => {
                 </View>
 
                 <View style={styles.helpRow}>
+                  <Text style={[styles.helpLabel, { color: '#5856D6' }]}>D</Text>
+                  <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
+                    {t('training.dropSetInstruction')}
+                  </Text>
+                </View>
+
+                <View style={styles.helpRow}>
                   <View style={{ width: 60, alignItems: 'flex-start', paddingLeft: 2 }}>
                     <InfinityIcon size={18} color={themeColors.primary} />
                   </View>
@@ -2100,6 +2220,9 @@ const styles = StyleSheet.create({
   },
   warmupBtnActive: {
     backgroundColor: '#FF9500', // Orange for Warmup (static usually, or use theme warning)
+  },
+  dropSetBtnActive: {
+    backgroundColor: '#5856D6',
   },
   warmupText: {
     fontSize: 12,

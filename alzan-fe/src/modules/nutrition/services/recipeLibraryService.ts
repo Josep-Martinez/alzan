@@ -9,11 +9,13 @@ import { supabase } from '../../../lib/supabaseClient';
 import { getLocalizedRecipeDescription, getLocalizedRecipeName } from '../../../services/localization';
 import { normalizeInput } from '../../../services/ingredientsService';
 import { MealComponent } from '../types/ingredients';
+import { buildRecipeSoftDeletePayload } from './recipeEditing';
 
 // Discovery sorting lens (all backed by aggregate columns already on `recipes`).
 export type DiscoverSort = 'recommended' | 'week' | 'month' | 'saved';
 // Macro-based category filter (derived from the per-100g columns on `recipes`).
 export type DiscoverCategory = 'all' | 'high_protein' | 'low_cal' | 'high_carb';
+export type PersonalRecipeSort = 'recently_used' | 'most_used' | 'alphabetical';
 
 const HIGH_PROTEIN_MIN_G = 15;
 const LOW_CAL_MAX_KCAL = 120;
@@ -28,6 +30,7 @@ interface RecipeRow {
   source: 'system' | 'user';
   owner_user_id: string | null;
   visibility: 'private' | 'public';
+  updated_at: string;
   kcal_100: number | null;
   protein_g_100: number | null;
   carbs_g_100: number | null;
@@ -40,6 +43,30 @@ interface RecipeRow {
   uses_total: number | null;
 }
 
+export interface RankedRecipeRow extends RecipeRow {
+  search_rank: number | null;
+}
+
+type RankedRecipePageRow = {
+  items: RankedRecipeRow[] | null;
+  total_count: number | null;
+};
+
+export type SearchRecipesRpc = {
+  rpc: (
+    fn: 'search_recipes_ranked',
+    args: {
+      p_query: string;
+      p_scope: 'all' | 'source' | 'users' | 'saved' | 'favorites';
+      p_user_id: string | null;
+      p_category: DiscoverCategory;
+      p_sort: DiscoverSort;
+      p_limit: number;
+      p_offset: number;
+    },
+  ) => Promise<{ data: RankedRecipePageRow[] | null; error: { message: string } | null }>;
+};
+
 interface RecipeFavoriteRow {
   recipe_id: string;
 }
@@ -50,13 +77,31 @@ interface UserNameRow {
   display_name: string | null;
 }
 
+interface RecipeUsageEventRow {
+  recipe_id: string;
+  used_at: string;
+}
+
+export interface RecipePersonalUsageSummary {
+  recipeId: string;
+  lastUsedAt: string | null;
+  useCount: number;
+}
+
 const RECIPE_CARD_FIELDS =
-  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
+  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, updated_at, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
 
 const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
 const stripCopySuffix = (rawName: string): string =>
   rawName.replace(/\s*\((?:copia|copy)(?:\s+\d+)?\)\s*$/i, '').trim();
+
+export const recipeMatchesCategory = (recipe: MealComponent, category: DiscoverCategory): boolean => {
+  if (category === 'all') return true;
+  if (category === 'high_protein') return (recipe.protein_g_100 ?? 0) >= HIGH_PROTEIN_MIN_G;
+  if (category === 'low_cal') return (recipe.kcal_100 ?? 0) <= LOW_CAL_MAX_KCAL;
+  return (recipe.carbs_g_100 ?? 0) >= HIGH_CARB_MIN_G;
+};
 
 const mapRecipeRow = (row: RecipeRow): MealComponent => ({
   id: `recipe_${row.id}`,
@@ -70,6 +115,7 @@ const mapRecipeRow = (row: RecipeRow): MealComponent => ({
   recipe_source: row.source,
   recipe_owner_user_id: row.owner_user_id,
   recipe_visibility: row.visibility,
+  recipe_updated_at: row.updated_at,
   recipe_popularity_score: row.popularity_score ?? 0,
   recipe_favorites_total: row.favorites_total ?? 0,
   recipe_saves_total: row.saves_total ?? 0,
@@ -147,7 +193,31 @@ export async function getDiscoverRecipes({
   category,
 }: DiscoverOptions): Promise<DiscoverPageResult> {
   const from = (Math.max(1, page) - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const userId = await getCurrentUserId();
+
+  const { data: rankedData, error: rankedError } = await (supabase as unknown as SearchRecipesRpc).rpc(
+    'search_recipes_ranked',
+    {
+      p_query: query,
+      p_scope: 'all',
+      p_user_id: userId,
+      p_category: category,
+      p_sort: sort,
+      p_limit: pageSize,
+      p_offset: from,
+    },
+  );
+
+  if (!rankedError && rankedData) {
+    const page = rankedData[0];
+    const items = page?.items ?? [];
+    return {
+      recipes: await attachAuthorNames(items.map(mapRecipeRow)),
+      total: page?.total_count ?? 0,
+    };
+  }
+
+  if (rankedError) console.error('[recipeLibraryService] search_recipes_ranked error:', rankedError);
 
   let builder = supabase
     .from('recipes')
@@ -171,6 +241,7 @@ export async function getDiscoverRecipes({
     builder = builder.order('saves_total', { ascending: false }).order('favorites_total', { ascending: false });
   else builder = builder.order('popularity_score', { ascending: false }).order('uses_7d', { ascending: false });
 
+  const to = from + pageSize - 1;
   const { data, error, count } = await builder
     .order('quality_score', { ascending: false })
     .range(from, to)
@@ -261,6 +332,46 @@ export async function getFavoriteRecipes(favoriteIds: string[]): Promise<MealCom
   return attachAuthorNames(ordered);
 }
 
+/** Per-user usage summary for local sorting in Mine/Favorites. */
+export async function getRecipePersonalUsageSummaries(recipeIds: string[]): Promise<RecipePersonalUsageSummary[]> {
+  const userId = await getCurrentUserId();
+  const uniqueRecipeIds = Array.from(new Set(recipeIds.filter(Boolean)));
+  if (!userId || uniqueRecipeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('recipe_usage_events')
+    .select('recipe_id, used_at')
+    .eq('user_id', userId)
+    .in('recipe_id', uniqueRecipeIds)
+    .order('used_at', { ascending: false })
+    .returns<RecipeUsageEventRow[]>();
+
+  if (error || !data) {
+    if (error) console.error('[recipeLibraryService] getRecipePersonalUsageSummaries error:', error);
+    return [];
+  }
+
+  const summaries = new Map<string, RecipePersonalUsageSummary>();
+
+  for (const event of data) {
+    const current = summaries.get(event.recipe_id);
+    if (current) {
+      current.useCount += 1;
+      if (!current.lastUsedAt || Date.parse(event.used_at) > Date.parse(current.lastUsedAt)) {
+        current.lastUsedAt = event.used_at;
+      }
+    } else {
+      summaries.set(event.recipe_id, {
+        recipeId: event.recipe_id,
+        lastUsedAt: event.used_at,
+        useCount: 1,
+      });
+    }
+  }
+
+  return Array.from(summaries.values());
+}
+
 /** Toggle a favorite; returns the new favorite state (true = now favorited). */
 export async function toggleFavoriteRecipe(recipeId: string, isCurrentlyFavorite: boolean): Promise<boolean> {
   const userId = await getCurrentUserId();
@@ -281,4 +392,31 @@ export async function toggleFavoriteRecipe(recipeId: string, isCurrentlyFavorite
     return false;
   }
   return true;
+}
+
+export async function softDeleteOwnRecipe(
+  recipeId: string,
+  userId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('recipes')
+    .update(buildRecipeSoftDeletePayload(now))
+    .eq('id', recipeId)
+    .eq('owner_user_id', userId)
+    .eq('source', 'user')
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    console.error('[recipeLibraryService] soft delete recipe error:', error);
+    return { success: false, error: error.message };
+  }
+
+  if (!data) {
+    return { success: false, error: 'recipe_not_found_or_not_owned' };
+  }
+
+  return { success: true };
 }

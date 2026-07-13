@@ -863,6 +863,114 @@ export type Database = {
           },
         ];
       };
+      body_composition_logs: {
+        Row: {
+          bmi: number | null;
+          bodyfat_formula: string | null;
+          bodyfat_inputs: Json;
+          bodyfat_method: string | null;
+          bodyfat_percent: number | null;
+          bodyfat_precision_level: number | null;
+          calculated_for_date: string;
+          composition_calculated_at: string;
+          created_at: string;
+          id: string;
+          muscle_formula: string | null;
+          muscle_inputs: Json;
+          muscle_mass_kg: number | null;
+          muscle_method: string | null;
+          muscle_percent: number | null;
+          muscle_precision_level: number | null;
+          source_weight_log_id: string | null;
+          updated_at: string;
+          user_id: string;
+          waist_to_height_category: string | null;
+          waist_to_height_formula: string | null;
+          waist_to_height_inputs: Json;
+          waist_to_height_ratio: number | null;
+          waist_to_hip_category: string | null;
+          waist_to_hip_formula: string | null;
+          waist_to_hip_inputs: Json;
+          waist_to_hip_ratio: number | null;
+          weight_kg_used: number | null;
+        };
+        Insert: {
+          bmi?: number | null;
+          bodyfat_formula?: string | null;
+          bodyfat_inputs?: Json;
+          bodyfat_method?: string | null;
+          bodyfat_percent?: number | null;
+          bodyfat_precision_level?: number | null;
+          calculated_for_date: string;
+          composition_calculated_at?: string;
+          created_at?: string;
+          id?: string;
+          muscle_formula?: string | null;
+          muscle_inputs?: Json;
+          muscle_mass_kg?: number | null;
+          muscle_method?: string | null;
+          muscle_percent?: number | null;
+          muscle_precision_level?: number | null;
+          source_weight_log_id?: string | null;
+          updated_at?: string;
+          user_id: string;
+          waist_to_height_category?: string | null;
+          waist_to_height_formula?: string | null;
+          waist_to_height_inputs?: Json;
+          waist_to_height_ratio?: number | null;
+          waist_to_hip_category?: string | null;
+          waist_to_hip_formula?: string | null;
+          waist_to_hip_inputs?: Json;
+          waist_to_hip_ratio?: number | null;
+          weight_kg_used?: number | null;
+        };
+        Update: {
+          bmi?: number | null;
+          bodyfat_formula?: string | null;
+          bodyfat_inputs?: Json;
+          bodyfat_method?: string | null;
+          bodyfat_percent?: number | null;
+          bodyfat_precision_level?: number | null;
+          calculated_for_date?: string;
+          composition_calculated_at?: string;
+          created_at?: string;
+          id?: string;
+          muscle_formula?: string | null;
+          muscle_inputs?: Json;
+          muscle_mass_kg?: number | null;
+          muscle_method?: string | null;
+          muscle_percent?: number | null;
+          muscle_precision_level?: number | null;
+          source_weight_log_id?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          waist_to_height_category?: string | null;
+          waist_to_height_formula?: string | null;
+          waist_to_height_inputs?: Json;
+          waist_to_height_ratio?: number | null;
+          waist_to_hip_category?: string | null;
+          waist_to_hip_formula?: string | null;
+          waist_to_hip_inputs?: Json;
+          waist_to_hip_ratio?: number | null;
+          weight_kg_used?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'body_composition_logs_source_weight_log_id_fkey';
+            columns: ['source_weight_log_id'];
+            isOneToOne: false;
+            referencedRelation: 'weight_logs';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'body_composition_logs_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       body_measurements: {
         Row: {
           id: string;
@@ -2530,6 +2638,7 @@ export type Database = {
           origin_confidence: number | null;
           protein_g: number | null;
           source: string;
+          source_recipe_id: string | null;
           user_id: string;
         };
         Insert: {
@@ -2550,6 +2659,7 @@ export type Database = {
           origin_confidence?: number | null;
           protein_g?: number | null;
           source?: string;
+          source_recipe_id?: string | null;
           user_id: string;
         };
         Update: {
@@ -2570,6 +2680,7 @@ export type Database = {
           origin_confidence?: number | null;
           protein_g?: number | null;
           source?: string;
+          source_recipe_id?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -2578,6 +2689,13 @@ export type Database = {
             columns: ['diet_template_meal_id'];
             isOneToOne: false;
             referencedRelation: 'diet_template_meals';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'meal_logs_source_recipe_id_fkey';
+            columns: ['source_recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
             referencedColumns: ['id'];
           },
           {
@@ -4482,6 +4600,7 @@ export type Database = {
       };
       workout_template_exercises: {
         Row: {
+          drop_set_mode: string;
           exercise_id: string;
           id: string;
           is_warmup: boolean;
@@ -4498,6 +4617,7 @@ export type Database = {
           workout_template_id: string;
         };
         Insert: {
+          drop_set_mode?: string;
           exercise_id: string;
           id?: string;
           is_warmup?: boolean;
@@ -4514,6 +4634,7 @@ export type Database = {
           workout_template_id: string;
         };
         Update: {
+          drop_set_mode?: string;
           exercise_id?: string;
           id?: string;
           is_warmup?: boolean;
@@ -4663,6 +4784,40 @@ export type Database = {
         Args: { p_recipe_id: string };
         Returns: string;
       };
+      get_home_summary: {
+        Args: {
+          p_timezone?: string;
+          p_today: string;
+          p_user_id: string;
+          p_week_end: string;
+          p_week_start: string;
+        };
+        Returns: {
+          active_today_workout: Json;
+          completed_workouts_today: number;
+          scheduled_workouts_today: Json;
+          weekly_health_days: number;
+          weekly_nutrition_days: number;
+          weekly_workouts_count: number;
+          weight: Json;
+          weight_trend: number;
+        }[];
+      };
+      get_training_calendar_marks: {
+        Args: {
+          p_end_date: string;
+          p_start_date: string;
+          p_timezone?: string;
+          p_user_id: string;
+        };
+        Returns: {
+          completed_count: number;
+          date: string;
+          has_completed: boolean;
+          has_planned: boolean;
+          planned_count: number;
+        }[];
+      };
       import_ingredients_batch: { Args: { payload: Json }; Returns: number };
       import_recipes_batch: { Args: { payload: Json }; Returns: number };
       log_recipe_usage: {
@@ -4679,7 +4834,70 @@ export type Database = {
         Returns: undefined;
       };
       reset_user_data: { Args: never; Returns: undefined };
+      search_exercises_ranked: {
+        Args: {
+          p_equipment_id?: number;
+          p_limit?: number;
+          p_locale?: string;
+          p_muscle_id?: number;
+          p_query: string;
+        };
+        Returns: {
+          id: string;
+          search_rank: number;
+        }[];
+      };
+      search_ingredients_ranked: {
+        Args: {
+          p_category?: Database['public']['Enums']['ingredients_category'];
+          p_limit?: number;
+          p_locale?: string;
+          p_query: string;
+        };
+        Returns: {
+          carbs_g_100: number;
+          category: Database['public']['Enums']['ingredients_category'];
+          created_at: string;
+          fat_g_100: number;
+          fiber_g_100: number;
+          id: string;
+          kcal_100: number;
+          name_en: string;
+          name_es: string;
+          name_norm_es: string;
+          notes_en: string;
+          notes_es: string;
+          protein_g_100: number;
+          quality_score: number;
+          salt_g_100: number;
+          search_rank: number;
+          sodium_mg_100: number;
+          source_primary: Json;
+          source_secondary: Json;
+          sugar_g_100: number;
+          unit_basis: Database['public']['Enums']['ingredients_unit_basis'];
+          updated_at: string;
+        }[];
+      };
+      search_recipes_ranked: {
+        Args: {
+          p_category?: string;
+          p_limit?: number;
+          p_offset?: number;
+          p_query: string;
+          p_scope?: string;
+          p_sort?: string;
+          p_user_id?: string;
+        };
+        Returns: {
+          items: Json;
+          total_count: number;
+        }[];
+      };
+      show_limit: { Args: never; Returns: number };
+      show_trgm: { Args: { '': string }; Returns: string[] };
       slugify_recipe_name: { Args: { p_name: string }; Returns: string };
+      unaccent: { Args: { '': string }; Returns: string };
       unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
     };
     Enums: {

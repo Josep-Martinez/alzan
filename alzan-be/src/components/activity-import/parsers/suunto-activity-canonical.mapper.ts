@@ -9,6 +9,7 @@ import {
   CanonicalSportSubtype,
   CanonicalSportType,
 } from './activity-import-canonical.types';
+import { normaliseCanonicalActivityLaps } from './canonical-lap-normalizer';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapGolfTextToCanonical } from './golf-sport.mapper';
 import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
@@ -765,6 +766,7 @@ function appendFitLap(state: FitParseState, lap: FitLapAccumulator): void {
 }
 
 function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions): CanonicalActivity {
+  binary = normaliseSuuntoFitBinary(binary);
   if (binary.byteLength < 12) throw new Error('Invalid Suunto FIT file.');
   const dataView = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
   const headerSize = dataView.getUint8(0);
@@ -838,12 +840,35 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
       power: state.power,
       temperature: state.temperature,
     },
-    laps: state.laps,
+    laps: normaliseCanonicalActivityLaps(state.laps, state.summary),
     device: state.device,
     vendorFields: { suuntoFitSport: state.sport, suuntoFitSubSport: state.subSport },
     heartRateZones: state.nativeHeartRateZones,
     estimatedMaxHeartRate: options?.estimatedMaxHeartRate,
   });
+}
+
+function normaliseSuuntoFitBinary(binary: Uint8Array): Uint8Array {
+  if (binary.byteLength >= 12 && String.fromCharCode(binary[8], binary[9], binary[10], binary[11]) === '.FIT') {
+    return binary;
+  }
+
+  for (let signatureOffset = 8; signatureOffset + 3 < binary.byteLength; signatureOffset += 1) {
+    if (
+      binary[signatureOffset] === 0x2e &&
+      binary[signatureOffset + 1] === 0x46 &&
+      binary[signatureOffset + 2] === 0x49 &&
+      binary[signatureOffset + 3] === 0x54
+    ) {
+      const headerOffset = signatureOffset - 8;
+      const headerSize = binary[headerOffset];
+      if (headerSize >= 12 && headerOffset + headerSize <= binary.byteLength) {
+        return binary.subarray(headerOffset);
+      }
+    }
+  }
+
+  return binary;
 }
 
 function pushJsonSample(sample: JsonRecord, startedAt: string | null, streams: CanonicalActivityStreams): void {

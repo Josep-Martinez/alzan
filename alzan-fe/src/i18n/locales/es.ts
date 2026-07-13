@@ -106,6 +106,12 @@ export default {
     adjust: 'Ajustar',
     ml: 'ml',
     hydration: 'Hidratación',
+    defaultHydrationTitle: 'HIDRATACIÓN',
+    defaultHydrationLabel: 'Agua diaria por defecto',
+    defaultHydrationHint:
+      'Se usa como valor inicial en días sin registro de agua guardado. Luego puedes editar cada día.',
+    defaultHydrationPlaceholder: 'Sin defecto',
+    defaultHydrationSaveError: 'No se pudo guardar el valor de hidratación por defecto.',
     checkOfficialSiteForIngredients: 'Para conocer los ingredientes, consulta la web oficial del proveedor.',
     onlyMacrosWarning: '⚠️ Solo macros disponibles.',
     noIngredientsFound: 'No se encontraron ingredientes',
@@ -144,10 +150,13 @@ export default {
     discoverSortWeek: 'Esta semana',
     discoverSortMonth: 'Este mes',
     discoverSortSaved: 'Más guardadas',
-    discoverCategoryAll: 'Todas',
-    discoverCategoryProtein: 'Alta proteína',
-    discoverCategoryLowCal: 'Bajas en kcal',
-    discoverCategoryCarbs: 'Carbohidratos',
+    recipeSortRecentlyUsed: 'Usadas recientemente',
+    recipeSortMostUsed: 'Más usadas',
+    recipeSortAlphabetical: 'A-Z',
+    discoverCategoryAll: 'Todo',
+    discoverCategoryProtein: 'Proteicas',
+    discoverCategoryLowCal: 'Ligeras',
+    discoverCategoryCarbs: 'Altas en carbos',
     discoverRising: 'En auge',
     max1kgLabel: 'Máximo 1kg',
     ingredientsTitleParen: 'Ingredientes (',
@@ -227,6 +236,9 @@ export default {
       'Elige a qué hora debe pasar la app al siguiente día de nutrición.\n\nAntes de esa hora, los registros automáticos siguen usando el día anterior, útil para cenas o snacks después de medianoche.',
     nutritionDayRolloverLabel: 'Cambiar día a las',
     nutritionDayRolloverHint: 'Las comidas registradas antes de esta hora usan el día nutricional anterior.',
+    defaultHydrationInfoModalTitle: 'Hidratación por defecto',
+    defaultHydrationInfoModalBody:
+      'Define un valor diario de agua que aparece por defecto en Nutrición.\n\nNo crea registros de hidratación por adelantado. Si editas el agua de un día concreto, ese valor guardado tiene prioridad.',
     recipePrivacyTitle: 'PRIVACIDAD DE RECETAS',
     recipePrivacyInfoModalTitle: 'Privacidad de recetas',
     recipePrivacyInfoModalBody:
@@ -265,9 +277,12 @@ export default {
     openRecipeLibrary: 'Abrir recetario',
     recipeLibraryTitle: 'Biblioteca de recetas',
     saveRecipeAction: 'Guardar receta',
+    editRecipeAction: 'Editar receta',
     updateRecipeAction: 'Actualizar receta',
     savingRecipeAction: 'Guardando receta...',
+    editingRecipeAction: 'Editando receta...',
     updatingRecipeAction: 'Actualizando receta...',
+    deleteRecipeAction: 'Eliminar receta',
     publishRecipeAction: 'Publicar',
     unpublishRecipeAction: 'Despublicar',
     duplicateRecipeAction: 'Guardar copia',
@@ -308,6 +323,14 @@ export default {
       'Por ahora solo puedes guardar recetas con ingredientes de la base de datos.',
     recipeSavedTitle: 'Receta guardada',
     recipeSavedMessage: 'Tu receta se guardó correctamente.',
+    recipeUpdatedTitle: 'Receta actualizada',
+    recipeUpdatedMessage: 'Tu receta se actualizó correctamente.',
+    deleteRecipeTitle: 'Eliminar receta',
+    deleteRecipeMessage: '¿Eliminar "{{name}}" de tus recetas?',
+    recipeDeletedTitle: 'Receta eliminada',
+    recipeDeletedMessage: 'La receta se eliminó de tus recetas.',
+    recipeDeleteError: 'No se pudo eliminar esta receta.',
+    recipeEditUnavailableMessage: 'Esta receta no se puede editar desde tu cuenta.',
     recipeNowPublicMessage: 'Tu receta ahora es pública.',
     recipeNowPrivateMessage: 'Tu receta ahora es privada.',
     recipeVisibilityActionError: 'No se pudo cambiar la visibilidad de la receta.',
@@ -633,6 +656,122 @@ export default {
     yourWeight: 'Tu peso',
     bmiFormula: 'IMC = Peso (kg) / Altura² (m²)',
     formulaLabel: 'Fórmula:',
+    dataUsedLabel: 'Datos usados:',
+    formulaCunBaeLocalized:
+      'CUN-BAE = -44.988 + 0.503 * edad + 10.689 * factor mujer + 3.172 * IMC - 0.026 * IMC^2 + 0.181 * IMC * factor mujer - 0.02 * IMC * edad - 0.005 * IMC^2 * factor mujer + 0.00021 * IMC^2 * edad (factor mujer = {{femaleFactor}} porque tu perfil está configurado como {{sexLabel}})',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (altura / abdomen)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (altura / abdomen)',
+    formulaBaiLocalized: 'BAI = (cadera / alturaM^1.5) - 18',
+    formulaDeurenbergLocalized:
+      'Deurenberg = 1.20 * IMC + 0.23 * edad - 10.8 * factor hombre - 5.4 (factor hombre = {{maleFactor}})',
+    formulaLeeLocalized:
+      'SMM = 0.244 * peso + 7.8 * alturaM - 0.098 * edad + 6.6 * factor hombre - 3.3 (factor hombre = {{maleFactor}})',
+    formulaAlGindanMaleLocalized: 'SMM = 39.5 + 0.665 * peso - 0.185 * abdomen - 0.418 * cadera - 0.08 * edad',
+    formulaAlGindanFemaleLocalized: 'SMM = 2.89 + 0.255 * peso - 0.175 * cadera - 0.038 * edad + 0.118 * altura',
+    calcInputWeight: 'peso',
+    calcInputHeight: 'altura',
+    calcInputAge: 'edad',
+    calcInputSex: 'sexo',
+    calcInputStoredBodyFat: 'valor guardado de grasa corporal',
+    calcInputStoredMuscleMass: 'valor guardado de masa muscular',
+    storedCalculationUnknown:
+      'Valor guardado. El método original no se guarda, así que Alzan no intenta adivinar la fórmula.',
+    measuredCalculationNote:
+      'Valor importado o introducido directamente. Trátalo como una estimación de la fuente, no como una fórmula de Alzan.',
+    rfmPrecisionNote:
+      'Estimación antropométrica avanzada con abdomen y altura. Su precisión depende de que la medida de abdomen sea reciente y esté bien tomada.',
+    baiPrecisionNote:
+      'Estimación de confianza media con cadera y altura. Es útil si falta abdomen, pero menos fiable que RFM.',
+    basicBodyFatPrecisionNote: 'Estimación básica con IMC, edad y sexo porque faltan medidas corporales recientes.',
+    alGindanPrecisionNote:
+      'Estimación muscular antropométrica avanzada. Necesita abdomen y cadera recientes y sigue siendo una estimación, no una prueba clínica.',
+    basicMusclePrecisionNote:
+      'Estimación muscular básica con peso, altura, edad y sexo porque faltan abdomen y cadera recientes.',
+    bodyFatOptimalPrecisionTitle: 'Precisión óptima para grasa corporal:',
+    bodyFatOptimalPrecisionBody:
+      'Mantén tu abdomen actualizado; no necesitas cadera para mejorar este cálculo de grasa corporal.',
+    bodyFatImprovePrecisionBody:
+      'Añade abdomen para activar RFM, el método más preciso disponible en Alzan para grasa corporal.',
+    muscleOptimalPrecisionTitle: 'Precisión óptima para músculo estimado:',
+    muscleOptimalPrecisionBody:
+      'Mantén abdomen y cadera actualizados para conservar la mejor estimación muscular disponible en Alzan.',
+    muscleImprovePrecisionBody:
+      'Añade abdomen y cadera para activar Al-Gindan, la estimación muscular más precisa disponible en Alzan.',
+    trackingMeasurementsNote:
+      'Pecho, brazo y muslo sirven para ver cambios de perímetros y progreso visual, pero no se usan en esta estimación.',
+    remainderDescription:
+      'Resto es la parte de tu peso que no se estima como masa grasa ni como masa muscular esquelética.',
+    remainderFormula: 'Resto = peso total - masa grasa - masa muscular estimada',
+    remainderComponents:
+      'Incluye principalmente agua corporal, huesos/minerales, órganos, piel, tejido conectivo, sangre, glucógeno y el margen de error de las estimaciones.',
+    remainderClinicalNote:
+      'No es una métrica clínica aislada. Puede variar por hidratación, glucógeno, comida reciente y la precisión de las estimaciones de grasa y músculo.',
+    abdominalHealth: 'Salud abdominal',
+    waistToHeight: 'Abdomen/altura',
+    waistToHip: 'Abdomen/cadera',
+    recomposition: 'Recomposición',
+    status: 'Estado',
+    advancedMarkers: 'Marcadores avanzados',
+    bri: 'BRI',
+    absi: 'ABSI',
+    abdominalCategoryLow: 'Bajo',
+    abdominalCategoryVeryLow: 'Muy bajo',
+    abdominalCategoryHealthy: 'Zona saludable',
+    abdominalCategoryIncreased: 'Riesgo aumentado',
+    abdominalCategoryModerate: 'Riesgo moderado',
+    abdominalCategoryHigh: 'Riesgo alto',
+    waistToHeightDescription:
+      'El ratio abdomen/altura es un indicador sencillo de riesgo abdominal. Es útil porque compara tu abdomen con tu tamaño corporal.',
+    waistToHeightFormula: 'Abdomen/altura = abdomen en cm / altura en cm',
+    waistToHeightRule:
+      'Una referencia práctica es mantener el abdomen por debajo de la mitad de tu altura. Es un indicador, no un diagnóstico médico.',
+    waistToHeightSummary:
+      'Indica si tu abdomen está por debajo de la mitad de tu altura; más bajo suele reducir riesgo abdominal.',
+    waistToHipDescription:
+      'El ratio abdomen/cadera ayuda a leer la distribución de grasa y si el peso se concentra más en la zona abdominal.',
+    waistToHipFormula: 'Abdomen/cadera = abdomen en cm / cadera en cm',
+    waistToHipRule:
+      'La lectura usa rangos por sexo y conviene interpretarla junto con abdomen/altura y la tendencia de grasa corporal.',
+    waistToHipSummary:
+      'Indica cómo se distribuye el perímetro entre abdomen y cadera; más alto suele indicar más concentración abdominal.',
+    abdominalAdvancedDescription:
+      'BRI y ABSI son índices complementarios de forma corporal. Sirven como contexto, pero no son objetivos principales ni diagnósticos médicos.',
+    briExplanation: 'BRI es un índice experimental de forma abdominal basado en abdomen y altura.',
+    briDirection:
+      'Un BRI más alto suele indicar más redondez abdominal. Úsalo como contexto extra, no como objetivo principal.',
+    absiExplanation:
+      'ABSI compara cintura con IMC y altura para ver si la cintura es mayor de lo esperado para tu tamaño corporal.',
+    absiDirection:
+      'Un ABSI más alto sugiere una cintura mayor para el mismo tamaño corporal. Úsalo como señal complementaria de riesgo.',
+    missingAbdomenForAbdominal: 'Añade abdomen para calcular los marcadores de salud abdominal.',
+    missingHipForWaistHip: 'Añade cadera para calcular abdomen/cadera.',
+    recompositionDescription:
+      'La recomposición compara la tendencia reciente de abdomen, peso, pecho, brazo y muslo. Es una señal de progreso, no una fórmula médica.',
+    recompositionFormula: 'Tendencia = cambio de abdomen + cambio de peso + conservación de pecho/brazo/muslo',
+    recompositionNoMedicalFormula:
+      'Pecho, brazo y muslo ayudan a seguir cambios de perímetros y conservación muscular relativa, pero no recalculan grasa ni músculo.',
+    pdfAbdominalHealthSection: 'Salud abdominal',
+    pdfAbdominalHealthHint:
+      'Estos ratios ayudan a entender el riesgo abdominal y la distribución de grasa. Son indicadores, no diagnósticos.',
+    pdfAbdominalMetricPurpose: 'Para qué sirve',
+    recompositionPositive: 'Recomposición positiva',
+    recompositionPositiveAdvice: 'El abdomen baja mientras los perímetros clave se mantienen. Mantén el ritmo actual.',
+    recompositionCorrect: 'Progreso correcto',
+    recompositionCorrectAdvice: 'Peso y abdomen bajan. Vigila fuerza y perímetros para evitar un déficit excesivo.',
+    recompositionMuscleLossRisk: 'Posible pérdida muscular',
+    recompositionMuscleLossRiskAdvice:
+      'El peso bajó mientras pecho, brazo o muslo cayeron bastante. Revisa déficit, proteína y rendimiento de fuerza.',
+    recompositionAbdomenIncreased: 'Abdomen en aumento',
+    recompositionAbdomenIncreasedAdvice:
+      'El abdomen sube. Revisa ingesta reciente, estrés, sueño y consistencia al medir.',
+    recompositionNeutral: 'Tendencia estable',
+    recompositionNeutralAdvice:
+      'Los cambios son pequeños. Sigue midiendo en condiciones parecidas para aclarar la tendencia.',
+    recompositionInsufficient: 'Necesita mediciones previas',
+    recompositionNeedPrevious:
+      'Registra otro día con abdomen e idealmente pecho, brazo y muslo para calcular recomposición.',
+    currentTrend: 'Tendencia actual',
+    dataCompared: 'Datos comparados:',
     autoCompCalcDisclaimer:
       'Los datos de composición corporal se calculan automáticamente al registrar el peso. Se recomienda añadir primero las medidas corporales para un cálculo más exacto.',
     addFirstSleepRecord: 'Toca + para añadir tu primera noche',
@@ -1128,7 +1267,7 @@ export default {
     healthConsent: 'Consentimiento de Salud',
     termsConditions: 'Términos y Condiciones',
     preferNotToSay: 'Prefiero no decir',
-    male: 'male',
+    male: 'Hombre',
     yourName: 'Tu nombre',
     athleteDesc: 'Competitivo, dobles sesiones (+7 sesiones/semana).',
     proAthlete: 'Atleta / Alto Rendimiento',
@@ -1259,7 +1398,7 @@ export default {
     irreversibleActionWarning: 'No hay vuelta atrás. ¿Realmente quieres borrar todo?',
     lastWarning: 'Última advertencia',
     accountDeletionImmediateEffect: 'Tu cuenta dejará de existir inmediatamente después de confirmar.',
-    genderFemale: 'female',
+    genderFemale: 'Mujer',
     genderMale: 'Hombre',
     genderFemaleAlt: 'Mujer',
     genderPrivate: 'Prefiero no decirlo',
@@ -1282,7 +1421,12 @@ export default {
     completeSetInstruction: 'Pulsa el check para completar la serie.',
     onlyCompletedSetsSavedInstruction: 'Solo se guardan las series marcadas como completadas.',
     supersetInstruction: 'Pulse el infinito entre dos ejercicios para vincularlos como una superserie.',
-    warmupSetInstruction: 'Toca el número de set para marcar o desmarcar como calentamiento (W).',
+    warmupSetInstruction: 'Toca el número de set para alternar normal, calentamiento (W) y drop set (D).',
+    dropSetInstruction:
+      'Drop set (D): al llegar a las reps objetivo o al fallo, baja el peso y continúa con poco o ningún descanso. En plantillas, toca Drop set para aplicarlo a la última serie o a todas.',
+    dropSet: 'Drop set',
+    dropSetLast: 'Última',
+    dropSetAll: 'Todas',
     repsOrTimeGoal: 'El objetivo de repeticiones o tiempo.',
     repsColon: 'Reps',
     weightLiftedLabel: 'Carga levantada en este ejercicio.',
@@ -2247,6 +2391,8 @@ export default {
     saveSessionError: 'No se pudo guardar la sesión.',
     loadRoutineError: 'No se pudo cargar la rutina.',
     startSessionError: 'No se pudo iniciar la sesión',
+    activeGymSessionTitle: 'Entreno ya iniciado',
+    activeGymSessionMessage: 'Ya tienes un entreno de gym en curso. Finalízalo antes de empezar otro.',
     updateDateError: 'No se pudo actualizar la fecha',
     newWorkout: 'Nuevo Entrenamiento',
     saving: 'Guardando...',

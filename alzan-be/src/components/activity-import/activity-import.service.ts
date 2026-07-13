@@ -28,6 +28,7 @@ import {
   RouteImportDetails,
   RouteImportLap,
 } from './parsers/route-import.parser';
+import { buildDistanceSplitBucketsFromLaps, isOneKilometerAutoLapSequence } from './parsers/lap-split-utils';
 
 type ActivitySessionUpdate = Database['public']['Tables']['activity_sessions']['Update'];
 type ActivityStreamInsert = Database['public']['Tables']['activity_streams']['Insert'];
@@ -384,7 +385,7 @@ export class ActivityImportService {
         split_group_order: tabIndex,
         split_distance_m: tab.splitDistanceM != null ? Math.round(tab.splitDistanceM) : null,
         distance_m: lap.distanceM,
-        duration_s: lap.durationSeconds != null ? Math.round(lap.durationSeconds) : null,
+        duration_s: lap.durationSeconds,
         avg_heart_rate: lap.avgHeartRate != null ? Math.round(lap.avgHeartRate) : null,
         max_heart_rate: lap.maxHeartRate != null ? Math.round(lap.maxHeartRate) : null,
         avg_pace_s_per_km: lap.avgPaceSecondsPerKm != null ? Math.round(lap.avgPaceSecondsPerKm) : null,
@@ -401,13 +402,20 @@ export class ActivityImportService {
   }> {
     const tabs: Array<{ splitGroup: 'custom' | 'distance'; splitDistanceM: number | null; laps: RouteImportLap[] }> =
       [];
-    const distanceBuckets = details.distanceSplits
+    const nativeDistanceBuckets = buildDistanceSplitBucketsFromLaps(details.customSplits);
+    const distanceBuckets = [
+      ...nativeDistanceBuckets,
+      ...details.distanceSplits.filter(
+        bucket => !nativeDistanceBuckets.some(nativeBucket => nativeBucket.splitDistanceM === bucket.splitDistanceM),
+      ),
+    ]
       .filter(bucket => bucket.laps.length > 0)
       .sort((left, right) => left.splitDistanceM - right.splitDistanceM);
     const customSplits = details.customSplits;
     const customDuplicatesDistanceBucket =
       customSplits.length > 0 && distanceBuckets.some(bucket => this.areEquivalentLaps(customSplits, bucket.laps));
-    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket;
+    const shouldShowCustom =
+      customSplits.length > 0 && !customDuplicatesDistanceBucket && !isOneKilometerAutoLapSequence(customSplits);
 
     if (shouldShowCustom) {
       tabs.push({ splitGroup: 'custom', splitDistanceM: null, laps: customSplits });

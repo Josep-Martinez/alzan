@@ -4,7 +4,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { ChevronLeft, Search, Star, Plus, Info, Flame } from 'lucide-react-native';
+import { ChevronLeft, Search, Star, Plus, Info, Flame, Pencil, Trash2 } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -15,19 +15,25 @@ import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../ty
 import { TranslationKey } from '../../i18n/locales/en';
 import { MealType } from '../../types/requests.types';
 import { MealComponent } from '../../modules/nutrition/types/ingredients';
+import { normalizeInput } from '../../services/ingredientsService';
 import { RecipeDetailModal } from '../../modules/nutrition/components/RecipeDetailModal';
 import { FilterDropdown } from '../../modules/nutrition/components/FilterDropdown';
 import { MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
 import { usePreferences } from '../../hooks/settings/usePreferences';
+import { Alert } from '../../components/common/Alert';
 import {
   getDiscoverRecipes,
   getFavoriteRecipeIds,
   getFavoriteRecipes,
   getMySavedRecipes,
+  getRecipePersonalUsageSummaries,
   isRecipeRising,
+  recipeMatchesCategory,
+  softDeleteOwnRecipe,
   toggleFavoriteRecipe,
   DiscoverSort,
   DiscoverCategory,
+  PersonalRecipeSort,
 } from '../../modules/nutrition/services/recipeLibraryService';
 import {
   formatNutritionDayDate,
@@ -53,6 +59,18 @@ const DISCOVER_CATEGORIES: { key: DiscoverCategory; labelKey: TranslationKey }[]
   { key: 'high_carb', labelKey: 'nutrition.discoverCategoryCarbs' },
 ];
 
+const PERSONAL_SORTS: { key: PersonalRecipeSort; labelKey: TranslationKey }[] = [
+  { key: 'recently_used', labelKey: 'nutrition.recipeSortRecentlyUsed' },
+  { key: 'most_used', labelKey: 'nutrition.recipeSortMostUsed' },
+  { key: 'alphabetical', labelKey: 'nutrition.recipeSortAlphabetical' },
+];
+
+const getTimeValue = (value: string | null | undefined): number => {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 export const RecipeLibraryScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -77,10 +95,12 @@ export const RecipeLibraryScreen = () => {
   const [discoverTotal, setDiscoverTotal] = useState(0);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('recommended');
-  const [discoverCategory, setDiscoverCategory] = useState<DiscoverCategory>('all');
+  const [personalSort, setPersonalSort] = useState<PersonalRecipeSort>('recently_used');
+  const [recipeCategory, setRecipeCategory] = useState<DiscoverCategory>('all');
 
   const [detailRecipe, setDetailRecipe] = useState<MealComponent | null>(null);
   const [pendingMealRecipe, setPendingMealRecipe] = useState<MealComponent | null>(null);
+  const [deletingRecipeId, setDeletingRecipeId] = useState<string | null>(null);
 
   const enabledMeals = preferences?.nutrition_prefs?.enabled_meals;
   const selectableMealTypes = useMemo(() => {
@@ -122,7 +142,7 @@ export const RecipeLibraryScreen = () => {
           page,
           pageSize: DISCOVER_PAGE_SIZE,
           sort: discoverSort,
-          category: discoverCategory,
+          category: recipeCategory,
         });
         setDiscoverTotal(total);
         setDiscover(prev => (replace ? recipes : [...prev, ...recipes]));
@@ -133,7 +153,7 @@ export const RecipeLibraryScreen = () => {
         setDiscoverLoading(false);
       }
     },
-    [debouncedQuery, discoverSort, discoverCategory],
+    [debouncedQuery, discoverSort, recipeCategory],
   );
 
   useEffect(() => {
@@ -182,8 +202,114 @@ export const RecipeLibraryScreen = () => {
     openRecipeInMealLog(recipe, mealType);
   };
 
-  const listData =
-    tab === 'discover' ? discover : tab === 'mine' ? (mineQuery.data ?? []) : (favoritesQuery.data ?? []);
+  const invalidateRecipeLists = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['myRecipes'] }),
+      queryClient.invalidateQueries({ queryKey: ['recipeFavoriteIds'] }),
+      queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] }),
+    ]);
+  };
+
+  const handleEditRecipe = (recipe: MealComponent) => {
+    if (!recipe.external_id) return;
+    setDetailRecipe(null);
+    navigation.navigate('MealLogForm', {
+      date: targetDate,
+      editRecipeId: recipe.external_id,
+      recipeEditorOnly: true,
+    });
+  };
+
+  const deleteRecipe = async (recipe: MealComponent) => {
+    if (!user?.id || !recipe.external_id) return;
+
+    setDeletingRecipeId(recipe.external_id);
+    try {
+      const result = await softDeleteOwnRecipe(recipe.external_id, user.id);
+      if (!result.success) {
+        Alert.alert(t('common.error'), t('nutrition.recipeDeleteError'));
+        return;
+      }
+
+      queryClient.setQueryData<MealComponent[]>(['myRecipes', user.id], previous =>
+        previous?.filter(item => item.external_id !== recipe.external_id),
+      );
+      queryClient.setQueryData<MealComponent[]>(['recipeFavorites', favoriteIds], previous =>
+        previous?.filter(item => item.external_id !== recipe.external_id),
+      );
+      setDiscover(prev => prev.filter(item => item.external_id !== recipe.external_id));
+      setDetailRecipe(current => (current?.external_id === recipe.external_id ? null : current));
+      await invalidateRecipeLists();
+      Alert.alert(t('nutrition.recipeDeletedTitle'), t('nutrition.recipeDeletedMessage'));
+    } finally {
+      setDeletingRecipeId(null);
+    }
+  };
+
+  const handleDeleteRecipe = (recipe: MealComponent) => {
+    Alert.alert(t('nutrition.deleteRecipeTitle'), t('nutrition.deleteRecipeMessage', { name: recipe.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          void deleteRecipe(recipe);
+        },
+      },
+    ]);
+  };
+
+  const personalRecipes =
+    tab === 'mine' ? (mineQuery.data ?? []) : tab === 'favorites' ? (favoritesQuery.data ?? []) : [];
+
+  const personalRecipeIds = useMemo(
+    () => personalRecipes.map(recipe => recipe.external_id).filter((id): id is string => Boolean(id)),
+    [personalRecipes],
+  );
+
+  const personalUsageQuery = useQuery({
+    queryKey: ['recipePersonalUsageSummaries', user?.id, personalRecipeIds],
+    queryFn: () => getRecipePersonalUsageSummaries(personalRecipeIds),
+    enabled: !!user && tab !== 'discover' && personalRecipeIds.length > 0,
+  });
+
+  const personalUsageById = useMemo(() => {
+    return new Map((personalUsageQuery.data ?? []).map(summary => [summary.recipeId, summary]));
+  }, [personalUsageQuery.data]);
+
+  const filteredPersonalRecipes = useMemo(() => {
+    if (tab === 'discover') return [];
+
+    const normalizedQuery = normalizeInput(debouncedQuery);
+    const searchedRecipes =
+      normalizedQuery.length > 0
+        ? personalRecipes.filter(recipe => normalizeInput(recipe.name).includes(normalizedQuery))
+        : personalRecipes;
+    const categorizedRecipes = searchedRecipes.filter(recipe => recipeMatchesCategory(recipe, recipeCategory));
+
+    return [...categorizedRecipes].sort((a, b) => {
+      const aUsage = a.external_id ? personalUsageById.get(a.external_id) : undefined;
+      const bUsage = b.external_id ? personalUsageById.get(b.external_id) : undefined;
+
+      if (personalSort === 'alphabetical') {
+        return a.name.localeCompare(b.name);
+      }
+
+      if (personalSort === 'most_used') {
+        const aUses = (aUsage?.useCount ?? 0) || (a.recipe_uses_total ?? 0);
+        const bUses = (bUsage?.useCount ?? 0) || (b.recipe_uses_total ?? 0);
+        if (bUses !== aUses) return bUses - aUses;
+      } else {
+        const aRecent = getTimeValue(aUsage?.lastUsedAt) || getTimeValue(a.recipe_updated_at);
+        const bRecent = getTimeValue(bUsage?.lastUsedAt) || getTimeValue(b.recipe_updated_at);
+        if (bRecent !== aRecent) return bRecent - aRecent;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [debouncedQuery, personalRecipes, personalSort, personalUsageById, recipeCategory, tab]);
+
+  const listData = tab === 'discover' ? discover : filteredPersonalRecipes;
   const isListLoading =
     tab === 'discover'
       ? discoverLoading && discover.length === 0
@@ -195,6 +321,8 @@ export const RecipeLibraryScreen = () => {
   const renderCard = ({ item }: { item: MealComponent }) => {
     const isFav = item.external_id ? favoriteIds.includes(item.external_id) : false;
     const rising = tab === 'discover' && isRecipeRising(item);
+    const canManageRecipe = tab === 'mine' && item.recipe_source === 'user' && item.recipe_owner_user_id === user?.id;
+    const isDeleting = deletingRecipeId === item.external_id;
     return (
       <View style={[styles.card, dynamicStyles.card, { backgroundColor: isDark ? themeColors.surfaceSolid : '#FFF' }]}>
         <View style={styles.cardTopRow}>
@@ -241,14 +369,57 @@ export const RecipeLibraryScreen = () => {
           })}
         </Text>
 
-        <TouchableOpacity
-          style={[styles.useButton, { backgroundColor: themeColors.primary }]}
-          onPress={() => handleUse(item)}
-          activeOpacity={0.85}
-        >
-          <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
-          <Text style={styles.useButtonText}>{t('nutrition.recipeUse')}</Text>
-        </TouchableOpacity>
+        {canManageRecipe ? (
+          <View style={styles.cardActionRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
+              onPress={() => handleUse(item)}
+              activeOpacity={0.85}
+            >
+              <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
+              <Text style={styles.actionButtonText}>{t('nutrition.recipeUse')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.iconActionButton,
+                { borderColor: themeColors.primary + '55', backgroundColor: themeColors.primary + '12' },
+              ]}
+              onPress={() => handleEditRecipe(item)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.editRecipeAction')}
+            >
+              <Pencil size={17} color={themeColors.primary} strokeWidth={2.4} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.iconActionButton,
+                { borderColor: themeColors.danger + '55', backgroundColor: themeColors.danger + '12' },
+                isDeleting && { opacity: 0.5 },
+              ]}
+              onPress={() => handleDeleteRecipe(item)}
+              activeOpacity={0.85}
+              disabled={isDeleting}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.deleteRecipeAction')}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color={themeColors.danger} />
+              ) : (
+                <Trash2 size={17} color={themeColors.danger} strokeWidth={2.4} />
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.useButton, { backgroundColor: themeColors.primary }]}
+            onPress={() => handleUse(item)}
+            activeOpacity={0.85}
+          >
+            <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
+            <Text style={styles.useButtonText}>{t('nutrition.recipeUse')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -293,33 +464,37 @@ export const RecipeLibraryScreen = () => {
           })}
         </View>
 
-        {tab === 'discover' && (
-          <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF' }]}>
-            <Search size={18} color={themeColors.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: themeColors.textPrimary }]}
-              placeholder={t('nutrition.recipeLibrarySearchPlaceholder')}
-              placeholderTextColor={themeColors.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-            />
-          </View>
-        )}
+        <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF' }]}>
+          <Search size={18} color={themeColors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: themeColors.textPrimary }]}
+            placeholder={t('nutrition.recipeLibrarySearchPlaceholder')}
+            placeholderTextColor={themeColors.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+          />
+        </View>
 
-        {tab === 'discover' && (
-          <View style={styles.filtersRow}>
+        <View style={styles.filtersRow}>
+          {tab === 'discover' ? (
             <FilterDropdown
               value={discoverSort}
               options={DISCOVER_SORTS.map(option => ({ key: option.key, label: t(option.labelKey) }))}
               onChange={setDiscoverSort}
             />
+          ) : (
             <FilterDropdown
-              value={discoverCategory}
-              options={DISCOVER_CATEGORIES.map(option => ({ key: option.key, label: t(option.labelKey) }))}
-              onChange={setDiscoverCategory}
+              value={personalSort}
+              options={PERSONAL_SORTS.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+              onChange={setPersonalSort}
             />
-          </View>
-        )}
+          )}
+          <FilterDropdown
+            value={recipeCategory}
+            options={DISCOVER_CATEGORIES.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+            onChange={setRecipeCategory}
+          />
+        </View>
 
         {isListLoading ? (
           <View style={styles.centerState}>
@@ -365,6 +540,17 @@ export const RecipeLibraryScreen = () => {
           visible={detailRecipe !== null}
           onClose={() => setDetailRecipe(null)}
           onUse={handleUse}
+          onEdit={
+            detailRecipe?.recipe_source === 'user' && detailRecipe.recipe_owner_user_id === user?.id
+              ? handleEditRecipe
+              : undefined
+          }
+          onDelete={
+            detailRecipe?.recipe_source === 'user' && detailRecipe.recipe_owner_user_id === user?.id
+              ? handleDeleteRecipe
+              : undefined
+          }
+          isDeleting={deletingRecipeId === detailRecipe?.external_id}
         />
 
         <Modal
@@ -477,6 +663,31 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
   },
   useButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  cardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.m,
+  },
+  actionButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  iconActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   centerState: { paddingTop: 60, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 14 },
   loadMore: {

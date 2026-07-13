@@ -62,10 +62,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
+import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.helper';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
 const HYROX_SPORT_TYPE = 'hyrox' as ActivitySession['sport_type'];
+const SPLIT_DISTANCE_TOLERANCE_M = 10;
 const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
   VOLLEYBALL_SPORT_TYPE,
   TRAIL_SPORT_TYPE,
@@ -74,6 +76,137 @@ const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
   'golf',
   HYROX_SPORT_TYPE,
 ]);
+
+function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
+  if (laps.length === 0) return false;
+
+  return laps.every((lap, index) => {
+    if (lap.distance_m == null || !Number.isFinite(lap.distance_m) || lap.distance_m <= 0) return false;
+    const isLast = index === laps.length - 1;
+    const fullLap = Math.abs(lap.distance_m - 1000) <= SPLIT_DISTANCE_TOLERANCE_M;
+    const partialFinalLap = isLast && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
+
+    return fullLap || partialFinalLap;
+  });
+}
+
+function buildDistanceSplitTargets(totalDistanceM: number): number[] {
+  if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
+
+  const targets = new Set<number>([1000]);
+  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
+
+  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
+    targets.add(target);
+  }
+
+  return Array.from(targets).sort((left, right) => left - right);
+}
+
+function buildDistanceSessionLapBuckets(laps: SessionLap[]): Array<{ splitDistanceM: number; laps: SessionLap[] }> {
+  if (!isOneKilometerSessionLapSequence(laps)) return [];
+
+  const totalDistanceM = laps.reduce((sum, lap) => sum + (lap.distance_m ?? 0), 0);
+
+  return buildDistanceSplitTargets(totalDistanceM)
+    .map(splitDistanceM => ({
+      splitDistanceM,
+      laps: buildAggregatedSessionLaps(laps, splitDistanceM),
+    }))
+    .filter(bucket => bucket.laps.length > 0);
+}
+
+function buildAggregatedSessionLaps(laps: SessionLap[], splitDistanceM: number): SessionLap[] {
+  if (splitDistanceM <= 1000) {
+    return laps.map((lap, index) => ({
+      ...lap,
+      id: `${lap.id}-distance-1000`,
+      lap_index: index + 1,
+      split_group: 'distance',
+      split_group_order: 0,
+      split_distance_m: 1000,
+      lap_type: 'distance',
+    }));
+  }
+
+  const aggregated: SessionLap[] = [];
+  let current: SessionLap[] = [];
+  let currentDistanceM = 0;
+
+  const flushCurrent = () => {
+    if (current.length === 0 || currentDistanceM <= 0) return;
+    const first = current[0];
+    const last = current[current.length - 1];
+    const durationSeconds = sumSessionLapValues(current.map(lap => lap.duration_s));
+
+    aggregated.push({
+      ...first,
+      id: `${first.id}-distance-${splitDistanceM}-${aggregated.length + 1}`,
+      lap_index: aggregated.length + 1,
+      split_group: 'distance',
+      split_group_order: 0,
+      split_distance_m: splitDistanceM,
+      distance_m: currentDistanceM,
+      duration_s: durationSeconds,
+      avg_pace_s_per_km:
+        durationSeconds != null && currentDistanceM > 0 ? durationSeconds / (currentDistanceM / 1000) : null,
+      avg_heart_rate: weightedSessionLapAverage(current, lap => lap.avg_heart_rate),
+      max_heart_rate: maxSessionLapValue(current.map(lap => lap.max_heart_rate)),
+      start_offset_s: first.start_offset_s,
+      end_offset_s: last.end_offset_s,
+    });
+
+    current = [];
+    currentDistanceM = 0;
+  };
+
+  for (const lap of laps) {
+    current.push(lap);
+    currentDistanceM += lap.distance_m ?? 0;
+
+    if (currentDistanceM >= splitDistanceM - SPLIT_DISTANCE_TOLERANCE_M) {
+      flushCurrent();
+    }
+  }
+
+  flushCurrent();
+
+  return aggregated;
+}
+
+function sumSessionLapValues(values: Array<number | null>): number | null {
+  let total = 0;
+  let hasValue = false;
+
+  for (const value of values) {
+    if (value == null || !Number.isFinite(value)) continue;
+    total += value;
+    hasValue = true;
+  }
+
+  return hasValue ? total : null;
+}
+
+function maxSessionLapValue(values: Array<number | null>): number | null {
+  const safeValues = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (safeValues.length === 0) return null;
+  return Math.max(...safeValues);
+}
+
+function weightedSessionLapAverage(laps: SessionLap[], getValue: (lap: SessionLap) => number | null): number | null {
+  let weightedTotal = 0;
+  let totalWeight = 0;
+
+  for (const lap of laps) {
+    const value = getValue(lap);
+    const weight = lap.duration_s ?? lap.distance_m ?? 0;
+    if (value == null || !Number.isFinite(value) || weight <= 0) continue;
+    weightedTotal += value * weight;
+    totalWeight += weight;
+  }
+
+  return totalWeight > 0 ? weightedTotal / totalWeight : null;
+}
 
 const createPendingDetailSession = (sessionId?: string): ActivitySession =>
   ({
@@ -273,19 +406,51 @@ export const EnduranceSessionDetailScreen = () => {
       });
     });
 
-    return Array.from(grouped.entries())
-      .sort((left, right) => {
-        const leftGroup = left[1];
-        const rightGroup = right[1];
+    const groups = Array.from(grouped.entries()).map(([groupKey, group]) => ({ ...group, key: groupKey }));
+    const derivedDistanceGroups = groups
+      .filter(group => group.splitGroup === 'custom' && isOneKilometerSessionLapSequence(group.laps))
+      .flatMap(group =>
+        buildDistanceSessionLapBuckets([...group.laps].sort((left, right) => left.lap_index - right.lap_index)).map(
+          bucket => ({
+            key: `derived-distance-${bucket.splitDistanceM}`,
+            splitGroup: 'distance' as const,
+            splitDistanceM: bucket.splitDistanceM,
+            splitGroupOrder: 0,
+            laps: bucket.laps,
+          }),
+        ),
+      );
+    const groupsWithDerivedDistance = [
+      ...derivedDistanceGroups,
+      ...groups.filter(group => {
+        const customIsOneKilometer = group.splitGroup === 'custom' && isOneKilometerSessionLapSequence(group.laps);
+        const duplicatedByDerivedDistance =
+          group.splitGroup === 'distance' &&
+          group.splitDistanceM != null &&
+          derivedDistanceGroups.some(derivedGroup => derivedGroup.splitDistanceM === group.splitDistanceM);
 
-        if (leftGroup.splitGroupOrder !== rightGroup.splitGroupOrder) {
-          return leftGroup.splitGroupOrder - rightGroup.splitGroupOrder;
+        return !customIsOneKilometer && !duplicatedByDerivedDistance;
+      }),
+    ];
+
+    return groupsWithDerivedDistance
+      .sort((left, right) => {
+        if (left.splitGroup !== right.splitGroup) {
+          return left.splitGroup === 'distance' ? -1 : 1;
         }
 
-        return (leftGroup.splitDistanceM ?? 0) - (rightGroup.splitDistanceM ?? 0);
+        if (left.splitGroup === 'distance' && right.splitGroup === 'distance') {
+          return (left.splitDistanceM ?? 0) - (right.splitDistanceM ?? 0);
+        }
+
+        if (left.splitGroupOrder !== right.splitGroupOrder) {
+          return left.splitGroupOrder - right.splitGroupOrder;
+        }
+
+        return (left.splitDistanceM ?? 0) - (right.splitDistanceM ?? 0);
       })
-      .map(([groupKey, group]) => ({
-        key: groupKey,
+      .map(group => ({
+        key: group.key,
         label:
           group.splitGroup === 'distance' && group.splitDistanceM != null && group.splitDistanceM > 0
             ? formatSplitDistanceBucketLabel(group.splitDistanceM)
@@ -315,6 +480,10 @@ export const EnduranceSessionDetailScreen = () => {
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
   const fastestPace = activeSplitPaceValues.length > 0 ? Math.min(...activeSplitPaceValues) : null;
   const slowestPace = activeSplitPaceValues.length > 0 ? Math.max(...activeSplitPaceValues) : null;
+  const maxHeartRateZoneDuration = useMemo(
+    () => heartRateZones?.reduce((max, zone) => Math.max(max, zone.duration_s), 0) ?? 0,
+    [heartRateZones],
+  );
 
   const resolvePaceCellBackground = useCallback(
     (lap: SessionLap) => {
@@ -370,6 +539,7 @@ export const EnduranceSessionDetailScreen = () => {
   const formatSplitDistance = useCallback(
     (distanceM: number | null) => {
       if (distanceM == null || distanceM <= 0) return '-';
+      if (distanceM < 1000) return `${Math.round(distanceM)} m`;
       const convertedDistance = convertDistanceToUi(distanceM, 2);
       const numericValue = Number(convertedDistance.value);
       const decimals = numericValue >= 10 ? 1 : 2;
@@ -1672,66 +1842,85 @@ export const EnduranceSessionDetailScreen = () => {
                           </Text>
                           <View style={{ width: 30 }} />
                         </View>
-                        {group.sets.map(set => (
-                          <View
-                            key={set.id}
-                            style={[
-                              styles.setRow,
-                              set.is_warmup && {
-                                backgroundColor: `${themeColors.warning}12`,
-                                borderRadius: 10,
-                              },
-                              { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-                            ]}
-                          >
-                            <View style={styles.setIndexCell}>
-                              <Text
-                                style={[
-                                  styles.setNumber,
-                                  dynamicStyles.sublabel,
-                                  set.is_warmup && { color: themeColors.warning, fontWeight: '700' },
-                                ]}
-                              >
-                                {set.set_number}
-                              </Text>
-                              {set.is_warmup && (
-                                <View
+                        {group.sets.map(set => {
+                          const isDropSet = set.set_type === 'drop_set';
+                          return (
+                            <View
+                              key={set.id}
+                              style={[
+                                styles.setRow,
+                                set.is_warmup && {
+                                  backgroundColor: `${themeColors.warning}12`,
+                                  borderRadius: 10,
+                                },
+                                isDropSet && {
+                                  backgroundColor: 'rgba(88,86,214,0.1)',
+                                  borderRadius: 10,
+                                },
+                                { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                              ]}
+                            >
+                              <View style={styles.setIndexCell}>
+                                <Text
                                   style={[
-                                    styles.warmupSetBadge,
-                                    {
-                                      backgroundColor: `${themeColors.warning}1F`,
-                                      borderColor: `${themeColors.warning}55`,
-                                    },
+                                    styles.setNumber,
+                                    dynamicStyles.sublabel,
+                                    set.is_warmup && { color: themeColors.warning, fontWeight: '700' },
+                                    isDropSet && { color: '#5856D6', fontWeight: '700' },
                                   ]}
                                 >
-                                  <Text style={[styles.warmupSetBadgeText, { color: themeColors.warning }]}>W</Text>
-                                </View>
-                              )}
+                                  {set.set_number}
+                                </Text>
+                                {(set.is_warmup || isDropSet) && (
+                                  <View
+                                    style={[
+                                      styles.warmupSetBadge,
+                                      {
+                                        backgroundColor: set.is_warmup
+                                          ? `${themeColors.warning}1F`
+                                          : 'rgba(88,86,214,0.12)',
+                                        borderColor: set.is_warmup
+                                          ? `${themeColors.warning}55`
+                                          : 'rgba(88,86,214,0.35)',
+                                      },
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.warmupSetBadgeText,
+                                        { color: set.is_warmup ? themeColors.warning : '#5856D6' },
+                                      ]}
+                                    >
+                                      {set.is_warmup ? 'W' : 'D'}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>{set.reps}</Text>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={[styles.setCellValue, dynamicStyles.title]}>
+                                  {toDisplayWeight(set.weight_kg)}
+                                </Text>
+                                {set.is_pr && (
+                                  <View style={styles.prBadge}>
+                                    <Award size={10} color="#FF9500" />
+                                  </View>
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.editSetButton}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                onPress={() => {
+                                  setEditingSet(set);
+                                  setEditReps(String(set.reps));
+                                  setEditWeight(String(toDisplayWeight(set.weight_kg)));
+                                }}
+                              >
+                                <Pencil size={13} color={themeColors.textSecondary} />
+                              </TouchableOpacity>
                             </View>
-                            <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>{set.reps}</Text>
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={[styles.setCellValue, dynamicStyles.title]}>
-                                {toDisplayWeight(set.weight_kg)}
-                              </Text>
-                              {set.is_pr && (
-                                <View style={styles.prBadge}>
-                                  <Award size={10} color="#FF9500" />
-                                </View>
-                              )}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.editSetButton}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              onPress={() => {
-                                setEditingSet(set);
-                                setEditReps(String(set.reps));
-                                setEditWeight(String(toDisplayWeight(set.weight_kg)));
-                              }}
-                            >
-                              <Pencil size={13} color={themeColors.textSecondary} />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     </GlassCard>
 
@@ -1811,7 +2000,7 @@ export const EnduranceSessionDetailScreen = () => {
                         style={[
                           styles.zoneFill,
                           {
-                            width: `${Math.max(0, Math.min(100, zone.percentage))}%`,
+                            width: `${getHeartRateZoneFillPercentage(zone.duration_s, maxHeartRateZoneDuration)}%`,
                             backgroundColor: resolveZoneColor(zone.zone),
                           },
                         ]}
