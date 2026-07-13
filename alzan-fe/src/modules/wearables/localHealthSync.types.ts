@@ -86,5 +86,7 @@ export type LocalHealthSyncResult = {
 export type CloudProviderSyncResult = {
   provider: WearableProviderKey;
   activities_imported: number;
+  activities_skipped?: number;
+  activities_reconciled?: number;
   last_success_at: string;
 };

@@ -41,6 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { moveWorkoutPlan } from '../../modules/training/services/trainingRescheduleService';
+import { ActivityImportReview } from '../../openapi/generated/alzan-be/sdk.gen';
 
 interface DailyEntry {
   id: string;
@@ -76,6 +77,7 @@ interface CompletedSession {
   sport_type: string;
   sport_subtype?: string | null;
   workout_template_id: string | null;
+  endurance_template_id: string | null;
   start_time: string;
   name: string;
   source: string;
@@ -161,6 +163,44 @@ export const TrainingHomeScreen = () => {
     onError: error => {
       console.error('Error moving planned workout:', error);
       Alert.alert(t('common.error'), t('training.moveWorkoutError'));
+    },
+  });
+
+  const associateCompletedSessionMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      enduranceTemplateId,
+    }: {
+      sessionId: string;
+      enduranceTemplateId: string;
+    }): Promise<string> => {
+      const { data } = await ActivityImportReview.associateTemplate({
+        path: { id: sessionId },
+        body: {
+          endurance_template_id: enduranceTemplateId,
+          workout_template_id: null,
+        },
+      });
+      if (!data?.session_id) throw new Error('IMPORT_REVIEW_ACTION_FAILED');
+      return data.session_id;
+    },
+    onSuccess: nextSessionId => {
+      setPreviewPlan(null);
+      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['homeSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
+      queryClient.invalidateQueries({ queryKey: ['importReviewAssociatedTemplate'] });
+      queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['activitySession', nextSessionId] });
+    },
+    onError: error => {
+      console.error('Error associating completed workout:', error);
+      Alert.alert(t('common.error'), t('training.associateCompletedWorkoutError'));
     },
   });
 
@@ -508,7 +548,9 @@ export const TrainingHomeScreen = () => {
 
       const { data, error } = await supabase
         .from('activity_sessions')
-        .select('id, sport_type, sport_subtype, workout_template_id, start_time, name, source, distance_m, duration_s')
+        .select(
+          'id, sport_type, sport_subtype, workout_template_id, endurance_template_id, start_time, name, source, distance_m, duration_s',
+        )
         .eq('user_id', user.id)
         .eq('needs_strength_review', false)
         .or(
@@ -532,22 +574,27 @@ export const TrainingHomeScreen = () => {
 
     // Track matched sessions to avoid duplication
     const matchedSessionIds = new Set<string>();
+    const linkedSessionIds = new Set(
+      plans.map(plan => plan.activity_session_id).filter((value): value is string => Boolean(value)),
+    );
 
-    // 1. Iterate plans to find matches (logic mirrors rendering matching)
+    // 1. Iterate plans to find matches. Explicit DB links win before legacy fallbacks.
     plans.forEach(plan => {
       const template = plan.workout_templates || plan.endurance_workout_templates;
       const isGym = !!plan.gym_template_id;
+      const planTemplateId = isGym ? plan.gym_template_id || template?.id : plan.endurance_template_id || template?.id;
 
       const match = sessions.find((s: CompletedSession) => {
+        if (plan.activity_session_id && s.id === plan.activity_session_id) return true;
         if (isGym) {
-          // Match by template ID or Name+Type for Gym
+          // Match by template ID or Name+Type for older gym sessions.
           return (
-            s.workout_template_id === template?.id || (s.name === template?.base_name && s.sport_type === 'strength')
+            s.workout_template_id === planTemplateId || (s.name === template?.base_name && s.sport_type === 'strength')
           );
-        } else {
-          // Match by Name+Type for Endurance
-          return s.sport_type === template?.sport_type && s.name === template?.base_name;
         }
+        if (s.endurance_template_id && s.endurance_template_id === planTemplateId) return true;
+        // Legacy fallback for imports created before template/session links existed.
+        return s.sport_type === template?.sport_type && s.name === template?.base_name;
       });
 
       if (match) {
@@ -557,7 +604,7 @@ export const TrainingHomeScreen = () => {
     });
 
     // 2. Create "Plan-like" objects for unmatched sessions
-    const extraSessions = sessions.filter(s => !matchedSessionIds.has(s.id));
+    const extraSessions = sessions.filter(s => !matchedSessionIds.has(s.id) && !linkedSessionIds.has(s.id));
 
     const sessionsAsPlans: DailyEntry[] = extraSessions.map(s => {
       const isGym = s.sport_type === 'strength' || s.source === 'gym_session';
@@ -604,6 +651,67 @@ export const TrainingHomeScreen = () => {
 
     return [...plans, ...sessionsAsPlans];
   }, [manualPlans, completedSessions, convertDistanceToUi, t]);
+
+  const planLinkedCompletedSessionIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    dailyPlans.forEach(plan => {
+      if (plan.isExtraSession) return;
+      if (plan.activity_session_id) ids.add(plan.activity_session_id);
+      if (plan.completedSession?.id) ids.add(plan.completedSession.id);
+    });
+    return ids;
+  }, [dailyPlans]);
+
+  const previewAssociateCandidates = React.useMemo(() => {
+    if (!previewPlan || previewPlan.type !== 'endurance' || previewPlan.isCompleted || !previewPlan.sportType)
+      return [];
+    return (completedSessions || []).filter(
+      session => session.sport_type === previewPlan.sportType && !planLinkedCompletedSessionIds.has(session.id),
+    );
+  }, [completedSessions, planLinkedCompletedSessionIds, previewPlan]);
+
+  const formatCompletedSessionCandidateLabel = React.useCallback(
+    (session: CompletedSession): string => {
+      const metric = session.distance_m
+        ? (() => {
+            const { value, unit } = convertDistanceToUi(session.distance_m);
+            return `${value}${unit}`;
+          })()
+        : session.duration_s
+          ? `${Math.round(session.duration_s / 60)}min`
+          : null;
+      return metric ? `${session.name || t('training.sport')} · ${metric}` : session.name || t('training.sport');
+    },
+    [convertDistanceToUi, t],
+  );
+
+  const handleAssociateCompletedFromPreview = React.useCallback(() => {
+    if (!previewPlan || previewPlan.type !== 'endurance' || previewAssociateCandidates.length === 0) return;
+    const associate = (session: CompletedSession) =>
+      associateCompletedSessionMutation.mutate({
+        sessionId: session.id,
+        enduranceTemplateId: previewPlan.templateId,
+      });
+
+    if (previewAssociateCandidates.length === 1) {
+      associate(previewAssociateCandidates[0]);
+      return;
+    }
+
+    Alert.alert(t('training.associateCompletedWorkout'), t('training.associateCompletedWorkoutHint'), [
+      ...previewAssociateCandidates.slice(0, 5).map(session => ({
+        text: formatCompletedSessionCandidateLabel(session),
+        onPress: () => associate(session),
+      })),
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  }, [
+    associateCompletedSessionMutation,
+    formatCompletedSessionCandidateLabel,
+    previewAssociateCandidates,
+    previewPlan,
+    t,
+  ]);
 
   const isLoading = loadingManual;
 
@@ -813,19 +921,8 @@ export const TrainingHomeScreen = () => {
               const isAnyGymSessionActive = isGym && !!activeGymSessionId;
 
               // Check if workout is already completed for this date
-              const isGymCompleted =
-                isGym &&
-                completedSessions?.some(
-                  (s: CompletedSession) => s.workout_template_id === (plan.gym_template_id || template?.id),
-                );
-              // Enhanced matching for Endurance: Check Sport AND Name (since we can't link IDs yet)
-              const isEnduranceCompleted =
-                !isGym &&
-                completedSessions?.some(
-                  (s: CompletedSession) => s.sport_type === template?.sport_type && s.name === template?.base_name,
-                );
-              // If this is an extra session (from Registrar Actividad), it's already completed
-              const isCompleted = Boolean(plan.isExtraSession || isGymCompleted || isEnduranceCompleted);
+              // Completion is resolved in dailyPlans using explicit activity_session_id/template links first.
+              const isCompleted = Boolean(plan.isExtraSession || plan.completedSession || plan.status === 'completed');
 
               const isRecurring = !!(isGym
                 ? plan.workout_templates && plan.workout_templates.suggested_day_of_week != null
@@ -1170,6 +1267,11 @@ export const TrainingHomeScreen = () => {
           }
           primaryActionDisabled={previewPlan?.isCompleted}
           onClose={() => setPreviewPlan(null)}
+          onAssociateCompletedAction={
+            previewAssociateCandidates.length > 0 && !associateCompletedSessionMutation.isPending
+              ? handleAssociateCompletedFromPreview
+              : undefined
+          }
           onMoveAction={previewPlan && !previewPlan.isCompleted ? () => openMoveModal(previewPlan) : undefined}
           onPrimaryAction={() => {
             if (!previewPlan) return;

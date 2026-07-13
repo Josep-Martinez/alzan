@@ -117,6 +117,15 @@ export function useSuuntoConnection() {
     mutationFn: async () => wearablesLocalHealthApi.syncSuuntoActivities(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['homeSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
     },
     onError: (error: Error) => {
       Alert.alert(t('common.error'), error.message);

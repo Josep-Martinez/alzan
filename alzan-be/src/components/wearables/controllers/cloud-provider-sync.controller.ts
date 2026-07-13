@@ -33,6 +33,8 @@ export class CloudProviderSyncController {
     return {
       provider: result.provider,
       activities_imported: result.activitiesImported,
+      activities_skipped: result.activitiesSkipped,
+      activities_reconciled: result.activitiesReconciled,
       last_success_at: result.lastSuccessAt,
     };
   }

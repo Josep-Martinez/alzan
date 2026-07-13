@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { parseActivityFileToCanonical } from '../../activity-import/parsers/acti
 import { CanonicalProvenance } from '../domain/wearable.types';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
+import { ImportReconciliationService } from './import-reconciliation.service';
 import { RawPayloadService } from './raw-payload.service';
 
 type JsonRecord = Record<string, unknown>;
@@ -25,16 +27,20 @@ type ProviderTokenRow = {
 export interface SuuntoSyncResult {
   provider: 'suunto';
   activitiesImported: number;
+  activitiesSkipped: number;
+  activitiesReconciled: number;
   lastSuccessAt: string;
 }
 
 const WORKOUT_LOOKBACK_DAYS = 20;
 const WORKOUT_LIST_LIMIT = 100;
+const WORKOUT_IMPORT_CONCURRENCY = 3;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
 @Injectable()
 export class SuuntoCloudSyncService {
+  private readonly logger = new Logger(SuuntoCloudSyncService.name);
   private readonly apiBaseUrl = 'https://cloudapi.suunto.com';
   private readonly tokenUrl = 'https://cloudapi-oauth.suunto.com/oauth/token';
 
@@ -44,19 +50,27 @@ export class SuuntoCloudSyncService {
     private readonly rawPayloadService: RawPayloadService,
     private readonly syncStateService: IntegrationSyncStateService,
     private readonly activityWriterService: CanonicalActivityWriterService,
+    private readonly importReconciliationService: ImportReconciliationService,
   ) {}
 
   public async syncActivities(userId: string): Promise<SuuntoSyncResult> {
     const token = await this.getUsableToken(userId);
     try {
       const workouts = await this.fetchWorkoutSummaries(token.accessToken);
-      let activitiesImported = 0;
-      for (const workout of workouts) {
-        const workoutKey = this.readWorkoutKey(workout);
-        if (!workoutKey) continue;
-        await this.importWorkout(userId, token.accessToken, workoutKey, workout);
-        activitiesImported += 1;
-      }
+      const keyedWorkouts = workouts
+        .map(workout => ({ workout, workoutKey: this.readWorkoutKey(workout) }))
+        .filter((entry): entry is { workout: JsonRecord; workoutKey: string } => entry.workoutKey != null);
+      const existingWorkoutKeys = await this.findExistingWorkoutKeys(
+        userId,
+        keyedWorkouts.map(entry => entry.workoutKey),
+      );
+      const newWorkouts = keyedWorkouts.filter(entry => !existingWorkoutKeys.has(entry.workoutKey));
+      await this.mapWithConcurrency(newWorkouts, WORKOUT_IMPORT_CONCURRENCY, entry =>
+        this.importWorkout(userId, token.accessToken, entry.workoutKey, entry.workout),
+      );
+      const activitiesImported = newWorkouts.length;
+      const activitiesSkipped = keyedWorkouts.length - newWorkouts.length;
+      const activitiesReconciled = await this.reconcileRecentSuuntoSessions(userId);
       const lastSuccessAt = new Date().toISOString();
       await this.markConnectionSuccess(userId, lastSuccessAt);
       await this.syncStateService.saveState({
@@ -70,7 +84,7 @@ export class SuuntoCloudSyncService {
         lastRecordAt: lastSuccessAt,
         status: 'success',
       });
-      return { provider: 'suunto', activitiesImported, lastSuccessAt };
+      return { provider: 'suunto', activitiesImported, activitiesSkipped, activitiesReconciled, lastSuccessAt };
     } catch (error: unknown) {
       await this.markConnectionError(userId, this.getErrorMessage(error));
       throw error;
@@ -105,6 +119,62 @@ export class SuuntoCloudSyncService {
       rawPayloadId: rawPayload.id,
     };
     await this.activityWriterService.upsertActivity({ userId, activity, provenance });
+  }
+
+  private async findExistingWorkoutKeys(userId: string, workoutKeys: string[]): Promise<Set<string>> {
+    const uniqueKeys = Array.from(new Set(workoutKeys));
+    if (uniqueKeys.length === 0) return new Set();
+    const [sourceRecordResult, providerActivityResult] = await Promise.all([
+      this.supabaseAdminService.client
+        .from('activity_sessions')
+        .select('source_record_id, provider_activity_id')
+        .eq('user_id', userId)
+        .eq('provider', 'suunto')
+        .in('source_record_id', uniqueKeys),
+      this.supabaseAdminService.client
+        .from('activity_sessions')
+        .select('source_record_id, provider_activity_id')
+        .eq('user_id', userId)
+        .eq('provider', 'suunto')
+        .in('provider_activity_id', uniqueKeys),
+    ]);
+    if (sourceRecordResult.error || providerActivityResult.error) {
+      throw new InternalServerErrorException('SUUNTO_EXISTING_WORKOUTS_READ_FAILED');
+    }
+    const existingKeys = new Set<string>();
+    for (const row of [...(sourceRecordResult.data ?? []), ...(providerActivityResult.data ?? [])]) {
+      if (typeof row.source_record_id === 'string') existingKeys.add(row.source_record_id);
+      if (typeof row.provider_activity_id === 'string') existingKeys.add(row.provider_activity_id);
+    }
+    return existingKeys;
+  }
+
+  private async reconcileRecentSuuntoSessions(userId: string): Promise<number> {
+    try {
+      const sinceIso = new Date(this.getWorkoutLookbackStartMs()).toISOString();
+      return await this.importReconciliationService.reconcileImportedEnduranceSessions(userId, 'suunto', sinceIso);
+    } catch (error) {
+      this.logger.warn(`Suunto recent reconciliation skipped for user ${userId}`, error as Error);
+      return 0;
+    }
+  }
+
+  private async mapWithConcurrency<T>(
+    items: T[],
+    concurrency: number,
+    task: (item: T) => Promise<void>,
+  ): Promise<void> {
+    let nextIndex = 0;
+    const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (nextIndex < items.length) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          await task(items[currentIndex]);
+        }
+      }),
+    );
   }
 
   private async fetchWorkoutSummaries(accessToken: string): Promise<JsonRecord[]> {

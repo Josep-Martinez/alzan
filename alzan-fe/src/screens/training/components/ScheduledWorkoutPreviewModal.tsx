@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, Dumbbell, Play, Target, X } from 'lucide-react-native';
+import { CalendarDays, Clock, Dumbbell, Link2, Play, Target, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { GlassCard } from '../../../components/GlassCard';
 import { SportIcon } from '../../../components/icons/SportIcon';
@@ -52,6 +52,7 @@ type ScheduledWorkoutPreviewModalProps = {
   primaryActionLabel?: string;
   primaryActionDisabled?: boolean;
   onClose: () => void;
+  onAssociateCompletedAction?: () => void;
   onMoveAction?: () => void;
   onPrimaryAction?: () => void;
 };
@@ -83,6 +84,7 @@ export const ScheduledWorkoutPreviewModal = ({
   primaryActionLabel,
   primaryActionDisabled,
   onClose,
+  onAssociateCompletedAction,
   onMoveAction,
   onPrimaryAction,
 }: ScheduledWorkoutPreviewModalProps) => {
@@ -303,6 +305,18 @@ export const ScheduledWorkoutPreviewModal = ({
 
           {!plan.isCompleted ? (
             <View style={styles.actionRow}>
+              {onAssociateCompletedAction ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.secondaryButton, { borderColor: colors.primary }]}
+                  onPress={onAssociateCompletedAction}
+                >
+                  <Link2 size={15} color={colors.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                    {t('training.associateCompletedWorkout')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               {onMoveAction ? (
                 <TouchableOpacity
                   accessibilityRole="button"

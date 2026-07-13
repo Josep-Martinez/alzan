@@ -218,6 +218,38 @@ export class ImportReconciliationService {
     }
   }
 
+  /**
+   * Re-runs lightweight association for recent provider imports. This is safe
+   * to execute repeatedly: already associated sessions only complete their
+   * matching calendar plan, while generic endurance sessions get template
+   * matching again with the current laps/plans/templates.
+   */
+  public async reconcileImportedEnduranceSessions(
+    userId: string,
+    provider: ActivitySessionRow['provider'],
+    sinceIso: string,
+  ): Promise<number> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .select('id, sport_type, endurance_template_id')
+      .eq('user_id', userId)
+      .eq('provider', provider)
+      .not('end_time', 'is', null)
+      .gte('start_time', sinceIso)
+      .order('start_time', { ascending: false });
+    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PROVIDER_SESSIONS_READ_FAILED');
+
+    const sessions = (data ?? []).filter(session => session.sport_type !== 'strength' && session.sport_type !== 'gym');
+    for (const session of sessions) {
+      if (session.endurance_template_id) {
+        await this.completePlansForAssociatedSession(userId, session.id);
+      } else {
+        await this.runEnduranceTemplateMatch(userId, session.id);
+      }
+    }
+    return sessions.length;
+  }
+
   /** Splits watch metrics vs an existing session into applicable/conflicting/previous. */
   public splitMetricsAgainstSession(session: ActivitySessionRow, activity: CanonicalActivity): StrengthMetricSplit {
     return splitStrengthMetrics(this.toStrengthLite(session), this.toWatchMetrics(activity));
