@@ -30,6 +30,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       setItem: (key, value) => AsyncStorage.setItem(key, value),
       removeItem: key => AsyncStorage.removeItem(key),
     },
+    // Bypass navigator.locks to prevent deadlock/hanging on web platforms
+    lock: async (name, acquireTimeout, fn) => {
+      return await fn();
+    },
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
