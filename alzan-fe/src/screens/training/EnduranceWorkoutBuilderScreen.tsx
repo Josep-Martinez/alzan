@@ -185,7 +185,37 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
-  const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
+  const [recurrenceWeeks, setRecurrenceWeeks] = useState<string>('');
+  const [showRecurrenceStartPicker, setShowRecurrenceStartPicker] = useState(false);
+
+  useEffect(() => {
+    if (!isRecurring) {
+      setRecurrenceEndDate('');
+      return;
+    }
+    const weeks = parseInt(recurrenceWeeks, 10);
+    if (isNaN(weeks) || weeks < 1) {
+      setRecurrenceEndDate('');
+      return;
+    }
+    const refStart = recurrenceStartDate || getNextScheduledDateString(new Date(), scheduledDays[0] ?? null);
+    if (!refStart) {
+      setRecurrenceEndDate('');
+      return;
+    }
+    try {
+      const parsedStart = new Date(`${refStart}T00:00:00`);
+      if (!isNaN(parsedStart.getTime())) {
+        const calculatedEnd = addDays(parsedStart, weeks * 7 - 1);
+        setRecurrenceEndDate(format(calculatedEnd, 'yyyy-MM-dd'));
+      } else {
+        setRecurrenceEndDate('');
+      }
+    } catch (err) {
+      console.error('[EnduranceWorkoutBuilderScreen] error calculating end date:', err);
+      setRecurrenceEndDate('');
+    }
+  }, [isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
   const [stepProgressions, setStepProgressions] = useState<StepProgressionOverride[]>([]);
   const [progressionPicker, setProgressionPicker] = useState<ProgressionPickerState | null>(null);
   const hydratedTemplateIdRef = useRef<string | null>(null);
@@ -383,6 +413,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setIsRecurring(!!existingTemplate.scheduled_day);
       setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
       setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
+      const weeks = calculateProgressionWeeks(
+        existingTemplate.recurrence_start_date,
+        existingTemplate.recurrence_end_date,
+      );
+      setRecurrenceWeeks(weeks > 0 ? String(weeks) : '');
       setStepProgressions(
         normalizeStepProgressions(
           existingProgressions.map(progression => ({
@@ -3140,6 +3175,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       setIsRecurring(nextRecurring);
                       if (!nextRecurring) {
                         setRecurrenceEndDate('');
+                        setRecurrenceWeeks('');
+                        setRecurrenceStartDate(null);
                         setStepProgressions([]);
                         setProgressionPicker(null);
                       }
@@ -3148,41 +3185,81 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   />
 
                   {isRecurring && (
-                    <View style={[styles.formRow, { borderBottomWidth: 0 }]}>
-                      <View style={styles.recurrenceEndLabel}>
-                        <Calendar size={16} color={themeColors.textSecondary} />
-                        <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                          {t('training.recurrenceEndDate')}
-                        </Text>
-                      </View>
-                      {Platform.OS === 'web' ? (
-                        <TextInput
-                          style={[styles.rowInput, { color: themeColors.textPrimary }]}
-                          value={recurrenceEndDate}
-                          onChangeText={setRecurrenceEndDate}
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor={themeColors.textSecondary}
-                          textAlign="right"
-                        />
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.rowRightValue}
-                          onPress={() => setShowRecurrenceEndPicker(true)}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('training.recurrenceEndDate')}
-                        >
-                          <Text
-                            style={[
-                              styles.rowValueText,
-                              { color: recurrenceEndDate ? themeColors.textPrimary : themeColors.textSecondary },
-                            ]}
-                          >
-                            {recurrenceEndDate || t('common.select')}
+                    <>
+                      {/* Start Date */}
+                      <View style={styles.formRow}>
+                        <View style={styles.recurrenceEndLabel}>
+                          <Calendar size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.startDate')}
                           </Text>
-                          <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
-                        </TouchableOpacity>
+                        </View>
+                        {Platform.OS === 'web' ? (
+                          <TextInput
+                            style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                            value={recurrenceStartDate || ''}
+                            onChangeText={setRecurrenceStartDate}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={themeColors.textSecondary}
+                            textAlign="right"
+                          />
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.rowRightValue}
+                            onPress={() => setShowRecurrenceStartPicker(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('training.startDate')}
+                          >
+                            <Text
+                              style={[
+                                styles.rowValueText,
+                                { color: recurrenceStartDate ? themeColors.textPrimary : themeColors.textSecondary },
+                              ]}
+                            >
+                              {recurrenceStartDate
+                                ? format(new Date(`${recurrenceStartDate}T00:00:00`), 'dd/MM/yyyy')
+                                : t('common.select')}
+                            </Text>
+                            <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Weeks Duration */}
+                      <View style={[styles.formRow, { borderBottomWidth: 0 }]}>
+                        <View style={styles.recurrenceEndLabel}>
+                          <Clock size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.recurrenceWeeks')}
+                          </Text>
+                        </View>
+                        <TextInput
+                          style={[
+                            styles.rowInput,
+                            { color: themeColors.textPrimary, textAlign: 'right', flex: 1, paddingRight: 4 },
+                          ]}
+                          value={recurrenceWeeks}
+                          onChangeText={val => {
+                            const filtered = val.replace(/[^0-9]/g, '');
+                            setRecurrenceWeeks(filtered);
+                          }}
+                          placeholder={t('training.indefinite') || 'Indefinida'}
+                          placeholderTextColor={themeColors.textSecondary}
+                          keyboardType="number-pad"
+                        />
+                      </View>
+
+                      {/* Calculated End Date Summary */}
+                      {recurrenceEndDate !== '' && (
+                        <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 }}>
+                          <Text style={{ fontSize: 13, color: themeColors.textSecondary, fontStyle: 'italic' }}>
+                            {t('training.recurrenceEndDateCalculated', {
+                              date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'dd/MM/yyyy'),
+                            })}
+                          </Text>
+                        </View>
                       )}
-                    </View>
+                    </>
                   )}
                 </View>
               </GlassCard>
@@ -3330,22 +3407,19 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
         {renderProgressionPickerModal()}
 
-        {showRecurrenceEndPicker && Platform.OS !== 'web' && (
+        {showRecurrenceStartPicker && Platform.OS !== 'web' && (
           <DateTimePicker
             value={
-              recurrenceEndDate
-                ? new Date(`${recurrenceEndDate}T00:00:00`)
+              recurrenceStartDate
+                ? new Date(`${recurrenceStartDate}T00:00:00`)
                 : new Date(`${effectiveRecurrenceStartDate || format(new Date(), 'yyyy-MM-dd')}T00:00:00`)
             }
             mode="date"
             display="default"
-            minimumDate={
-              effectiveRecurrenceStartDate ? new Date(`${effectiveRecurrenceStartDate}T00:00:00`) : new Date()
-            }
             onChange={(_event, selectedDate) => {
-              setShowRecurrenceEndPicker(false);
+              setShowRecurrenceStartPicker(false);
               if (selectedDate) {
-                setRecurrenceEndDate(format(selectedDate, 'yyyy-MM-dd'));
+                setRecurrenceStartDate(format(selectedDate, 'yyyy-MM-dd'));
               }
             }}
           />
