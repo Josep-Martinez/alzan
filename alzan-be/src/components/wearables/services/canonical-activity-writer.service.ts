@@ -481,10 +481,8 @@ export class CanonicalActivityWriterService {
         })),
       ),
       p_streams: this.toJson(this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance)),
-      p_stream_samples: this.toJson(
-        this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance),
-      ),
-      p_route_points: this.toJson(routePoints),
+      p_stream_samples: this.toJson([]),
+      p_route_points: this.toJson([]),
       p_route_polyline:
         positionSamples.length > 0
           ? encodePolyline(positionSamples.map(point => [point.lat, point.lon] as [number, number]))
@@ -496,6 +494,19 @@ export class CanonicalActivityWriterService {
       p_canonical_version: input.canonicalVersion ?? input.activity.hydrationVersion ?? 1,
     });
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
+
+    const sampleRows = this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance);
+    if (sampleRows.length > 0) {
+      await this.insertInChunks(
+        'activity_stream_samples',
+        sampleRows,
+        'WEARABLE_ACTIVITY_STREAM_SAMPLES_INSERT_FAILED',
+      );
+    }
+
+    if (routePoints.length > 0) {
+      await this.insertInChunks('activity_route_points', routePoints, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
+    }
   }
 
   private async insertSession(payload: ActivitySessionInsert): Promise<string> {
