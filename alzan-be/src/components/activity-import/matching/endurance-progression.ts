@@ -12,8 +12,9 @@ export type StepProgressionOverride = {
 };
 
 const parseDateOnly = (dateStr: string): Date | null => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
-  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  const datePart = dateStr.substring(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  const date = new Date(`${datePart}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date;
 };
 

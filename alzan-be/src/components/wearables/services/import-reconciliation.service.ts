@@ -402,13 +402,13 @@ export class ImportReconciliationService {
         steps: [],
         progressions: [],
       };
-      
+
       const matchingPlans = plannedPlans.filter(plan => plan.endurance_template_id === template.id);
       const plannedPlan = matchingPlans.length === 1 ? matchingPlans[0] : null;
       const plannedDate = plannedPlan?.planned_date ?? session.started_at_local ?? session.start_time;
-      
+
       const weekIndex = calculateProgressionWeekIndex(template.recurrence_start_date, plannedDate);
-      
+
       let steps = stepRows.map(this.toStepLike);
       if (weekIndex > 0 && progressionRows.length > 0) {
         steps = applyProgressionsToSteps(steps, weekIndex, progressionRows);

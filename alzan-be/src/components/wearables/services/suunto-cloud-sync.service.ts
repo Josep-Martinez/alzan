@@ -101,7 +101,12 @@ export class SuuntoCloudSyncService {
       phaseDurationsMs.fetchSummaries = Date.now() - fetchStartedAt;
       const keyedWorkouts = workouts
         .map(workout => ({ workout, workoutKey: this.readWorkoutKey(workout) }))
-        .filter((entry): entry is { workout: JsonRecord; workoutKey: string } => entry.workoutKey != null);
+        .filter((entry): entry is { workout: JsonRecord; workoutKey: string } => entry.workoutKey != null)
+        .sort((a, b) => {
+          const timeA = this.readWorkoutStartedAtMs(a.workout) || 0;
+          const timeB = this.readWorkoutStartedAtMs(b.workout) || 0;
+          return timeB - timeA;
+        });
       const importStartedAt = Date.now();
       const outcomes = await this.mapWithConcurrency(keyedWorkouts, WORKOUT_IMPORT_CONCURRENCY, async entry =>
         this.processWorkout({
