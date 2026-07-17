@@ -27,6 +27,10 @@ import { format } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
 import { useEnduranceTemplateSteps } from '../../hooks/useEnduranceSessions';
+import {
+  fetchEnduranceStepProgressions,
+  applyProgressionsForPlannedDate,
+} from '../../modules/training/services/enduranceProgressionService';
 import { useSessionLaps, type ActivityLap as SessionLap } from '../../hooks/useSessionLaps';
 import { useSessionHeartRateZones } from '../../hooks/useSessionHeartRateZones';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
@@ -327,6 +331,16 @@ export const EnduranceSessionDetailScreen = () => {
 
   // Fetch data for endurance template steps (use endurance_template_id for non-gym)
   const { data: templateSteps } = useEnduranceTemplateSteps(session.endurance_template_id);
+
+  // Fetch endurance template step progressions to show correct progressed steps
+  const { data: progressions } = useQuery({
+    queryKey: ['enduranceTemplateProgressions', session.endurance_template_id],
+    queryFn: async () => {
+      if (!session.endurance_template_id) return [];
+      return fetchEnduranceStepProgressions(session.endurance_template_id);
+    },
+    enabled: !!session.endurance_template_id,
+  });
 
   // Fetch laps
   const { data: laps } = useSessionLaps(resolvedSessionId);
@@ -1266,8 +1280,18 @@ export const EnduranceSessionDetailScreen = () => {
   const renderProgrammedWorkoutSection = () => {
     if (!templateSteps || templateSteps.length === 0) return null;
 
-    const topLevelSteps = templateSteps.filter(s => !s.parent_step_id);
-    const getChildren = (parentId: string) => templateSteps.filter(s => s.parent_step_id === parentId);
+    let progressedSteps = templateSteps;
+    if (template && progressions && session.started_at_local) {
+      progressedSteps = applyProgressionsForPlannedDate(
+        template,
+        templateSteps,
+        progressions,
+        session.started_at_local,
+      );
+    }
+
+    const topLevelSteps = progressedSteps.filter(s => !s.parent_step_id);
+    const getChildren = (parentId: string) => progressedSteps.filter(s => s.parent_step_id === parentId);
 
     const renderStep = (step: EnduranceWorkoutStep, isChild = false) => {
       const duration = formatStepDuration(step);

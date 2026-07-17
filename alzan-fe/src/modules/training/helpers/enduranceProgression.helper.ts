@@ -42,8 +42,9 @@ export type EligibleProgressionStep = ProgressionBuilderStep & {
 const STRUCTURED_PROGRESSION_SPORTS: SportType[] = ['running', 'cycling', 'swimming', 'hyrox'];
 
 const parseDateOnly = (dateStr: string): Date | null => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
-  const date = parseISO(`${dateStr}T00:00:00`);
+  const datePart = dateStr.substring(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  const date = parseISO(`${datePart}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
 };
 

@@ -27,7 +27,7 @@ async function run() {
       .from('integration_sync_state')
       .update({ status: 'error' })
       .eq('status', 'running');
-    
+
     if (error1) throw error1;
     console.log('✅ Cleared stuck integration_sync_state jobs.');
 
@@ -35,21 +35,19 @@ async function run() {
       .from('wearable_sync_jobs')
       .update({ status: 'error' })
       .eq('status', 'running');
-      
+
     if (error2) throw error2;
     console.log('✅ Cleared stuck wearable_sync_jobs (set to failed).');
 
-    const { error: error3 } = await client
-      .from('wearable_activity_imports')
-      .delete()
-      .eq('status', 'processing');
-      
+    const { error: error3 } = await client.from('wearable_activity_imports').delete().eq('status', 'processing');
+
     if (error3) throw error3;
     console.log('✅ Deleted stuck wearable_activity_imports.');
 
     console.log('🎉 All stuck sync jobs successfully cleared.');
-  } catch (e: any) {
-    console.error('❌ Failed to clear jobs:', e.message);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('❌ Failed to clear jobs:', message);
   }
 }
 
