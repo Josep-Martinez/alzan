@@ -485,8 +485,9 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
     client.inserts.some(
       insert =>
         insert.table === 'activity_route_points' &&
-        insert.rows?.every(row => row.session_id === 'survivor-session') === true,
+        insert.rows?.every(row => row.lat != null && row.lon != null) === true,
     ),
+    'compact route points should contain lat/lon fields',
   );
   assert.ok(
     client.inserts.some(

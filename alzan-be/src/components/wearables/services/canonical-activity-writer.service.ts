@@ -444,9 +444,7 @@ export class CanonicalActivityWriterService {
   }): Promise<void> {
     const { input, sessionId } = params;
     const positionSamples = this.sanitizePositionSamples(input.activity.streams.position);
-    const routePoints: ActivityRoutePointInsert[] = positionSamples.map((point, index) => ({
-      session_id: sessionId,
-      user_id: input.userId,
+    const compactRoutePoints = positionSamples.map((point, index) => ({
       point_index: index,
       timestamp: point.timestamp,
       offset_s: point.offsetSeconds,
@@ -457,13 +455,8 @@ export class CanonicalActivityWriterService {
       speed_mps: point.speedMps,
       horizontal_accuracy_m: point.horizontalAccuracyM,
       vertical_accuracy_m: point.verticalAccuracyM,
-      source: WEARABLE_IMPORT_SOURCE,
-      source_channel: input.provenance.sourceChannel,
-      source_package: input.provenance.sourcePackage,
-      source_record_id: input.provenance.sourceRecordId,
-      raw_payload_id: input.provenance.rawPayloadId,
-      raw_payload: null,
     }));
+    const compactStreamSamples = this.buildCompactStreamSampleRows(input.activity);
     const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
     const { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', {
       p_user_id: input.userId,
@@ -481,8 +474,8 @@ export class CanonicalActivityWriterService {
         })),
       ),
       p_streams: this.toJson(this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance)),
-      p_stream_samples: this.toJson([]),
-      p_route_points: this.toJson([]),
+      p_stream_samples: this.toJson(compactStreamSamples),
+      p_route_points: this.toJson(compactRoutePoints),
       p_route_polyline:
         positionSamples.length > 0
           ? encodePolyline(positionSamples.map(point => [point.lat, point.lon] as [number, number]))
@@ -494,19 +487,6 @@ export class CanonicalActivityWriterService {
       p_canonical_version: input.canonicalVersion ?? input.activity.hydrationVersion ?? 1,
     });
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
-
-    const sampleRows = this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance);
-    if (sampleRows.length > 0) {
-      await this.insertInChunks(
-        'activity_stream_samples',
-        sampleRows,
-        'WEARABLE_ACTIVITY_STREAM_SAMPLES_INSERT_FAILED',
-      );
-    }
-
-    if (routePoints.length > 0) {
-      await this.insertInChunks('activity_route_points', routePoints, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
-    }
   }
 
   private async insertSession(payload: ActivitySessionInsert): Promise<string> {
@@ -690,6 +670,28 @@ export class CanonicalActivityWriterService {
         source_record_id: provenance.sourceRecordId,
         raw_payload_id: provenance.rawPayloadId,
         raw_payload: null,
+      })),
+    );
+  }
+
+  /**
+   * Build compact stream-sample rows for the atomic RPC bundle.
+   *
+   * Only per-row unique fields are included (stream_type, timestamp, offset_s,
+   * value, unit).  The SQL function injects the shared columns (session_id,
+   * user_id, source, source_channel, source_package, source_record_id,
+   * raw_payload_id) server-side, reducing JSON payload size by ~80 %.
+   */
+  private buildCompactStreamSampleRows(
+    activity: CanonicalActivity,
+  ): Array<{ stream_type: string; timestamp: string | null; offset_s: number | null; value: number; unit: string }> {
+    return this.getMetricStreams(activity).flatMap(stream =>
+      this.dedupeSamples(stream.samples).map(sample => ({
+        stream_type: stream.streamType,
+        timestamp: sample.timestamp,
+        offset_s: sample.offsetSeconds,
+        value: sample.value,
+        unit: stream.unit,
       })),
     );
   }

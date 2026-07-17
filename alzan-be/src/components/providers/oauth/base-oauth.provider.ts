@@ -132,7 +132,7 @@ export abstract class BaseOAuthProvider {
       .select('id')
       .eq('user_id', userId)
       .eq('provider', this.providerName)
-      .single();
+      .maybeSingle();
 
     if (connection) {
       const expiresAt = new Date();
@@ -301,7 +301,7 @@ export abstract class BaseOAuthProvider {
       .select('id')
       .eq('user_id', userId)
       .eq('provider', this.providerName)
-      .single();
+      .maybeSingle();
 
     if (existingConnection) {
       const { error } = await this.supabaseAdmin.client
