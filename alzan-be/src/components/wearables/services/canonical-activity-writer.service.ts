@@ -46,6 +46,7 @@ type ExistingSessionMeta = {
   source: string | null;
   sport_type: string;
   endurance_template_id: string | null;
+  workout_template_id: string | null;
 };
 
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
@@ -89,6 +90,7 @@ export class CanonicalActivityWriterService {
     let completeAssociatedPlans = false;
     let strengthAssociation = false;
     let shouldRunEnduranceTemplateMatch = false;
+    let shouldRunStrengthTemplateMatch = false;
     if (existingSessionId) {
       const writeSessionId = await this.resolveExistingWriteSessionId(existingSessionId);
       const redirectedDuplicate = writeSessionId !== existingSessionId;
@@ -114,8 +116,12 @@ export class CanonicalActivityWriterService {
       } else {
         sessionId = writeSessionId;
         sessionPayloadToPersist = sessionPayload;
-        shouldRunEnduranceTemplateMatch =
-          !isStrengthSport(existingMeta?.sport_type) && existingMeta?.endurance_template_id == null;
+        if (isStrengthSport(existingMeta?.sport_type)) {
+          shouldRunStrengthTemplateMatch = existingMeta?.workout_template_id == null;
+        } else {
+          shouldRunEnduranceTemplateMatch =
+            !isStrengthSport(existingMeta?.sport_type) && existingMeta?.endurance_template_id == null;
+        }
       }
     } else if (isStrengthSport(input.activity.sportType)) {
       // The watch never creates sets: a same-day Alzan strength session may
@@ -133,6 +139,7 @@ export class CanonicalActivityWriterService {
         sessionId = randomUUID();
         sessionPayloadToPersist = { ...sessionPayload, ...directive.extraFields } as ActivitySessionInsert;
         await this.insertHydrationSkeleton(sessionId, sessionPayloadToPersist as ActivitySessionInsert);
+        shouldRunStrengthTemplateMatch = true;
       }
     } else {
       const directive = await this.importReconciliationService.resolveEnduranceDirective(input.userId, input.activity);
@@ -169,6 +176,14 @@ export class CanonicalActivityWriterService {
         await this.finishLifecycleReconciliation(input.lifecycleImportId, null);
       } catch (error) {
         this.logger.warn(`Template matching deferred for imported session ${sessionId}`, error as Error);
+        await this.finishLifecycleReconciliation(input.lifecycleImportId, this.errorMessage(error));
+      }
+    } else if (shouldRunStrengthTemplateMatch) {
+      try {
+        await this.importReconciliationService.runStrengthTemplateMatch(input.userId, sessionId);
+        await this.finishLifecycleReconciliation(input.lifecycleImportId, null);
+      } catch (error) {
+        this.logger.warn(`Strength template matching deferred for imported session ${sessionId}`, error as Error);
         await this.finishLifecycleReconciliation(input.lifecycleImportId, this.errorMessage(error));
       }
     } else {
@@ -211,7 +226,7 @@ export class CanonicalActivityWriterService {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
       .select(
-        'sport_type, source, endurance_template_id, duplicate_of_session_id, duplicate_resolution, duplicate_score',
+        'sport_type, source, endurance_template_id, workout_template_id, duplicate_of_session_id, duplicate_resolution, duplicate_score',
       )
       .eq('id', sessionId)
       .maybeSingle();

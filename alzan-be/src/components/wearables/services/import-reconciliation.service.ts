@@ -5,11 +5,8 @@ import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import {
   buildActivityTotals,
   buildTemplateTotals,
-  countComparableTotalSignals,
   countComparableStructuralSignals,
-  deriveActivityStructure,
-  deriveTemplateDistanceMatchedActivityStructure,
-  deriveTemplateStructure,
+  countComparableTotalSignals,
   EnduranceStepLike,
   POSSIBLE_MATCH,
   scoreStructuralMatch,
@@ -17,7 +14,15 @@ import {
   isMatchMarginSufficient,
   STRONG_MATCH,
   templateHasBoundaryPhases,
+  deriveActivityStructure,
+  deriveTemplateDistanceMatchedActivityStructure,
+  deriveTemplateStructure,
 } from '../../activity-import/matching/endurance-template-match';
+import {
+  calculateProgressionWeekIndex,
+  applyProgressionsToSteps,
+  StepProgressionOverride,
+} from '../../activity-import/matching/endurance-progression';
 import {
   isSameLocalDay,
   planEnduranceReconciliation,
@@ -162,14 +167,12 @@ export class ImportReconciliationService {
       timezone: session.timezone,
     });
     if (!localDate) return;
-    const plannedPlans = await this.findPlannedPlans(userId, localDate);
+    const plannedPlans = await this.findEndurancePlannedPlans(userId, localDate);
     const laps = await this.getSessionLaps(sessionId);
 
     let best: TemplateMatchResult | null = null;
     if (plannedPlans.length > 0) {
-      const plannedTemplateIds = plannedPlans
-        .map(plan => plan.endurance_template_id)
-        .filter((value): value is string => value != null);
+      const plannedTemplateIds = plannedPlans.map(plan => plan.endurance_template_id).filter(id => id !== null);
       best = await this.scoreTemplates(session, laps, plannedTemplateIds, plannedPlans);
     }
     if (best == null || best.score < POSSIBLE_MATCH) {
@@ -221,6 +224,44 @@ export class ImportReconciliationService {
       template_match_score: best.score,
       template_match_method: best.method,
     });
+  }
+
+  /**
+   * Template matching for an imported strength session. If exactly one gym plan
+   * is scheduled for today, it auto-associates the generic imported session
+   * to that plan to prevent floating calendar entries.
+   */
+  public async runStrengthTemplateMatch(userId: string, sessionId: string): Promise<void> {
+    const session = await this.getSession(userId, sessionId);
+    if (!session || (session.sport_type !== 'strength' && session.sport_type !== 'gym')) return;
+    if (session.workout_template_id != null) return;
+
+    const localDate = resolveActivityLocalDate({
+      startTime: session.start_time,
+      startedAtLocal: session.started_at_local,
+      timezone: session.timezone,
+    });
+    if (!localDate) return;
+    const plannedPlans = await this.findStrengthPlannedPlans(userId, localDate);
+
+    if (plannedPlans.length === 1) {
+      const plan = plannedPlans[0];
+      const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+        p_user_id: userId,
+        p_session_id: sessionId,
+        p_endurance_template_id: undefined,
+        p_workout_template_id: plan.gym_template_id ?? undefined,
+        p_workout_plan_id: plan.id,
+      });
+      if (error) {
+        this.logger.error(`Strength template auto-association failed for session ${sessionId}`, error.message);
+        return;
+      }
+      if (session.name == null) {
+        // We could look up the template name to rename the session if needed,
+        // but for now we just associate it.
+      }
+    }
   }
 
   /**
@@ -344,7 +385,9 @@ export class ImportReconciliationService {
       template => template.sport_type === session.sport_type,
     );
     if (templates.length === 0) return null;
-    const stepsByTemplate = await this.findStepsByTemplateIds(templates.map(template => template.id));
+    const stepsAndProgressionsByTemplate = await this.findStepsAndProgressionsByTemplateIds(
+      templates.map(template => template.id),
+    );
 
     const lapLikes = laps.map(lap => ({
       distanceM: lap.distance_m,
@@ -355,7 +398,22 @@ export class ImportReconciliationService {
 
     const matches: TemplateMatchResult[] = [];
     for (const template of templates) {
-      const steps = (stepsByTemplate.get(template.id) ?? []).map(this.toStepLike);
+      const { steps: stepRows, progressions: progressionRows } = stepsAndProgressionsByTemplate.get(template.id) ?? {
+        steps: [],
+        progressions: [],
+      };
+      
+      const matchingPlans = plannedPlans.filter(plan => plan.endurance_template_id === template.id);
+      const plannedPlan = matchingPlans.length === 1 ? matchingPlans[0] : null;
+      const plannedDate = plannedPlan?.planned_date ?? session.started_at_local ?? session.start_time;
+      
+      const weekIndex = calculateProgressionWeekIndex(template.recurrence_start_date, plannedDate);
+      
+      let steps = stepRows.map(this.toStepLike);
+      if (weekIndex > 0 && progressionRows.length > 0) {
+        steps = applyProgressionsToSteps(steps, weekIndex, progressionRows);
+      }
+
       const templateAwareStructure = deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps);
       const activityStructure =
         templateAwareStructure ?? (templateHasBoundaryPhases(steps) ? null : deriveActivityStructure(lapLikes));
@@ -376,8 +434,6 @@ export class ImportReconciliationService {
         method = 'totals';
         signalCount = countComparableTotalSignals(activityTotals, templateTotals);
       }
-      const matchingPlans = plannedPlans.filter(plan => plan.endurance_template_id === template.id);
-      const plannedPlan = matchingPlans.length === 1 ? matchingPlans[0] : null;
       matches.push({
         templateId: template.id,
         templateName: template.base_name,
@@ -399,6 +455,7 @@ export class ImportReconciliationService {
     return {
       id: step.id,
       parentStepId: step.parent_step_id,
+      progressionKey: step.progression_key,
       isGroup: step.is_group ?? false,
       repetitions: step.repetitions,
       orderIndex: step.order_index,
@@ -512,7 +569,7 @@ export class ImportReconciliationService {
     return data ?? [];
   }
 
-  private async findPlannedPlans(userId: string, localDate: string): Promise<WorkoutPlanRow[]> {
+  private async findEndurancePlannedPlans(userId: string, localDate: string): Promise<WorkoutPlanRow[]> {
     const { data, error } = await this.supabaseAdminService.client
       .from('workout_plans')
       .select('*')
@@ -520,6 +577,18 @@ export class ImportReconciliationService {
       .eq('planned_date', localDate)
       .eq('status', 'planned')
       .not('endurance_template_id', 'is', null);
+    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLANS_READ_FAILED');
+    return data ?? [];
+  }
+
+  private async findStrengthPlannedPlans(userId: string, localDate: string): Promise<WorkoutPlanRow[]> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('workout_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('planned_date', localDate)
+      .eq('status', 'planned')
+      .not('gym_template_id', 'is', null);
     if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLANS_READ_FAILED');
     return data ?? [];
   }
@@ -547,20 +616,39 @@ export class ImportReconciliationService {
     return data ?? [];
   }
 
-  private async findStepsByTemplateIds(templateIds: string[]): Promise<Map<string, EnduranceStepRow[]>> {
-    const result = new Map<string, EnduranceStepRow[]>();
+  private async findStepsAndProgressionsByTemplateIds(
+    templateIds: string[],
+  ): Promise<Map<string, { steps: EnduranceStepRow[]; progressions: StepProgressionOverride[] }>> {
+    const result = new Map<string, { steps: EnduranceStepRow[]; progressions: StepProgressionOverride[] }>();
     if (templateIds.length === 0) return result;
-    const { data, error } = await this.supabaseAdminService.client
-      .from('endurance_workout_steps')
-      .select('*')
-      .in('template_id', templateIds)
-      .order('order_index', { ascending: true });
-    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_STEPS_READ_FAILED');
-    for (const step of data ?? []) {
-      const steps = result.get(step.template_id) ?? [];
-      steps.push(step);
-      result.set(step.template_id, steps);
+
+    const [{ data: stepsData, error: stepsError }, { data: progressionsData, error: progressionsError }] =
+      await Promise.all([
+        this.supabaseAdminService.client
+          .from('endurance_workout_steps')
+          .select('*')
+          .in('template_id', templateIds)
+          .order('order_index', { ascending: true }),
+        this.supabaseAdminService.client
+          .from('endurance_workout_step_progressions')
+          .select('*')
+          .in('template_id', templateIds),
+      ]);
+
+    if (stepsError) throw new InternalServerErrorException('IMPORT_RECONCILIATION_STEPS_READ_FAILED');
+    if (progressionsError) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PROGRESSIONS_READ_FAILED');
+
+    for (const id of templateIds) {
+      result.set(id, { steps: [], progressions: [] });
     }
+
+    for (const step of stepsData ?? []) {
+      result.get(step.template_id)!.steps.push(step);
+    }
+    for (const progression of progressionsData ?? []) {
+      result.get(progression.template_id)!.progressions.push(progression);
+    }
+
     return result;
   }
 

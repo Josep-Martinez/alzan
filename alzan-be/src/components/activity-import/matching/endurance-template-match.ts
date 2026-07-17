@@ -18,6 +18,7 @@ export interface ActivityLapLike {
 export interface EnduranceStepLike {
   id: string;
   parentStepId: string | null;
+  progressionKey?: string | null;
   isGroup: boolean;
   repetitions: number | null;
   orderIndex: number;
