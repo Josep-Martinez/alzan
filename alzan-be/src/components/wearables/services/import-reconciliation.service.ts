@@ -83,7 +83,7 @@ export class ImportReconciliationService {
       // Legacy gym sessions may still use sport_type 'gym'.
       const todaysSessions = await this.findTodaysSessions(userId, ['strength', 'gym'], activity);
       const plan = planStrengthReconciliation(todaysSessions.map(this.toStrengthLite), watch);
-      return this.directiveFromPlan(plan, watch);
+      return this.directiveFromPlan(plan, watch, activity);
     } catch (error) {
       this.logger.error(
         `Strength reconciliation failed for user ${userId}; importing as plain session`,
@@ -298,7 +298,11 @@ export class ImportReconciliationService {
     } as unknown as Json;
   }
 
-  private directiveFromPlan(plan: StrengthReconciliationPlan, watch: WatchStrengthMetrics): StrengthWriteDirective {
+  private directiveFromPlan(
+    plan: StrengthReconciliationPlan,
+    watch: WatchStrengthMetrics,
+    activity: CanonicalActivity,
+  ): StrengthWriteDirective {
     switch (plan.kind) {
       case 'create_generic':
         return { kind: 'insert', extraFields: {} };
@@ -318,7 +322,12 @@ export class ImportReconciliationService {
         return {
           kind: 'associate',
           targetSessionId: plan.targetSessionId,
-          payload: this.buildStrengthWatchPayload(watch),
+          payload: {
+            ...this.buildStrengthWatchPayload(watch),
+            start_time: activity.summary.startedAt ?? undefined,
+            started_at_local: activity.summary.startedAtLocal ?? null,
+            timezone: activity.summary.timezone ?? null,
+          },
         };
       case 'associate': {
         // Watch wins by default: apply both the filled-in and the overriding
@@ -330,6 +339,9 @@ export class ImportReconciliationService {
           epoc: watch.epoc,
           pte: watch.pte,
           tss_hr: watch.tssHr,
+          start_time: activity.summary.startedAt ?? undefined,
+          started_at_local: activity.summary.startedAtLocal ?? null,
+          timezone: activity.summary.timezone ?? null,
         };
         return { kind: 'associate', targetSessionId: plan.targetSessionId, payload };
       }
@@ -346,6 +358,9 @@ export class ImportReconciliationService {
           epoc: watch.epoc,
           pte: watch.pte,
           tss_hr: watch.tssHr,
+          start_time: activity.summary.startedAt ?? undefined,
+          started_at_local: activity.summary.startedAtLocal ?? null,
+          timezone: activity.summary.timezone ?? null,
         };
         return { kind: 'associate', targetSessionId: plan.targetSessionId, payload };
       }

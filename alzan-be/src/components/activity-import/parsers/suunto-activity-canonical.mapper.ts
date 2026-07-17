@@ -1029,7 +1029,11 @@ function parseSuuntoJson(rawJson: string, options?: ParseSuuntoActivityOptions):
   });
   const startedAt =
     normaliseTimestamp(header.DateTime) ?? normaliseTimestamp(header.StartTime) ?? normaliseTimestamp(header.startTime);
-  const durationSeconds = readNumber(header.Duration) ?? readNumber(header.duration);
+  const durationSeconds =
+    readNumber(header.Duration) ??
+    readNumber(header.duration) ??
+    readNumber(header.totalTime) ??
+    readNumber(header.total_time);
   const streams: CanonicalActivityStreams = {
     position: [],
     heartRate: [],
