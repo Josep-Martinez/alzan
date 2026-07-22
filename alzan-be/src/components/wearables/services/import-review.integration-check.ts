@@ -568,7 +568,7 @@ async function main(): Promise<void> {
           sourceUpdatedAt: '2026-06-13T09:00:00Z',
           rawPayloadId: null,
         },
-        canonicalVersion: 7,
+        canonicalVersion: 8,
       };
       const { count: sessionsBeforeMatch } = await client
         .from('activity_sessions')

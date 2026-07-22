@@ -45,6 +45,13 @@ type FakeRecordedMutation = {
 
 interface CanonicalActivityWriterServicePrivate {
   insertInChunks(table: InsertableTable, rows: Array<Record<string, unknown>>, errorCode: string): Promise<void>;
+  persistActivityBundle(params: {
+    clearProvenanceSessionId: string | null;
+    input: UpsertActivityInput;
+    replaceLaps: boolean;
+    sessionId: string;
+    sessionPayload: Record<string, unknown>;
+  }): Promise<void>;
   replaceLaps(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void>;
   resolveExistingWriteSessionId(sessionId: string): Promise<string>;
   sanitizePositionSamples(samples: CanonicalActivityPointSample[]): CanonicalActivityPointSample[];
@@ -346,6 +353,34 @@ function buildCanonicalRun(): CanonicalActivity {
   };
 }
 
+function buildEpipeError(): FakeSupabaseError {
+  return {
+    code: '',
+    details: 'TypeError: fetch failed\nCaused by: Error: write EPIPE (EPIPE)',
+    hint: '',
+    message: 'TypeError: fetch failed',
+  };
+}
+
+function buildLifecycleInput(activity: CanonicalActivity): UpsertActivityInput {
+  return {
+    userId: 'user-1',
+    activity,
+    provenance: {
+      provider: 'suunto',
+      sourceChannel: 'cloud',
+      sourcePackage: null,
+      sourceProviderKey: 'suunto',
+      sourceRecordId: 'suunto-run-1',
+      sourceUpdatedAt: null,
+      rawPayloadId: 'raw-1',
+    },
+    lifecycleImportId: 'import-1',
+    lifecycleJobId: 'job-1',
+    canonicalVersion: 8,
+  };
+}
+
 async function assertStreamSamplesUseTransportSafeChunks(): Promise<void> {
   const client = createFakeSupabaseClient(100);
   const service = createService(client);
@@ -570,6 +605,167 @@ async function assertBundleFailureFallsBackToGenericActivityWithLaps(): Promise<
   );
 }
 
+async function assertRetryableBundleFailureRetriesFullPayloadWithoutDegrading(): Promise<void> {
+  const activity = buildCanonicalRun();
+  const client = createFullSupabaseClient(
+    {
+      wearable_activity_imports: [
+        {
+          id: 'import-1',
+          status: 'processing',
+          session_id: null,
+          canonical_version: 8,
+        },
+      ],
+    },
+    [buildEpipeError()],
+  );
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {
+      buildActivityFingerprint: () => 'fingerprint',
+      buildStrongActivityKey: () => 'strong-key',
+    } as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.persistActivityBundle({
+    input: buildLifecycleInput(activity),
+    sessionId: 'session-1',
+    sessionPayload: { distance_m: activity.summary.distanceM },
+    clearProvenanceSessionId: null,
+    replaceLaps: true,
+  });
+
+  assert.equal(client.rpcCalls.length, 2);
+  assert.equal(client.rpcCalls[1]?.args.p_import_id, 'import-1');
+  assert.notEqual(client.rpcCalls[1]?.args.p_route_polyline, null);
+  assert.ok(client.inserts.some(insert => insert.table === 'activity_route_points'));
+}
+
+async function assertLostBundleResponseUsesAtomicallyCommittedFullPayload(): Promise<void> {
+  const activity = buildCanonicalRun();
+  const client = createFullSupabaseClient(
+    {
+      wearable_activity_imports: [
+        {
+          id: 'import-1',
+          status: 'complete',
+          session_id: 'session-1',
+          canonical_version: 8,
+        },
+      ],
+    },
+    [buildEpipeError()],
+  );
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {
+      buildActivityFingerprint: () => 'fingerprint',
+      buildStrongActivityKey: () => 'strong-key',
+    } as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.persistActivityBundle({
+    input: buildLifecycleInput(activity),
+    sessionId: 'session-1',
+    sessionPayload: { distance_m: activity.summary.distanceM },
+    clearProvenanceSessionId: null,
+    replaceLaps: true,
+  });
+
+  assert.equal(client.rpcCalls.length, 1, 'a committed atomic bundle must not be replayed after a lost response');
+  assert.ok(client.inserts.some(insert => insert.table === 'activity_route_points'));
+}
+
+async function assertGenericLifecycleFallbackRemainsRetryable(): Promise<void> {
+  const activity = buildCanonicalRun();
+  const client = createFullSupabaseClient(
+    {
+      wearable_activity_imports: [
+        {
+          id: 'import-1',
+          status: 'processing',
+          session_id: null,
+          canonical_version: 8,
+        },
+      ],
+    },
+    [buildEpipeError(), buildEpipeError(), buildEpipeError()],
+  );
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {
+      buildActivityFingerprint: () => 'fingerprint',
+      buildStrongActivityKey: () => 'strong-key',
+    } as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await assert.rejects(
+    service.persistActivityBundle({
+      input: buildLifecycleInput(activity),
+      sessionId: 'session-1',
+      sessionPayload: { distance_m: activity.summary.distanceM },
+      clearProvenanceSessionId: null,
+      replaceLaps: true,
+    }),
+    (error: unknown) => error instanceof Error && error.message === 'WEARABLE_ACTIVITY_BUNDLE_PERSIST_DEGRADED',
+  );
+
+  assert.equal(client.rpcCalls.length, 4);
+  assert.equal(client.rpcCalls[3]?.args.p_import_id, 'import-1');
+  assert.equal(client.rpcCalls[3]?.args.p_route_polyline, null);
+  assert.ok((client.rpcCalls[3]?.args.p_laps as Array<unknown>).length > 0);
+  assert.equal(
+    client.inserts.some(insert => insert.table === 'activity_route_points'),
+    false,
+  );
+}
+
+async function assertTransportFailurePreservesPreviouslyImportedSession(): Promise<void> {
+  const activity = buildCanonicalRun();
+  const client = createFullSupabaseClient(
+    {
+      wearable_activity_imports: [
+        {
+          id: 'import-1',
+          status: 'processing',
+          session_id: 'session-1',
+          canonical_version: 8,
+        },
+      ],
+    },
+    [buildEpipeError(), buildEpipeError(), buildEpipeError()],
+  );
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {
+      buildActivityFingerprint: () => 'fingerprint',
+      buildStrongActivityKey: () => 'strong-key',
+    } as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await assert.rejects(
+    service.persistActivityBundle({
+      input: buildLifecycleInput(activity),
+      sessionId: 'session-1',
+      sessionPayload: { distance_m: activity.summary.distanceM },
+      clearProvenanceSessionId: null,
+      replaceLaps: true,
+    }),
+    (error: unknown) => error instanceof Error && error.message === 'WEARABLE_ACTIVITY_BUNDLE_PERSIST_DEGRADED',
+  );
+
+  assert.equal(client.rpcCalls.length, 3, 'an existing imported session must never be replaced by a generic bundle');
+}
+
 async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Promise<void> {
   const activity = buildCanonicalRun();
   activity.summary.distanceM = 9220;
@@ -747,6 +943,10 @@ async function run(): Promise<void> {
   await assertStrongPendingDuplicateWritesToSurvivor();
   await assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate();
   await assertBundleFailureFallsBackToGenericActivityWithLaps();
+  await assertRetryableBundleFailureRetriesFullPayloadWithoutDegrading();
+  await assertLostBundleResponseUsesAtomicallyCommittedFullPayload();
+  await assertGenericLifecycleFallbackRemainsRetryable();
+  await assertTransportFailurePreservesPreviouslyImportedSession();
   await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
   await assertExactSuuntoSeriesPersistsElevenNativeLaps();
 }

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Json } from '../../../types/database.types';
 import { Database, Insert, Update } from '../../../types/requests.types';
@@ -33,7 +33,8 @@ type ActivityRoutePointInsert = Insert<'activity_route_points'>;
 type ActivityStreamSampleInsert = Insert<'activity_stream_samples'>;
 type ActivityProviderFieldsInsert = Insert<'activity_provider_fields'>;
 type StreamType = Database['public']['Enums']['stream_type_enum'];
-type ChunkInsertError = {
+type WearableActivityBundleArgs = Database['public']['Functions']['persist_wearable_activity_bundle']['Args'];
+type PersistenceError = {
   code?: string | null;
   details?: string | null;
   hint?: string | null;
@@ -56,6 +57,9 @@ const STREAM_SAMPLE_INSERT_CHUNK_SIZE = 100;
 const MIN_RETRY_INSERT_CHUNK_SIZE = 25;
 const INSERT_RETRY_BASE_DELAY_MS = 150;
 const INSERT_RETRY_ATTEMPTS = 3;
+const BUNDLE_PERSIST_RETRY_BASE_DELAY_MS = 150;
+const BUNDLE_PERSIST_RETRY_ATTEMPTS = 3;
+const DEGRADED_BUNDLE_ERROR_CODE = 'WEARABLE_ACTIVITY_BUNDLE_PERSIST_DEGRADED';
 
 /**
  * Gym workouts can arrive from watches as either 'strength' or 'gym', and
@@ -511,9 +515,12 @@ export class CanonicalActivityWriterService {
       p_canonical_version: input.canonicalVersion ?? input.activity.hydrationVersion ?? 1,
     };
     let usedGenericFallback = false;
-    let { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', baseBundle);
+    let error = await this.persistBundleWithTransportRetries(baseBundle, sessionId);
     if (error) {
       this.logBundlePersistError('full', sessionId, error);
+      if (await this.shouldPreserveExistingImportedSession(input.lifecycleImportId, sessionId)) {
+        throw new ServiceUnavailableException(DEGRADED_BUNDLE_ERROR_CODE);
+      }
       const genericBundle = {
         ...baseBundle,
         p_heart_rate_zones: [],
@@ -539,6 +546,9 @@ export class CanonicalActivityWriterService {
       this.logBundlePersistError('summary', sessionId, error);
       throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
     }
+    if (usedGenericFallback && input.lifecycleImportId) {
+      throw new ServiceUnavailableException(DEGRADED_BUNDLE_ERROR_CODE);
+    }
 
     const sampleRows = usedGenericFallback
       ? []
@@ -554,6 +564,64 @@ export class CanonicalActivityWriterService {
     if (!usedGenericFallback && routePoints.length > 0) {
       await this.insertInChunks('activity_route_points', routePoints, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
     }
+  }
+
+  private async persistBundleWithTransportRetries(
+    bundle: WearableActivityBundleArgs,
+    sessionId: string,
+  ): Promise<PersistenceError | null> {
+    let lastError: PersistenceError | null = null;
+    for (let attempt = 1; attempt <= BUNDLE_PERSIST_RETRY_ATTEMPTS; attempt += 1) {
+      const { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', bundle);
+      if (!error) return null;
+      lastError = error;
+      if (await this.hasBundleCommitCompleted(bundle, sessionId)) {
+        this.logger.warn(`Confirmed committed wearable activity bundle after lost response for session ${sessionId}`);
+        return null;
+      }
+      if (!this.isRetryableTransportError(error) || attempt === BUNDLE_PERSIST_RETRY_ATTEMPTS) return lastError;
+      this.logger.warn(
+        `Retrying wearable activity bundle for session ${sessionId} after transport failure ` +
+          `(attempt ${attempt + 1}/${BUNDLE_PERSIST_RETRY_ATTEMPTS})`,
+      );
+      await this.sleep(BUNDLE_PERSIST_RETRY_BASE_DELAY_MS * attempt);
+    }
+    return lastError;
+  }
+
+  private async hasBundleCommitCompleted(bundle: WearableActivityBundleArgs, sessionId: string): Promise<boolean> {
+    if (!bundle.p_import_id) return false;
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_activity_imports')
+      .select('status, session_id, canonical_version')
+      .eq('id', bundle.p_import_id)
+      .maybeSingle();
+    if (error) {
+      this.logger.warn(`Unable to confirm wearable activity bundle commit for session ${sessionId}`);
+      return false;
+    }
+    return (
+      data?.status === 'complete' &&
+      data.session_id === sessionId &&
+      data.canonical_version >= bundle.p_canonical_version
+    );
+  }
+
+  private async shouldPreserveExistingImportedSession(
+    importId: string | null | undefined,
+    sessionId: string,
+  ): Promise<boolean> {
+    if (!importId) return false;
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_activity_imports')
+      .select('session_id')
+      .eq('id', importId)
+      .maybeSingle();
+    if (error) {
+      this.logger.warn(`Unable to inspect prior wearable activity session ${sessionId}; preserving existing data`);
+      return true;
+    }
+    return data?.session_id === sessionId;
   }
 
   private logBundlePersistError(
@@ -916,7 +984,7 @@ export class CanonicalActivityWriterService {
   ): Promise<void> {
     const { error } = await this.supabaseAdminService.client.from(table).insert(rows);
     if (!error) return;
-    if (this.isRetryableInsertError(error) && rows.length > MIN_RETRY_INSERT_CHUNK_SIZE) {
+    if (this.isRetryableTransportError(error) && rows.length > MIN_RETRY_INSERT_CHUNK_SIZE) {
       const midpoint = Math.ceil(rows.length / 2);
       this.logger.log(
         `${errorCode}: retrying ${table} chunk [${startIndex}-${startIndex + rows.length}] as smaller chunks`,
@@ -925,7 +993,7 @@ export class CanonicalActivityWriterService {
       await this.insertChunkWithRecovery(table, rows.slice(midpoint), errorCode, startIndex + midpoint, totalRows);
       return;
     }
-    if (this.isRetryableInsertError(error)) {
+    if (this.isRetryableTransportError(error)) {
       await this.retrySmallChunk(table, rows, errorCode, startIndex, totalRows, error);
       return;
     }
@@ -938,7 +1006,7 @@ export class CanonicalActivityWriterService {
     errorCode: string,
     startIndex: number,
     totalRows: number,
-    firstError: ChunkInsertError,
+    firstError: PersistenceError,
   ): Promise<void> {
     let lastError = firstError;
     for (let attempt = 2; attempt <= INSERT_RETRY_ATTEMPTS; attempt += 1) {
@@ -946,12 +1014,12 @@ export class CanonicalActivityWriterService {
       const { error } = await this.supabaseAdminService.client.from(table).insert(rows);
       if (!error) return;
       lastError = error;
-      if (!this.isRetryableInsertError(error)) break;
+      if (!this.isRetryableTransportError(error)) break;
     }
     this.throwChunkInsertError(table, errorCode, startIndex, rows.length, totalRows, lastError);
   }
 
-  private isRetryableInsertError(error: ChunkInsertError): boolean {
+  private isRetryableTransportError(error: PersistenceError): boolean {
     const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
     return message.includes('fetch failed') || message.includes('socket') || message.includes('und_err_socket');
   }
@@ -962,7 +1030,7 @@ export class CanonicalActivityWriterService {
     startIndex: number,
     chunkLength: number,
     totalRows: number,
-    error: ChunkInsertError,
+    error: PersistenceError,
   ): never {
     this.logger.error(
       `${errorCode}: insert into ${table} failed for chunk [${startIndex}-${startIndex + chunkLength}] ` +
