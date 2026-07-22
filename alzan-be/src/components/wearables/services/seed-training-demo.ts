@@ -41,9 +41,15 @@ const ID = {
   tplRun10k: '5eed0000-0000-4000-8000-000000000001',
   tplRunIntervals: '5eed0000-0000-4000-8000-000000000002',
   tplGymPush: '5eed0000-0000-4000-8000-000000000003',
+  tplSeriesExample: '5eed0000-0000-4000-8000-000000000004',
   stepGroup: '5eed0000-0000-4000-8000-000000000010',
   stepWork: '5eed0000-0000-4000-8000-000000000011',
   stepRec: '5eed0000-0000-4000-8000-000000000012',
+  stepSeriesWarmup: '5eed0000-0000-4000-8000-000000000020',
+  stepSeriesGroup: '5eed0000-0000-4000-8000-000000000021',
+  stepSeriesWork: '5eed0000-0000-4000-8000-000000000022',
+  stepSeriesRec: '5eed0000-0000-4000-8000-000000000023',
+  stepSeriesCooldown: '5eed0000-0000-4000-8000-000000000024',
   tplExercise: '5eed0000-0000-4000-8000-000000000013',
   appRunDup: '5eed0000-0000-4000-8000-000000000101',
   appRideWeak: '5eed0000-0000-4000-8000-000000000102',
@@ -212,7 +218,8 @@ async function main(): Promise<void> {
   fail('cleanup plans by gym', (await db.from('workout_plans').delete().eq('gym_template_id', ID.tplGymPush)).error);
   fail(
     'cleanup steps',
-    (await db.from('endurance_workout_steps').delete().eq('template_id', ID.tplRunIntervals)).error,
+    (await db.from('endurance_workout_steps').delete().in('template_id', [ID.tplRunIntervals, ID.tplSeriesExample]))
+      .error,
   );
   fail(
     'cleanup template exercises',
@@ -220,7 +227,12 @@ async function main(): Promise<void> {
   );
   fail(
     'cleanup endurance templates',
-    (await db.from('endurance_workout_templates').delete().in('id', [ID.tplRun10k, ID.tplRunIntervals])).error,
+    (
+      await db
+        .from('endurance_workout_templates')
+        .delete()
+        .in('id', [ID.tplRun10k, ID.tplRunIntervals, ID.tplSeriesExample])
+    ).error,
   );
   fail('cleanup gym templates', (await db.from('workout_templates').delete().eq('id', ID.tplGymPush)).error);
 
@@ -246,6 +258,19 @@ async function main(): Promise<void> {
           description: '6 reps of 400m with 90s recovery jogs.',
           total_distance_m: 4800,
           total_duration_s: 1800,
+        },
+        {
+          id: ID.tplSeriesExample,
+          user_id: USER_ID,
+          sport_type: 'running',
+          base_name: 'series example',
+          description:
+            'Plantilla de series: Calentamiento 15min Zona 2 + 6x (400m a 4:00/km + 2min rec) + 10min enfriamiento.',
+          total_distance_m: 2400,
+          total_duration_s: 2796,
+          scheduled_day: 2,
+          recurrence_start_date: dayAt(7, 0).slice(0, 10),
+          recurrence_end_date: dayAt(-6, 0).slice(0, 10),
         },
       ])
     ).error,
@@ -285,6 +310,103 @@ async function main(): Promise<void> {
           duration_type: 'time',
           duration_s: 90,
           target_type: 'none',
+        },
+        {
+          id: ID.stepSeriesWarmup,
+          template_id: ID.tplSeriesExample,
+          order_index: 0,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'warmup',
+          duration_type: 'time',
+          duration_s: 900,
+          target_type: 'heart_rate',
+          target_min: 2,
+          target_max: 2,
+        },
+        {
+          id: ID.stepSeriesGroup,
+          template_id: ID.tplSeriesExample,
+          order_index: 1,
+          is_group: true,
+          repetitions: 6,
+          phase_type: 'interval',
+          duration_type: 'distance',
+          target_type: 'none',
+        },
+        {
+          id: ID.stepSeriesWork,
+          template_id: ID.tplSeriesExample,
+          parent_step_id: ID.stepSeriesGroup,
+          order_index: 0,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'interval',
+          duration_type: 'distance',
+          distance_m: 400,
+          target_type: 'pace',
+          target_min: 240,
+          target_max: 240,
+        },
+        {
+          id: ID.stepSeriesRec,
+          template_id: ID.tplSeriesExample,
+          parent_step_id: ID.stepSeriesGroup,
+          order_index: 1,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'recovery',
+          duration_type: 'time',
+          duration_s: 120,
+          target_type: 'none',
+        },
+        {
+          id: ID.stepSeriesCooldown,
+          template_id: ID.tplSeriesExample,
+          order_index: 2,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'cooldown',
+          duration_type: 'time',
+          duration_s: 600,
+          target_type: 'none',
+        },
+      ])
+    ).error,
+  );
+  fail(
+    'endurance step progressions',
+    (
+      await db.from('endurance_workout_step_progressions').insert([
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesGroup,
+          week_index: 1,
+          repetitions: 6,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesWork,
+          week_index: 1,
+          distance_m: 400,
+          target_type: 'pace',
+          target_min: 240,
+          target_max: 240,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesGroup,
+          week_index: 2,
+          repetitions: 4,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesWork,
+          week_index: 2,
+          distance_m: 1000,
+          target_type: 'pace',
+          target_min: 280,
+          target_max: 280,
         },
       ])
     ).error,

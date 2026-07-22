@@ -85,11 +85,13 @@ interface FakeFullTableClient {
 interface FakeFullSupabaseClient {
   deletes: FakeRecordedMutation[];
   inserts: FakeRecordedMutation[];
+  rpcCalls: Array<{ args: Record<string, unknown>; fn: string }>;
+  rpcErrors: FakeSupabaseError[];
   rows: Record<string, Array<Record<string, unknown>>>;
   updates: FakeRecordedMutation[];
   upserts: FakeRecordedMutation[];
   from(table: string): FakeFullTableClient;
-  rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null }>;
+  rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: FakeSupabaseError | null }>;
 }
 
 function createFakeSupabaseClient(
@@ -205,15 +207,23 @@ function createFullQuery(
   return query;
 }
 
-function createFullSupabaseClient(rows: Record<string, Array<Record<string, unknown>>>): FakeFullSupabaseClient {
+function createFullSupabaseClient(
+  rows: Record<string, Array<Record<string, unknown>>>,
+  rpcErrors: FakeSupabaseError[] = [],
+): FakeFullSupabaseClient {
   const client: FakeFullSupabaseClient = {
     deletes: [],
     inserts: [],
+    rpcCalls: [],
+    rpcErrors: [...rpcErrors],
     rows,
     updates: [],
     upserts: [],
-    async rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null }> {
+    async rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: FakeSupabaseError | null }> {
       assert.equal(fn, 'persist_wearable_activity_bundle');
+      client.rpcCalls.push({ fn, args });
+      const rpcError = client.rpcErrors.shift();
+      if (rpcError) return { data: null, error: rpcError };
       const sessionId = String(args.p_session_id);
       const sessionPayload = args.p_session_payload as Record<string, unknown>;
       client.updates.push({
@@ -500,6 +510,66 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
   assert.equal(linkedPayloads.length, 0, 'bundle transaction owns raw-payload linking');
 }
 
+async function assertBundleFailureFallsBackToGenericActivityWithLaps(): Promise<void> {
+  const activity = buildCanonicalRun();
+  const client = createFullSupabaseClient(
+    {
+      activity_sessions: [
+        {
+          id: 'session-1',
+          user_id: 'user-1',
+          provider: 'suunto',
+          provider_activity_id: 'suunto-run-1',
+          source_channel: 'cloud',
+          source_package: null,
+          source_record_id: 'suunto-run-1',
+          sport_type: 'running',
+          source: 'imported',
+          endurance_template_id: 'template-1',
+          duplicate_of_session_id: null,
+          duplicate_resolution: null,
+          duplicate_score: null,
+        },
+      ],
+    },
+    [{ code: 'PGRST500', message: 'simulated optional payload failure', details: '', hint: '' }],
+  );
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {
+      buildActivityFingerprint: () => 'fingerprint',
+      buildStrongActivityKey: () => 'strong-key',
+    } as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  );
+
+  const sessionId = await service.upsertActivity({
+    userId: 'user-1',
+    activity,
+    provenance: {
+      provider: 'suunto',
+      sourceChannel: 'cloud',
+      sourcePackage: null,
+      sourceProviderKey: 'suunto',
+      sourceRecordId: 'suunto-run-1',
+      sourceUpdatedAt: null,
+      rawPayloadId: 'raw-1',
+    },
+  });
+
+  assert.equal(sessionId, 'session-1');
+  assert.equal(client.rpcCalls.length, 2);
+  assert.equal((client.rpcCalls[1]?.args.p_streams as Array<unknown>).length, 0);
+  assert.ok((client.rpcCalls[1]?.args.p_laps as Array<unknown>).length > 0);
+  assert.equal(
+    client.inserts.some(
+      insert => insert.table === 'activity_route_points' || insert.table === 'activity_stream_samples',
+    ),
+    false,
+  );
+}
+
 async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Promise<void> {
   const activity = buildCanonicalRun();
   activity.summary.distanceM = 9220;
@@ -550,6 +620,84 @@ async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Pro
   assert.ok(insertedRows.some(row => row.split_distance_m === 10000 && row.distance_m === 9220));
 }
 
+async function assertExactSuuntoSeriesPersistsElevenNativeLaps(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.summary.distanceM = 7739;
+  activity.summary.durationSeconds = 2848.7;
+  const values = [
+    [1477.4, 600],
+    [1000, 294.4],
+    [190.1, 120],
+    [1000, 284.4],
+    [163.1, 120],
+    [1000, 286.7],
+    [173.1, 120],
+    [1000, 289.6],
+    [171, 120],
+    [1525.9, 600],
+  ] as const;
+  let offsetSeconds = 0;
+  activity.laps = values.map(([distanceM, durationSeconds], index) => {
+    const startOffsetSeconds = offsetSeconds;
+    offsetSeconds += durationSeconds;
+    return {
+      lapIndex: index + 1,
+      lapType: 'manual' as const,
+      distanceM,
+      durationSeconds,
+      avgPaceSecondsPerKm: (durationSeconds / distanceM) * 1000,
+      avgHeartRate: 150,
+      maxHeartRate: 170,
+      startOffsetSeconds,
+      endOffsetSeconds: offsetSeconds,
+    };
+  });
+  activity.laps.push(
+    {
+      lapIndex: 11,
+      lapType: 'distance',
+      distanceM: 36,
+      durationSeconds: 13.6,
+      avgPaceSecondsPerKm: (13.6 / 36) * 1000,
+      avgHeartRate: 165,
+      maxHeartRate: 170,
+      startOffsetSeconds: offsetSeconds,
+      endOffsetSeconds: offsetSeconds + 13.6,
+    },
+    {
+      lapIndex: 12,
+      lapType: 'distance',
+      distanceM: 739,
+      durationSeconds: 309.3,
+      avgPaceSecondsPerKm: (309.3 / 739) * 1000,
+      avgHeartRate: 163,
+      maxHeartRate: 170,
+      startOffsetSeconds: null,
+      endOffsetSeconds: null,
+    },
+  );
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  assert.equal(insertedRows.length, 11);
+  assert.deepEqual(
+    insertedRows.map(row => Math.round(Number(row.distance_m))),
+    [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
+  );
+  assert.equal(
+    insertedRows.every(row => row.split_group === 'custom'),
+    true,
+  );
+}
+
 function assertPositionSamplesAreSanitizedForValidRoutes(): void {
   const client = createFakeSupabaseClient(250);
   const service = createService(client);
@@ -598,7 +746,9 @@ async function run(): Promise<void> {
   await assertRetryableChunkFailuresAreSplit();
   await assertStrongPendingDuplicateWritesToSurvivor();
   await assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate();
+  await assertBundleFailureFallsBackToGenericActivityWithLaps();
   await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
+  await assertExactSuuntoSeriesPersistsElevenNativeLaps();
 }
 
 void run();
