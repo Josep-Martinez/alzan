@@ -14,7 +14,17 @@ import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
-import { Download, Trash2, Calendar, Info, AlertTriangle, Clock, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import {
+  Download,
+  Trash2,
+  Calendar,
+  FileInput,
+  Info,
+  AlertTriangle,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react-native';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 import {
   addDays,
@@ -33,6 +43,7 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 import { useSettingsNotifications, NotificationSettings } from '../../hooks/settings/useSettingsNotifications';
 import {
   copySequentialOnActivate,
@@ -55,6 +66,12 @@ import { useTranslation } from 'react-i18next';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { useSetNutritionVacationDates, useVacationDateSet } from '../../modules/nutrition/hooks/useNutritionData';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import type { TranslationKey } from '../../i18n/locales/en';
+import type { HomeScreenNavigationProp } from '../../types/navigation.types';
+import {
+  normalizeShoppingListStartDay,
+  type ShoppingListStartDay,
+} from '../../modules/nutrition/services/shoppingListPlanner';
 import {
   clearFutureVacationDraftSelection,
   getVacationDraftSelectionDiff,
@@ -129,7 +146,26 @@ type NutritionSectionInfoKey =
   | 'recipePrivacy'
   | 'recipeSearch'
   | 'autoPlanning'
-  | 'data';
+  | 'data'
+  | 'shoppingList';
+
+const SHOPPING_LIST_DAYS: Array<{
+  value: ShoppingListStartDay;
+  labelKey: TranslationKey;
+  shortLabelKey: TranslationKey;
+}> = [
+  { value: 1, labelKey: 'nutrition.shoppingListDayMonday', shortLabelKey: 'nutrition.shoppingListDayMondayShort' },
+  { value: 2, labelKey: 'nutrition.shoppingListDayTuesday', shortLabelKey: 'nutrition.shoppingListDayTuesdayShort' },
+  {
+    value: 3,
+    labelKey: 'nutrition.shoppingListDayWednesday',
+    shortLabelKey: 'nutrition.shoppingListDayWednesdayShort',
+  },
+  { value: 4, labelKey: 'nutrition.shoppingListDayThursday', shortLabelKey: 'nutrition.shoppingListDayThursdayShort' },
+  { value: 5, labelKey: 'nutrition.shoppingListDayFriday', shortLabelKey: 'nutrition.shoppingListDayFridayShort' },
+  { value: 6, labelKey: 'nutrition.shoppingListDaySaturday', shortLabelKey: 'nutrition.shoppingListDaySaturdayShort' },
+  { value: 7, labelKey: 'nutrition.shoppingListDaySunday', shortLabelKey: 'nutrition.shoppingListDaySundayShort' },
+];
 
 // Radio Option Component
 const RadioOption = ({
@@ -217,6 +253,7 @@ const ToggleRow = ({
 
 export const NutritionSettingsScreen = () => {
   const { t } = useTranslation();
+  const navigation = useNavigation<HomeScreenNavigationProp>();
   const { preferences, updatePreferences } = usePreferences();
   const { user } = useAuth();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
@@ -248,6 +285,7 @@ export const NutritionSettingsScreen = () => {
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
+  const shoppingListStartDay = normalizeShoppingListStartDay(preferences?.nutrition_prefs?.shopping_list_start_day);
   const storedDefaultHydrationMl = preferences?.nutrition_prefs?.default_hydration_ml;
   const defaultHydrationMl =
     typeof storedDefaultHydrationMl === 'number' && Number.isFinite(storedDefaultHydrationMl)
@@ -933,6 +971,10 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.nutritionDayInfoModalTitle',
       bodyKey: 'nutrition.nutritionDayInfoModalBody',
     },
+    shoppingList: {
+      titleKey: 'nutrition.shoppingListInfoModalTitle',
+      bodyKey: 'nutrition.shoppingListInfoModalBody',
+    },
     hydration: {
       titleKey: 'nutrition.defaultHydrationInfoModalTitle',
       bodyKey: 'nutrition.defaultHydrationInfoModalBody',
@@ -1052,7 +1094,55 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 3. Hidratación */}
+          {/* 3. Lista de la compra */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.shoppingListStartDayTitle'), 'shoppingList')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <View style={styles.shoppingListSettingContent}>
+                <View>
+                  <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.shoppingListStartDayLabel')}
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.shoppingListStartDayHint')}
+                  </Text>
+                </View>
+                <View style={styles.shoppingDayGrid}>
+                  {SHOPPING_LIST_DAYS.map(day => {
+                    const isSelected = day.value === shoppingListStartDay;
+                    return (
+                      <TouchableOpacity
+                        key={day.value}
+                        style={[
+                          styles.shoppingDayButton,
+                          {
+                            borderColor: isSelected ? themeColors.primary : themeColors.border,
+                            backgroundColor: isSelected ? themeColors.primary + '14' : 'transparent',
+                          },
+                        ]}
+                        onPress={() => updateNutritionPrefs({ shopping_list_start_day: day.value })}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(day.labelKey)}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <Text
+                          style={[
+                            styles.shoppingDayButtonText,
+                            { color: isSelected ? themeColors.primary : themeColors.textSecondary },
+                          ]}
+                        >
+                          {t(day.shortLabelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 4. Hidratación */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.defaultHydrationTitle'), 'hydration')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -1423,6 +1513,20 @@ export const NutritionSettingsScreen = () => {
                 <Calendar size={20} color={themeColors.primary} />
                 <Text style={[styles.actionText, { color: themeColors.primary }]}>
                   {t('nutrition.manageVacationDays')}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+
+              {/* Importar menú */}
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => navigation.navigate('Nutrition', { screen: 'MenuImport' })}
+                activeOpacity={0.7}
+              >
+                <FileInput size={20} color={themeColors.primary} />
+                <Text style={[styles.actionText, { color: themeColors.primary }]}>
+                  {t('nutrition.menuImportSettingsAction')}
                 </Text>
               </TouchableOpacity>
 
@@ -2789,6 +2893,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.m,
+  },
+  shoppingDayGrid: {
+    flexDirection: 'row',
+    gap: spacing.s,
+  },
+  shoppingListSettingContent: {
+    padding: spacing.m,
+    gap: spacing.m,
+  },
+  shoppingDayButton: {
+    flex: 1,
+    minHeight: 40,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shoppingDayButtonText: {
+    ...typography.caption,
+    fontWeight: '700',
+    textAlign: 'center',
+    fontSize: 13,
   },
   infoButton: {
     padding: spacing.xs,
