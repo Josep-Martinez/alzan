@@ -17,7 +17,18 @@ import { GlassCard } from '../../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { spacing } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
-import { ChevronLeft, ChevronRight, Dumbbell, Calendar, Play, List, Plus, Settings, Trash2 } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Dumbbell,
+  Calendar,
+  Play,
+  List,
+  Plus,
+  Settings,
+  Trash2,
+  Upload,
+} from 'lucide-react-native';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../constants/sports';
@@ -1083,11 +1094,26 @@ export const TrainingHomeScreen = () => {
       <SafeAreaView style={{ flex: 1, paddingBottom: 0 }}>
         {/* Top Bar */}
         <View style={styles.topBar}>
-          <View style={{ width: 24 }} />
+          <View style={styles.topBarActionsPlaceholder} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('home.training')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={{ padding: 4 }}>
-            <Settings size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <View style={styles.topBarActions}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TrainingPlanImport')}
+              style={styles.topBarAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.importTrainingPlan')}
+            >
+              <Upload size={23} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.topBarAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('navigation.workoutSettings')}
+            >
+              <Settings size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <DaySwitcher
@@ -1295,6 +1321,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     position: 'relative',
+  },
+  topBarActionsPlaceholder: {
+    width: 72,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topBarAction: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,

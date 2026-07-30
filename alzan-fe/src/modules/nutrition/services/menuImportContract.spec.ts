@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import {
   MENU_IMPORT_MEAL_TYPES,
+  MENU_IMPORT_MAX_DAYS,
   MENU_IMPORT_MAX_TEXT_LENGTH,
   parseMenuImportJson,
   type MenuImportValidationErrorCode,
@@ -21,6 +22,7 @@ type MealInput = {
 
 type DayInput = {
   date: string;
+  weekday?: string;
   meals: MealInput[];
 };
 
@@ -80,12 +82,13 @@ const assertFirstError = (value: unknown, expectedCode: MenuImportValidationErro
 };
 
 // Canonical parsing and text-size boundary.
-const validResult = parseMenuImportJson(JSON.stringify(menu()));
+const validResult = parseMenuImportJson(JSON.stringify(menu({ days: [day({ weekday: 'lunes' })] })));
 assert.equal(validResult.ok, true);
 if (validResult.ok) {
   assert.equal(validResult.value.menu_name, 'Menú semanal');
   assert.equal(validResult.value.days[0]?.meals[0]?.name, 'Avena con plátano');
   assert.equal(validResult.value.days[0]?.meals[0]?.ingredients[0]?.name, 'Copos de avena');
+  assert.equal(validResult.value.days[0]?.weekday, 'lunes');
 }
 
 const exampleDocument = readTemplateJson('alzan-menu-plan-v1.example.json');
@@ -122,17 +125,36 @@ assertFirstError({ ...menu(), days: {} }, 'invalid_type', 'days');
 // Collection limits: one item is covered by the canonical menu; test empty, maximum, and overflow.
 assertValid(
   menu({
-    days: Array.from({ length: 31 }, (_, index) => day({ date: `2026-08-${String(index + 1).padStart(2, '0')}` })),
+    days: Array.from({ length: MENU_IMPORT_MAX_DAYS }, (_, index) => {
+      const date = new Date(Date.UTC(2026, 6, 1 + index)).toISOString().slice(0, 10);
+      return day({ date, weekday: undefined });
+    }),
   }),
 );
 assertFirstError(menu({ days: [] }), 'invalid_length', 'days');
-assertFirstError(menu({ days: Array.from({ length: 32 }, () => day()) }), 'invalid_length', 'days');
+assertFirstError(
+  menu({
+    days: Array.from({ length: MENU_IMPORT_MAX_DAYS + 1 }, (_, index) => {
+      const date = new Date(Date.UTC(2026, 6, 1 + index)).toISOString().slice(0, 10);
+      return day({ date, weekday: undefined });
+    }),
+  }),
+  'invalid_length',
+  'days',
+);
 assertFirstError(
   menu({
     days: [day({ date: '2026-08-03' }), day({ date: '2026-08-03' })],
   }),
   'duplicate_date',
   'days[1].date',
+);
+assertFirstError(
+  menu({
+    days: [day({ date: '2026-08-03' }), day({ date: '2026-09-17' })],
+  }),
+  'out_of_range',
+  'days',
 );
 
 assertValid(menu({ days: [day({ meals: Array.from({ length: 10 }, () => meal()) })] }));
@@ -269,6 +291,33 @@ const menuWithFifteenHundredAndOneIngredients = menu({
 });
 assertFirstError(menuWithFifteenHundredAndOneIngredients, 'too_many_ingredients', 'days');
 
+const createDaysWithUniqueIngredients = (count: number): DayInput[] => {
+  const uniqueIngredients = Array.from({ length: count }, (_, index) =>
+    ingredient({ name: `Ingrediente único ${index + 1}` }),
+  );
+
+  return Array.from({ length: Math.ceil(uniqueIngredients.length / 30) }, (_, dayIndex) =>
+    day({
+      date: new Date(Date.UTC(2026, 7, 1 + dayIndex)).toISOString().slice(0, 10),
+      meals: [
+        meal({
+          name: `Comida única ${dayIndex + 1}`,
+          ingredients: uniqueIngredients.slice(dayIndex * 30, dayIndex * 30 + 30),
+        }),
+      ],
+    }),
+  );
+};
+
+assertValid(menu({ days: createDaysWithUniqueIngredients(200) }));
+const tooManyUniqueIngredientsResult = parseMenuImportJson(
+  JSON.stringify(menu({ days: createDaysWithUniqueIngredients(201) })),
+);
+assert.equal(tooManyUniqueIngredientsResult.ok, false);
+if (!tooManyUniqueIngredientsResult.ok) {
+  assert.ok(tooManyUniqueIngredientsResult.errors.some(error => error.code === 'too_many_unique_ingredients'));
+}
+
 // Trimmed string lengths and quantity range.
 assertValid(
   menu({
@@ -345,6 +394,8 @@ assertFirstError(
 assertFirstError(menu({ days: [day({ date: '2026-02-30' })] }), 'invalid_date', 'days[0].date');
 assertFirstError(menu({ days: [day({ date: '03/08/2026' })] }), 'invalid_date', 'days[0].date');
 assertValid(menu({ days: [day({ date: '2028-02-29' })] }));
+assertFirstError(menu({ days: [day({ weekday: 'martes' })] }), 'weekday_mismatch', 'days[0].weekday');
+assertFirstError(menu({ days: [day({ weekday: 'laborable' })] }), 'invalid_weekday', 'days[0].weekday');
 
 // Every meal slot supported by the database remains accepted by the public contract.
 assertValid(
