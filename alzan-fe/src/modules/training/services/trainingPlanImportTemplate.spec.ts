@@ -10,38 +10,30 @@ import {
 import { parseTrainingPlanJson } from './trainingPlanImportContract';
 
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('running'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Plan_Entrenamiento.docx'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('el nombre puede variar'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('DOCX'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('aunque tenga otro nombre'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CSV adjunto'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('PRESERVACIÓN ABSOLUTA DEL ENTRENAMIENTO'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No cambies cargas, ritmos, kilómetros'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('detén la conversión y devuelve un informe de bloqueo'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No generes el campo notes'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No generes rpe, rir, rir_min ni rir_max'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No uses target_type: "rpe"'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No escribas duration_s, distance_m'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada exercise solo puede usar'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Copia exactamente fechas'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('informe de bloqueo'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_id'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('weekday'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('45 días'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Se permiten varias sesiones distintas en una misma fecha'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Mantén literalmente la distribución'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No pongas repetitions en un intervalo plano'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('mismo bloque de 7 días'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CONTRATO JSON AUTÓNOMO'));
-assert.ok(
-  TRAINING_PLAN_IMPORT_PROMPT.includes(
-    'La raíz solo puede contener format, version, plan_name, start_date, end_date y weeks',
-  ),
-);
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('2005 ejercicios'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('tempo_threshold'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('free_weights'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('phase_type solo puede ser warmup'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('La raíz solo contiene format, version'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Fases permitidas'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes UUID'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('traducciones, equipamiento, grupos musculares'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('alternativa canónica más parecida'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('alternativa más parecida'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('mismo patrón de movimiento'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('calentamiento 10 min'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('10 min'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('límite inferior'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('sesión normal'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('progression_key'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('caso real'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('23/06'));
+assert.doesNotMatch(TRAINING_PLAN_IMPORT_PROMPT, /conserva.*notes/i);
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"weekday": "lunes"'));
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"phase_type": "recovery"'));
 assert.ok(!TRAINING_PLAN_IMPORT_TEMPLATE.includes('REEMPLAZAR_UUID'));

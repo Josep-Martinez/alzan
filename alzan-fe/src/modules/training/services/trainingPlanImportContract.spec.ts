@@ -51,6 +51,42 @@ if (parsed.ok) {
   assert.equal(parsed.value.weeks[1].sessions[1].exercises?.[0].weight_kg, 80);
 }
 
+const legacyNotes = {
+  ...validDocument,
+  weeks: [
+    {
+      ...validDocument.weeks[0],
+      sessions: [
+        { ...validDocument.weeks[0].sessions[0], notes: 'x'.repeat(2000) },
+        {
+          ...validDocument.weeks[0].sessions[1],
+          exercises: [
+            {
+              exercise_name: 'Sentadilla',
+              order_index: 0,
+              sets: 4,
+              reps: 6,
+              notes: 'y'.repeat(2000),
+              rir: 2,
+              rir_min: 2,
+              rir_max: 3,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const parsedLegacyNotes = parseTrainingPlanJson(JSON.stringify(legacyNotes));
+assert.equal(parsedLegacyNotes.ok, true);
+if (parsedLegacyNotes.ok) {
+  assert.equal('notes' in parsedLegacyNotes.value.weeks[0].sessions[0], false);
+  assert.equal('notes' in parsedLegacyNotes.value.weeks[0].sessions[1].exercises![0], false);
+  assert.equal('rir' in parsedLegacyNotes.value.weeks[0].sessions[1].exercises![0], false);
+  assert.equal('rir_min' in parsedLegacyNotes.value.weeks[0].sessions[1].exercises![0], false);
+  assert.equal('rir_max' in parsedLegacyNotes.value.weeks[0].sessions[1].exercises![0], false);
+}
+
 const duplicate = parseTrainingPlanJson(
   JSON.stringify({
     ...validDocument,

@@ -139,6 +139,9 @@ const EXERCISE_KEYS = [
   'reps_max',
   'weight_kg',
   'rpe',
+  'rir',
+  'rir_min',
+  'rir_max',
   'rest_seconds',
   'notes',
 ];
@@ -409,9 +412,7 @@ const parseExercise = (
       : { weight_kg: value.weight_kg as number }),
     ...(readNumber(value.rpe, `${path}.rpe`, errors, 1, 10) === undefined ? {} : { rpe: value.rpe as number }),
     ...(restSeconds === undefined ? {} : { rest_seconds: restSeconds }),
-    ...(readString(value.notes, `${path}.notes`, errors)
-      ? { notes: readString(value.notes, `${path}.notes`, errors) }
-      : {}),
+    // Notes are accepted for backwards compatibility but are intentionally not imported.
   };
 };
 
@@ -568,9 +569,7 @@ const parseSession = (
     ...(readString(value.modality, `${path}.modality`, errors)
       ? { modality: readString(value.modality, `${path}.modality`, errors) }
       : {}),
-    ...(readString(value.notes, `${path}.notes`, errors)
-      ? { notes: readString(value.notes, `${path}.notes`, errors) }
-      : {}),
+    // Notes are accepted for backwards compatibility but are intentionally not imported.
     ...(readNumber(value.distance_km, `${path}.distance_km`, errors, 0, 1000) === undefined
       ? {}
       : { distance_km: value.distance_km as number }),
