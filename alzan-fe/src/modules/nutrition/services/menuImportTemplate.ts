@@ -49,11 +49,11 @@ ARCHIVOS DE REFERENCIA
 FIDELIDAD AL DOCUMENTO
 - Adapta el documento al esquema JSON; no diseñes otro menú.
 - Conserva exactamente las fechas, los días, el orden de las comidas, los nombres de las comidas, los ingredientes y sus cantidades del documento.
-- No optimices calorías o macronutrientes, no corrijas cantidades, no sustituyas alimentos, no mezcles recetas, no elimines comidas y no añadas ingredientes que no aparezcan en el documento.
+- No optimices calorías o macronutrientes, no corrijas cantidades, no cambies el orden, no mezcles recetas, no elimines comidas y no añadas ingredientes que no aparezcan en el documento. No sustituyas alimentos por criterio nutricional: la única sustitución permitida es resolver un nombre al ingrediente canónico más parecido del CSV cuando el alimento exacto no exista, conservando la cantidad y el estado original.
 - Usa las recetas detalladas del documento para expandir referencias como R01 o R34. No uses una lista de la compra como si fuera una comida.
 - Convierte una unidad a gramos solo cuando la equivalencia esté expresamente indicada en el documento o en el CSV. Si no se puede convertir sin suponer, detén la conversión y devuelve un informe de bloqueo en vez de inventar una cantidad.
 - Si el documento ofrece alternativas sin indicar cuál se debe usar, no elijas arbitrariamente: informa del conflicto para que se pueda resolver antes de importar.
-- Si un ingrediente no existe en el CSV o hay más de una coincidencia posible, informa del nombre y la fecha/comida afectada; no lo sustituyas ni lo inventes.
+- Si un ingrediente no existe en el CSV o hay más de una coincidencia posible, elige el ingrediente canónico más parecido solo si conserva el mismo alimento, categoría y uso culinario (por ejemplo, no confundas pechuga con muslo ni un alimento cocido con uno crudo). Prioriza coincidencia exacta normalizada y después la alternativa con mayor coincidencia semántica. Si no existe una alternativa segura, informa del nombre y la fecha/comida afectada; no inventes nombres, IDs ni ingredientes.
 
 REGLAS DEL CALENDARIO
 - Usa una entrada en days por cada fecha, en formato YYYY-MM-DD.
@@ -68,10 +68,11 @@ REGLAS NUTRICIONALES
 - Incluye solo name y quantity_g en cada ingrediente; la aplicación calcula calorías y macronutrientes.
 - Expresa las cantidades en gramos. Aclara en el nombre si el alimento está cocido, en crudo, escurrido o listo para consumir.
 - Usa nombres de ingredientes sencillos y reales que puedan existir en el catálogo de Alzan; evita marcas, recetas generales y cantidades vagas como “al gusto”.
-- El CSV es la autoridad del catálogo estático de producción (actualmente contiene aproximadamente 1977 ingredientes). Busca una coincidencia exacta o inequívoca y copia el nombre canónico del CSV; no inventes nombres, IDs ni ingredientes nuevos. El CSV puede tener categoría y unit_basis, pero esos campos no se exportan al JSON.
+- El CSV es la autoridad del catálogo estático de producción (actualmente contiene aproximadamente 1977 ingredientes). Busca primero una coincidencia exacta normalizada y copia el nombre canónico del CSV. Si no existe, usa la alternativa más parecida que mantenga alimento, categoría, estado (crudo/cocido/escurrido) y unidad de medida; no inventes nombres, IDs ni ingredientes nuevos. El CSV puede tener categoría y unit_basis, pero esos campos no se exportan al JSON.
 - Las categorías estáticas disponibles son bebida, cereal, condimento, dulce, fruta, fruto_seco, grasa, lacteo, legumbre, otro, precocinado, proteina_animal, proteina_vegetal, semilla, snack, tuberculo y verdura. No escribas la categoría en el JSON.
 - El catálogo usa principalmente unit_basis per_100g y los alimentos/recetas se expresan en g o ml; convierte ml a gramos solo con una equivalencia explícita del documento o del CSV.
 - Aunque el CSV o el documento incluyan alias, marcas, recetas, calorías, macros u otros metadatos, ninguno de esos datos tiene un campo en este contrato: no los exportes.
+- Si has tenido que resolver un ingrediente mediante una alternativa cercana, conserva exactamente su cantidad del documento y verifica internamente que la adaptación mantiene el alimento, el estado y la unidad; no cambies la ración para hacerla encajar ni añadas texto fuera del JSON.
 - Reutiliza el mismo nombre canónico cuando sea el mismo alimento y no superes ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres de ingredientes distintos por documento.
 - No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} entradas de ingredientes en total por documento.
 - No inventes calorías, proteínas, hidratos ni grasas en el JSON.
