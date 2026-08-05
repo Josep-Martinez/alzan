@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   findReusableImportedTemplate,
   getImportedTemplateScheduledDay,
+  getImportedSessionMetadata,
   groupTrainingPlanSessions,
 } from './trainingPlanImportPlanner';
 import type { TrainingPlanImportDocument } from './trainingPlanImportContract';
@@ -54,12 +55,43 @@ const document: TrainingPlanImportDocument = {
   ],
 };
 
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'intervals' }), {
+  workoutGoal: 'speed',
+  modality: 'outdoor',
+});
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'tempo', modality: 'outdoor' }), {
+  workoutGoal: 'tempo_threshold',
+  modality: 'outdoor',
+});
+assert.deepEqual(getImportedSessionMetadata({ sport: 'strength', workout_goal: 'hypertrophy' }), {
+  workoutGoal: 'hypertrophy',
+  modality: 'gym',
+});
+assert.deepEqual(
+  getImportedSessionMetadata({
+    sport: 'strength',
+    workout_goal: 'strength',
+    modality: 'free_weights',
+  }),
+  { workoutGoal: 'strength', modality: 'free_weights' },
+);
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'Resistencia', modality: 'Exterior' }), {
+  workoutGoal: 'endurance',
+  modality: 'outdoor',
+});
+assert.deepEqual(
+  getImportedSessionMetadata({ sport: 'strength', workout_goal: 'Resistencia muscular', modality: 'Peso libre' }),
+  { workoutGoal: 'muscular_endurance', modality: 'free_weights' },
+);
+
 const groups = groupTrainingPlanSessions(document);
 assert.equal(groups.length, 2);
 assert.equal(groups.find(group => group.sport === 'running')?.sessions.length, 2);
 assert.equal(groups.find(group => group.sport === 'strength')?.sessions.length, 2);
-assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), 1);
-assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), 2);
+assert.equal(groups.find(group => group.sport === 'running')?.modality, 'outdoor');
+assert.equal(groups.find(group => group.sport === 'strength')?.modality, 'gym');
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), null);
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), null);
 
 const structuralDocument: TrainingPlanImportDocument = {
   ...document,
@@ -89,7 +121,7 @@ const structuralDocument: TrainingPlanImportDocument = {
   ],
 };
 assert.equal(groupTrainingPlanSessions(structuralDocument).length, 1);
-assert.equal(getImportedTemplateScheduledDay(groupTrainingPlanSessions(structuralDocument)[0]), 1);
+assert.equal(getImportedTemplateScheduledDay(groupTrainingPlanSessions(structuralDocument)[0]), null);
 
 const weekdayDates = [
   ['2026-08-02', 0],
@@ -100,7 +132,7 @@ const weekdayDates = [
   ['2026-08-07', 5],
   ['2026-08-08', 6],
 ] as const;
-for (const [date, expectedDay] of weekdayDates) {
+for (const [date] of weekdayDates) {
   assert.equal(
     getImportedTemplateScheduledDay({
       familyKey: 'test',
@@ -111,7 +143,7 @@ for (const [date, expectedDay] of weekdayDates) {
       sessions: [{ date, sport: 'running', name: 'Test' }],
       signature: 'test',
     }),
-    expectedDay,
+    null,
   );
 }
 

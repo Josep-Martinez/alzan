@@ -5,10 +5,15 @@ DECLARE
   v_user_id uuid;
   v_session_id uuid := gen_random_uuid();
   v_template_id uuid := gen_random_uuid();
+  v_template_b_id uuid := gen_random_uuid();
   v_plan_a uuid := gen_random_uuid();
   v_plan_b uuid := gen_random_uuid();
   v_offset_session_id uuid := gen_random_uuid();
   v_offset_plan_id uuid := gen_random_uuid();
+  v_recurring_session_id uuid := gen_random_uuid();
+  v_recurring_template_id uuid := gen_random_uuid();
+  v_recurring_plan_id uuid := gen_random_uuid();
+  v_gym_session_id uuid := gen_random_uuid();
   v_gym_template_id uuid := gen_random_uuid();
   v_gym_plan_id uuid := gen_random_uuid();
   v_result jsonb;
@@ -17,12 +22,14 @@ BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'PLAN_ASSOCIATION_TEST_REQUIRES_LOCAL_USER'; END IF;
 
   INSERT INTO public.endurance_workout_templates (id, user_id, sport_type, base_name)
-  VALUES (v_template_id, v_user_id, 'running', 'Codex association fixture');
+  VALUES
+    (v_template_id, v_user_id, 'running', 'Codex association fixture'),
+    (v_template_b_id, v_user_id, 'running', 'Codex association fixture B');
   INSERT INTO public.activity_sessions (
-    id, user_id, sport_type, start_time, end_time, started_at_local, source
+    id, user_id, sport_type, start_time, end_time, started_at_local, source, name
   ) VALUES (
     v_session_id, v_user_id, 'running', '2026-05-01T08:00:00Z',
-    '2026-05-01T09:00:00Z', '2026-05-01T10:00:00', 'imported'
+    '2026-05-01T09:00:00Z', '2026-05-01T10:00:00', 'imported', 'Original provider title'
   );
   INSERT INTO public.workout_plans (id, user_id, planned_date, endurance_template_id)
   VALUES
@@ -52,10 +59,27 @@ BEGIN
   IF (SELECT count(*) FROM public.workout_plans WHERE activity_session_id = v_session_id) <> 1 THEN
     RAISE EXCEPTION 'PLAN_ASSOCIATION_SESSION_LINKED_MORE_THAN_ONCE';
   END IF;
+  IF (SELECT name FROM public.activity_sessions WHERE id = v_session_id) <> 'Codex association fixture' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_RUNNING_NAME_NOT_UPDATED';
+  END IF;
+
+  v_result := public.associate_activity_session_template(
+    v_user_id, v_session_id, v_template_b_id, NULL, v_plan_b
+  );
+  IF v_result->>'status' <> 'associated'
+    OR (SELECT name FROM public.activity_sessions WHERE id = v_session_id) <> 'Codex association fixture B' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_RUNNING_NAME_NOT_UPDATED_ON_REASSOCIATION';
+  END IF;
 
   PERFORM public.associate_activity_session_template(v_user_id, v_session_id, NULL, NULL, NULL);
   IF EXISTS (SELECT 1 FROM public.workout_plans WHERE activity_session_id = v_session_id) THEN
     RAISE EXCEPTION 'PLAN_ASSOCIATION_REMOVAL_DID_NOT_REVERT_PLAN';
+  END IF;
+  IF (SELECT name FROM public.activity_sessions WHERE id = v_session_id) IS DISTINCT FROM 'Original provider title' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_NAME_NOT_RESTORED';
+  END IF;
+  IF (SELECT template_name_state FROM public.activity_sessions WHERE id = v_session_id) IS NOT NULL THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_NAME_STATE_NOT_CLEARED';
   END IF;
 
   INSERT INTO public.activity_sessions (
@@ -73,8 +97,35 @@ BEGIN
     RAISE EXCEPTION 'PLAN_ASSOCIATION_FIXED_OFFSET_DATE_INCORRECT';
   END IF;
 
+  INSERT INTO public.endurance_workout_templates (
+    id, user_id, sport_type, base_name, scheduled_day, recurrence_start_date, recurrence_end_date
+  ) VALUES (
+    v_recurring_template_id, v_user_id, 'running', 'Codex recurring run fixture', 2, '2026-05-01', '2026-05-31'
+  );
+  INSERT INTO public.activity_sessions (
+    id, user_id, sport_type, start_time, end_time, started_at_local, source
+  ) VALUES (
+    v_recurring_session_id, v_user_id, 'running', '2026-05-05T08:00:00Z',
+    '2026-05-05T09:00:00Z', '2026-05-05T10:00:00', 'imported'
+  );
+  INSERT INTO public.workout_plans (id, user_id, planned_date, endurance_template_id)
+  VALUES (v_recurring_plan_id, v_user_id, '2026-05-05', v_recurring_template_id);
+  v_result := public.associate_activity_session_template(
+    v_user_id, v_recurring_session_id, v_recurring_template_id, NULL, v_recurring_plan_id
+  );
+  IF v_result->>'status' <> 'associated'
+    OR (SELECT name FROM public.activity_sessions WHERE id = v_recurring_session_id) <> 'Codex recurring run fixture' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_RECURRING_NAME_NOT_UPDATED';
+  END IF;
+
   INSERT INTO public.workout_templates (id, user_id, base_name)
   VALUES (v_gym_template_id, v_user_id, 'Codex gym fixture');
+  INSERT INTO public.activity_sessions (
+    id, user_id, sport_type, start_time, end_time, started_at_local, source, name
+  ) VALUES (
+    v_gym_session_id, v_user_id, 'strength', '2026-05-01T08:00:00Z',
+    '2026-05-01T09:00:00Z', '2026-05-01T10:00:00', 'imported', 'Original strength title'
+  );
   INSERT INTO public.workout_plans (id, user_id, planned_date, gym_template_id)
   VALUES (v_gym_plan_id, v_user_id, '2026-05-01', v_gym_template_id);
   BEGIN
@@ -85,6 +136,17 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM <> 'IMPORT_REVIEW_PLAN_SPORT_MISMATCH' THEN RAISE; END IF;
   END;
+  v_result := public.associate_activity_session_template(
+    v_user_id, v_gym_session_id, NULL, v_gym_template_id, v_gym_plan_id
+  );
+  IF v_result->>'status' <> 'associated'
+    OR (SELECT name FROM public.activity_sessions WHERE id = v_gym_session_id) <> 'Codex gym fixture' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_GYM_NAME_NOT_UPDATED';
+  END IF;
+  PERFORM public.associate_activity_session_template(v_user_id, v_gym_session_id, NULL, NULL, NULL);
+  IF (SELECT name FROM public.activity_sessions WHERE id = v_gym_session_id) IS DISTINCT FROM 'Original strength title' THEN
+    RAISE EXCEPTION 'PLAN_ASSOCIATION_GYM_NAME_NOT_RESTORED';
+  END IF;
 END;
 $$;
 

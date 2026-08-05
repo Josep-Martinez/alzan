@@ -9,6 +9,7 @@ import type {
   TrainingPlanSession,
   TrainingPlanRunningStep,
 } from './trainingPlanImportContract';
+import { resolveTrainingImportMetadata } from '../helpers/trainingPlanImportMetadata.helper';
 
 export type ImportedTemplateFamily = {
   familyKey: string;
@@ -26,6 +27,16 @@ export type ImportedTemplateCandidate = {
   source: string | null;
   recurrence_start_date: string | null;
   recurrence_end_date: string | null;
+};
+
+export const getImportedSessionMetadata = (
+  session: Pick<TrainingPlanSession, 'sport' | 'workout_goal' | 'modality'>,
+): { workoutGoal: string | null; modality: string | null } => {
+  const result = resolveTrainingImportMetadata(session.sport, session.workout_goal, session.modality);
+  if (!result.ok) {
+    throw new Error(`Invalid imported session metadata: ${result.invalidFields.join(', ')}`);
+  }
+  return { workoutGoal: result.workoutGoal, modality: result.modality };
 };
 
 export const findReusableImportedTemplate = (
@@ -50,11 +61,12 @@ const toEnduranceSignatureStep = (step: TrainingPlanRunningStep): EnduranceSigna
 });
 
 export const getTrainingPlanSessionSignature = (session: TrainingPlanSession): string => {
+  const metadata = getImportedSessionMetadata(session);
   if (session.sport === 'running') {
     return buildEnduranceTemplateFamilySignature({
       sportType: 'running',
-      workoutGoal: session.workout_goal,
-      modality: session.modality,
+      workoutGoal: metadata.workoutGoal,
+      modality: metadata.modality,
       steps: (session.running_steps ?? []).map(toEnduranceSignatureStep),
     });
   }
@@ -64,7 +76,7 @@ export const getTrainingPlanSessionSignature = (session: TrainingPlanSession): s
     orderIndex: exercise.order_index,
     isWarmup: exercise.is_warmup,
   }));
-  return buildGymTemplateFamilySignature({ workoutGoal: session.workout_goal, modality: session.modality, exercises });
+  return buildGymTemplateFamilySignature({ workoutGoal: metadata.workoutGoal, modality: metadata.modality, exercises });
 };
 
 const stableHash = (value: string): string => {
@@ -91,12 +103,13 @@ export const groupTrainingPlanSessions = (document: TrainingPlanImportDocument):
         current.sessions.push(session);
         continue;
       }
+      const metadata = getImportedSessionMetadata(session);
       grouped.set(familyKey, {
         familyKey,
         sport: session.sport,
         name: session.name,
-        workoutGoal: session.workout_goal ?? null,
-        modality: session.modality ?? null,
+        workoutGoal: metadata.workoutGoal,
+        modality: metadata.modality,
         sessions: [session],
         signature: getTrainingPlanSessionSignature(session),
       });
@@ -106,11 +119,9 @@ export const groupTrainingPlanSessions = (document: TrainingPlanImportDocument):
 };
 
 /**
- * Templates currently support one recurring weekday. Only expose it when the
- * imported sessions in the family are consistent; mixed weekdays remain
- * date-driven and must not generate invented calendar entries.
+ * Imported plans are always date-driven. Calendar entries come exclusively
+ * from the explicit session dates in the JSON, even when every occurrence of
+ * a template happens to fall on the same weekday. Weekly recurrence is only
+ * enabled later when the user explicitly edits the template.
  */
-export const getImportedTemplateScheduledDay = (family: ImportedTemplateFamily): number | null => {
-  const days = new Set(family.sessions.map(session => new Date(`${session.date}T00:00:00.000Z`).getUTCDay()));
-  return days.size === 1 ? [...days][0] : null;
-};
+export const getImportedTemplateScheduledDay = (_family: ImportedTemplateFamily): null => null;

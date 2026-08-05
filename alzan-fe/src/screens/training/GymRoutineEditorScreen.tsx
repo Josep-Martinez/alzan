@@ -42,6 +42,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
+import { OneOffDateSelector } from '../../components/training/OneOffDateSelector';
 import { useExercisesPRs } from '../../hooks/useExercisesPRs';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -56,7 +57,15 @@ import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/g
 import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
-import { isScheduledWeekday } from '../../modules/training/helpers/templateScheduling.helper';
+import {
+  getCurrentWeekDateForWeekday,
+  getCurrentWeekdayForDate,
+  hasValidRecurringDay,
+  isScheduledWeekday,
+  isValidIsoDate,
+  resolveOneOffDate,
+  shouldShowScheduleDays,
+} from '../../modules/training/helpers/templateScheduling.helper';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -69,22 +78,40 @@ export const GymRoutineEditorScreen = () => {
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
 
-  const { routineData, saveRoutine } = useGymRoutineEditor(routineId);
+  const { routineData, oneOffPlanDate, saveRoutine } = useGymRoutineEditor(routineId);
   const { getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
+  const isImportedDateDrivenTemplate =
+    routineData?.source === 'imported' &&
+    routineData.suggested_day_of_week === null &&
+    !!routineData.recurrence_start_date &&
+    !!routineData.recurrence_end_date;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [workoutGoal, setWorkoutGoal] = useState<string | null>(null);
-  const [modality, setModality] = useState<string | null>(null);
+  const [modality, setModality] = useState<string | null>('gym');
   const [currentView, setCurrentView] = useState<'main' | 'builder'>('main');
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [modalityModalVisible, setModalityModalVisible] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [originalSuggestedDay, setOriginalSuggestedDay] = useState<number | null>(null); // Track original day for edit mode
   const [isRecurring, setIsRecurring] = useState(false);
+  const [oneOffDate, setOneOffDate] = useState<string | null>(null);
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
+  const oneOffWeekday = !isRecurring ? getCurrentWeekdayForDate(oneOffDate) : null;
+
+  const handleScheduleDaysChange = (days: number[]) => {
+    if (!isRecurring) {
+      const selectedDay = days[0];
+      setSelectedDays([]);
+      setOneOffDate(selectedDay === undefined ? null : getCurrentWeekDateForWeekday(selectedDay));
+      return;
+    }
+    setSelectedDays(days);
+  };
+
   const [exercises, setExercises] = useState<RoutineDataExercise[]>([]);
   const [supersetLinks, setSupersetLinks] = useState<Set<number>>(new Set());
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -206,15 +233,20 @@ export const GymRoutineEditorScreen = () => {
         setOriginalSuggestedDay(null);
       }
       setIsRecurring(isScheduledWeekday(routineData.suggested_day_of_week));
+      setOneOffDate(null);
       setRecurrenceStartDate(lifecycleData.recurrence_start_date || null);
       setExercises(routineData.exercises || []);
       setSupersetLinks(buildSupersetLinksFromExercises(routineData.exercises || []));
       setWorkoutGoal(routineData.workout_goal || null);
-      setModality(routineData.modality || null);
+      setModality(routineData.modality || 'gym');
       setRecurrenceEndDate(lifecycleData.recurrence_end_date || '');
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
     }
   }, [routineData, trainingSettings.autoDeleteExpiredTemplates]);
+
+  useEffect(() => {
+    if (routineId) setOneOffDate(oneOffPlanDate);
+  }, [oneOffPlanDate, routineId]);
 
   useEffect(() => {
     exercisesRef.current = exercises;
@@ -579,11 +611,14 @@ export const GymRoutineEditorScreen = () => {
     try {
       const supersetIndexes = Array.from(supersetLinks).sort((a, b) => a - b);
       const suggestedDayForSave = isRecurring && selectedDays.length > 0 ? selectedDays[0] : null;
+      const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
       const recurrenceStartDateForSave = isRecurring
         ? selectedDays.length > 0
           ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd')
           : null
-        : recurrenceStartDate || null;
+        : isImportedDateDrivenTemplate
+          ? recurrenceStartDate || null
+          : null;
       const recurrenceEndDateForSave = recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null;
       const importedLifecycleChanged =
         routineData?.source === 'imported' &&
@@ -610,6 +645,13 @@ export const GymRoutineEditorScreen = () => {
         workout_goal: workoutGoal || null,
         modality: modality || null,
         suggested_day_of_week: suggestedDayForSave,
+        one_off_date: savedOneOffDate,
+        remove_one_off_plan:
+          isRecurring &&
+          !!routineId &&
+          !isImportedDateDrivenTemplate &&
+          routineData?.suggested_day_of_week === null &&
+          !!oneOffPlanDate,
         recurrence_start_date: recurrenceStartDateForSave,
         recurrence_end_date: recurrenceEndDateForSave,
         auto_delete_after_end: autoDeleteAfterEnd,
@@ -633,13 +675,23 @@ export const GymRoutineEditorScreen = () => {
       return;
     }
 
+    if (!hasValidRecurringDay(isRecurring, selectedDays)) {
+      Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
+      return;
+    }
+
+    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+      Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
+      return;
+    }
+
     if (recurrenceEndDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEndDate.trim())) {
       Alert.alert(t('common.error'), t('training.invalidTemplateEndDate'));
       return;
     }
 
     // Check if day changed in edit mode
-    const newDay = selectedDays.length > 0 ? selectedDays[0] : null;
+    const newDay = isRecurring && selectedDays.length > 0 ? selectedDays[0] : null;
     const dayChanged = routineId && originalSuggestedDay !== null && newDay !== originalSuggestedDay;
 
     if (dayChanged) {
@@ -944,12 +996,31 @@ export const GymRoutineEditorScreen = () => {
                 <View style={styles.formGroup}>
                   <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.scheduleDay')}</Text>
                   <WeekDaySelector
-                    selectedDays={selectedDays}
-                    onDaysChange={setSelectedDays}
+                    selectedDays={isRecurring ? selectedDays : oneOffWeekday === null ? [] : [oneOffWeekday]}
+                    onDaysChange={handleScheduleDaysChange}
                     isRecurring={isRecurring}
-                    onToggleRecurring={() => setIsRecurring(!isRecurring)}
+                    showDays={shouldShowScheduleDays({
+                      isRecurring,
+                      isImportedDateDriven: isImportedDateDrivenTemplate,
+                    })}
+                    onToggleRecurring={() => {
+                      const nextRecurring = !isRecurring;
+                      setIsRecurring(nextRecurring);
+                      if (!nextRecurring) setSelectedDays([]);
+                    }}
                     singleSelect={true}
                   />
+                  {!isRecurring && !isImportedDateDrivenTemplate && (
+                    <OneOffDateSelector
+                      value={oneOffDate}
+                      onChange={date => {
+                        setSelectedDays([]);
+                        setOneOffDate(date);
+                      }}
+                      label={t('training.oneOffDateLabel')}
+                      placeholder={t('training.oneOffDatePlaceholder')}
+                    />
+                  )}
                   <View style={styles.templateLifecycleCard}>
                     <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
                     <TextInput

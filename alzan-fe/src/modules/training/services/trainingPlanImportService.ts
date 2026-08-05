@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabaseClient';
-import type { EnduranceWorkoutTemplateProgressionInsert, WorkoutPlanInsert } from '../../../types/requests.types';
+import type { EnduranceWorkoutTemplateProgressionInsert } from '../../../types/requests.types';
 import { getProgressionWeekIndex, type StepProgressionOverride } from '../helpers/enduranceProgression.helper';
 import { replaceEnduranceStepProgressions } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
@@ -11,6 +11,7 @@ import {
   type ImportedTemplateFamily,
 } from './trainingPlanImportPlanner';
 import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPlanImportLogger';
+import { buildImportedWorkoutPlans } from './trainingPlanImportCalendar.helper';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import {
   getTrainingExerciseResolutionKey,
@@ -25,7 +26,22 @@ import type {
 
 type CreatedTemplate = { family: ImportedTemplateFamily; id: string };
 type TemplateCreationResult = { id: string; created: boolean };
-type TrainingPlanImportOptions = { autoDeleteExpiredTemplates?: boolean };
+export type TrainingPlanImportProgress = {
+  phase: 'preparing' | 'exercises' | 'templates' | 'calendar' | 'complete';
+  percentage: number;
+};
+type TrainingPlanImportOptions = {
+  autoDeleteExpiredTemplates?: boolean;
+  onProgress?: (progress: TrainingPlanImportProgress) => void;
+};
+
+const reportImportProgress = (
+  options: TrainingPlanImportOptions,
+  phase: TrainingPlanImportProgress['phase'],
+  percentage: number,
+): void => {
+  options.onProgress?.({ phase, percentage: Math.max(0, Math.min(100, Math.round(percentage))) });
+};
 
 const getDateRange = (document: TrainingPlanImportDocument): { start: string; end: string } => {
   return {
@@ -226,9 +242,9 @@ const createEnduranceTemplate = async (
       base_name: family.name,
       description: first.notes ?? null,
       workout_goal: family.workoutGoal,
-      // A single weekday can be represented by the recurring template and
-      // keeps the weekday selected in the editor. Mixed-weekday families stay
-      // date-driven so propagation cannot invent sessions.
+      environment_type: family.modality ?? 'outdoor',
+      // Imported calendar entries are created from the exact JSON dates below.
+      // Never turn an imported family into a recurrence implicitly.
       scheduled_day: null,
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
@@ -579,13 +595,16 @@ export const importTrainingPlan = async (
     startDate: document.start_date,
     endDate: document.end_date,
   });
+  reportImportProgress(options, 'preparing', 4);
   const range = getDateRange(document);
   const families = groupTrainingPlanSessions(document);
+  reportImportProgress(options, 'exercises', 10);
   const resolvedExercises = await resolveExercises(
     families.flatMap(family =>
       family.sport === 'strength' ? family.sessions.flatMap(session => session.exercises ?? []) : [],
     ),
   );
+  reportImportProgress(options, 'exercises', 25);
   await expireTrainingTemplates(userId);
   logTrainingPlanImport('families:grouped', {
     count: families.length,
@@ -634,9 +653,10 @@ export const importTrainingPlan = async (
     existingRunningTemplates = existingRunning.data ?? [];
     existingStrengthTemplates = existingStrength.data ?? [];
   }
+  reportImportProgress(options, 'templates', 35);
   try {
     const templateIdsByFamily = new Map<string, string>();
-    for (const family of families) {
+    for (const [familyIndex, family] of families.entries()) {
       const existingTemplate = findReusableImportedTemplate(
         family.sport === 'running' ? existingRunningTemplates : existingStrengthTemplates,
         family.familyKey,
@@ -663,28 +683,13 @@ export const importTrainingPlan = async (
         else reusedTemplateCount += 1;
         templateIdsByFamily.set(family.familyKey, result.id);
       }
+      reportImportProgress(options, 'templates', 35 + ((familyIndex + 1) / families.length) * 55);
     }
-    const requestedPlansWithPossibleDuplicates: WorkoutPlanInsert[] = families.flatMap(family =>
-      family.sessions.map(session => ({
-        user_id: userId,
-        planned_date: session.date,
-        status: 'planned',
-        notes: session.notes ?? null,
-        import_dedupe_key: `training-plan-v1:${session.date}:${family.familyKey}`,
-        ...(family.sport === 'running'
-          ? { endurance_template_id: templateIdsByFamily.get(family.familyKey) }
-          : { gym_template_id: templateIdsByFamily.get(family.familyKey) }),
-      })),
-    );
-    const requestedPlansByDateAndTemplate = new Map<string, WorkoutPlanInsert>();
-    requestedPlansWithPossibleDuplicates.forEach(plan => {
-      const templateId = plan.gym_template_id ?? plan.endurance_template_id;
-      if (templateId) requestedPlansByDateAndTemplate.set(`${plan.planned_date}:${templateId}`, plan);
-    });
-    const requestedPlans = [...requestedPlansByDateAndTemplate.values()];
+    const requestedPlans = buildImportedWorkoutPlans(userId, families, templateIdsByFamily);
     logTrainingPlanImport('plans:upsert', {
       requested: requestedPlans.length,
     });
+    reportImportProgress(options, 'calendar', 94);
     let createdPlanCount = 0;
     if (requestedPlans.length > 0) {
       const { data: insertedPlans, error } = await supabase
@@ -706,6 +711,7 @@ export const importTrainingPlan = async (
       reusedTemplates: reusedTemplateCount,
       createdPlans: createdPlanCount,
     });
+    reportImportProgress(options, 'complete', 100);
     return {
       createdTemplateIds: created.map(item => item.id),
       createdPlanCount,

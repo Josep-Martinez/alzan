@@ -10,6 +10,12 @@ import {
 } from '../services/localization';
 import { Exercise, WorkoutTemplateExercise } from '../types/requests.types';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
+import {
+  getOneOffTrainingPlanDate,
+  removeOneOffTrainingPlans,
+  syncOneOffTrainingPlan,
+} from '../modules/training/services/oneOffTrainingPlanService';
 import {
   buildStrengthExerciseReconciliationPlan,
   buildStrengthProgressionTargetPatch,
@@ -25,6 +31,8 @@ export type RoutineEditorData = {
   workout_goal?: string | null;
   modality?: string | null;
   suggested_day_of_week?: number | null;
+  one_off_date?: string | null;
+  remove_one_off_plan?: boolean;
   recurrence_start_date?: string | null;
   recurrence_end_date?: string | null;
   auto_delete_after_end?: boolean;
@@ -141,6 +149,15 @@ export const useGymRoutineEditor = (routineId?: string) => {
       };
     },
     enabled: !!routineId,
+  });
+
+  const { data: oneOffPlanDate = null } = useQuery({
+    queryKey: ['gymRoutineOneOffPlan', routineId, user?.id],
+    queryFn: async () => {
+      if (!routineId || !user) return null;
+      return getOneOffTrainingPlanDate({ userId: user.id, templateId: routineId, kind: 'gym' });
+    },
+    enabled: !!routineId && !!user && routineData?.suggested_day_of_week === null,
   });
 
   const saveRoutine = useMutation({
@@ -378,6 +395,17 @@ export const useGymRoutineEditor = (routineId?: string) => {
         recurrenceEndDate: data.recurrence_end_date,
       });
 
+      if (data.one_off_date) {
+        await syncOneOffTrainingPlan({
+          userId: user.id,
+          templateId: template.id,
+          plannedDate: data.one_off_date,
+          kind: 'gym',
+        });
+      } else if (data.remove_one_off_plan) {
+        await removeOneOffTrainingPlans({ userId: user.id, templateId: template.id, kind: 'gym' });
+      }
+
       return template;
     },
     onSuccess: async () => {
@@ -393,14 +421,13 @@ export const useGymRoutineEditor = (routineId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['gymRoutines'] });
       if (routineId) queryClient.invalidateQueries({ queryKey: ['routine', routineId] });
 
-      // Fix keys to match TrainingHomeScreen
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      invalidateTrainingCalendar(queryClient);
     },
   });
 
   return {
     routineData,
+    oneOffPlanDate,
     isLoading,
     saveRoutine,
   };
