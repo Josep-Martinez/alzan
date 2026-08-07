@@ -31,6 +31,16 @@ export type PresetRecipeDraftMode =
       originalSignature: null;
     };
 
+export type RecipeSaveMode = 'update-existing' | 'create-new' | 'no-changes';
+
+export type SavedRecipeDraftState = {
+  editingRecipeId: string;
+  editingRecipeName: string;
+  editingRecipeUpdatedAt: string;
+  editingRecipeSignature: string;
+  mealSourceRecipeId: string;
+};
+
 const normalizeRecipeName = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const normalizeQuantity = (quantity: number): number => Math.round(quantity * 10) / 10;
@@ -65,6 +75,25 @@ export const canSubmitRecipeDraft = ({
   return name.trim().length > 0 && ingredientsLength > 0 && originalSignature !== currentSignature;
 };
 
+export const getRecipeSaveMode = ({
+  editingRecipeId,
+  originalName,
+  currentName,
+  originalSignature,
+  currentSignature,
+}: {
+  editingRecipeId: string | null;
+  originalName: string | null;
+  currentName: string;
+  originalSignature: string | null;
+  currentSignature: string;
+}): RecipeSaveMode => {
+  if (originalSignature !== null && originalSignature === currentSignature) return 'no-changes';
+  if (!editingRecipeId) return 'create-new';
+  if (normalizeRecipeName(originalName ?? '') !== normalizeRecipeName(currentName)) return 'create-new';
+  return 'update-existing';
+};
+
 export const getPresetRecipeDraftMode = ({
   editableRecipeId,
   originalSignature,
@@ -94,6 +123,24 @@ export const getMealSourceRecipeIdForSave = ({
   selectedRecipeId: string | null;
   existingSourceRecipeId: string | null;
 }): string | null => selectedRecipeId ?? existingSourceRecipeId;
+
+export const getSavedRecipeDraftState = ({
+  recipeId,
+  recipeName,
+  recipeUpdatedAt,
+  recipeSignature,
+}: {
+  recipeId: string;
+  recipeName: string;
+  recipeUpdatedAt: string;
+  recipeSignature: string;
+}): SavedRecipeDraftState => ({
+  editingRecipeId: recipeId,
+  editingRecipeName: recipeName,
+  editingRecipeUpdatedAt: recipeUpdatedAt,
+  editingRecipeSignature: recipeSignature,
+  mealSourceRecipeId: recipeId,
+});
 
 export const buildRecipeSoftDeletePayload = (deletedAt: string): RecipeSoftDeletePayload => ({
   deleted_at: deletedAt,

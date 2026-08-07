@@ -18,7 +18,7 @@ import {
   LucideIcon,
 } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 import { spacing, borderRadius, typography } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
@@ -29,10 +29,12 @@ import { WeightLogModal } from '../../components/WeightLogModal';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
-import { NotificationSettings, useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
-import { useMediaPermissions } from '../../hooks/useMediaPermissions';
+import { useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
 import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
 import { HomeSummaryActiveWorkout, HomeSummaryScheduledWorkout, useHomeSummary } from '../../hooks/useHomeSummary';
+import { usePreferencesContext } from '../../context/PreferencesContext';
+import { getMealTypeForTime } from '../../modules/nutrition/services/nextMealPlanner';
+import { useCurrentNutritionDate } from '../../modules/nutrition/hooks/useCurrentNutritionDate';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
 import { useTodaySteps } from '../../modules/health/hooks/useSteps';
@@ -43,31 +45,6 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 
-const getNextMealType = (settings: NotificationSettings) => {
-  if (!settings?.meals) return MEAL_TYPES.BREAKFAST;
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  const getMinutes = (timeStr: string) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const breakfastTime = getMinutes(settings.meals.breakfast?.time || '08:00');
-  const almuerzoTime = getMinutes(settings.meals.almuerzo?.time || '11:00');
-  const lunchTime = getMinutes(settings.meals.lunch?.time || '14:00');
-  const meriendaTime = getMinutes(settings.meals.merienda?.time || '17:30');
-  const dinnerTime = getMinutes(settings.meals.dinner?.time || '21:00');
-
-  if (currentMinutes < breakfastTime) return MEAL_TYPES.BREAKFAST;
-  if (currentMinutes < almuerzoTime) return MEAL_TYPES.ALMUERZO;
-  if (currentMinutes < lunchTime) return MEAL_TYPES.LUNCH;
-  if (currentMinutes < meriendaTime) return MEAL_TYPES.MERIENDA;
-  if (currentMinutes < dinnerTime) return MEAL_TYPES.DINNER;
-  return MEAL_TYPES.BREAKFAST;
-};
-
 export const HomeScreen = () => {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -76,9 +53,9 @@ export const HomeScreen = () => {
 
   const { convertWeightToUi, convertEnergyToUi } = useUnitConversion();
   const { settings: notifSettings, refetch: refetchSettings } = useSettingsNotifications(); // Get settings
+  const { preferences } = usePreferencesContext();
   const { homeMode, homePrimaryAction } = useHomeSettings();
   const { data: homeSummary } = useHomeSummary();
-  useMediaPermissions(); // Request camera/mic permissions on mount
 
   // Auto-refresh when screen comes into focus
   useFocusEffect(
@@ -100,7 +77,8 @@ export const HomeScreen = () => {
   const { data: todaySteps } = useTodaySteps();
   const { homeCards } = useHomeCards();
   const pendingWorkout = !activeTodayWorkout && scheduledWorkouts.length > 0 ? scheduledWorkouts[0] : null;
-  const { totals, targets, meals } = useDayNutrition(new Date());
+  const currentNutritionDate = useCurrentNutritionDate(preferences?.nutrition_prefs?.nutrition_day_rollover_time);
+  const { totals, targets, meals } = useDayNutrition(parseISO(currentNutritionDate));
   const latestWeight = health?.weight?.weight_kg;
 
   // UI State
@@ -126,15 +104,24 @@ export const HomeScreen = () => {
   }, [navigation]);
 
   useEffect(() => {
-    if (notifSettings) {
-      setNextMealType(getNextMealType(notifSettings));
+    if (notifSettings?.meals) {
+      const resolveMealType = () =>
+        getMealTypeForTime(notifSettings.meals, preferences?.nutrition_prefs?.enabled_meals, new Date(), {
+          cutoffHours: preferences?.nutrition_prefs?.next_meal_cutoff_hours,
+        });
+
+      setNextMealType(resolveMealType());
 
       const interval = setInterval(() => {
-        setNextMealType(getNextMealType(notifSettings));
+        setNextMealType(resolveMealType());
       }, 60000);
       return () => clearInterval(interval);
     }
-  }, [notifSettings]);
+  }, [
+    notifSettings,
+    preferences?.nutrition_prefs?.enabled_meals,
+    preferences?.nutrition_prefs?.next_meal_cutoff_hours,
+  ]);
 
   // Get Next Meal Status
   const nextMealItems = meals ? meals.filter(m => m.mealType === nextMealType) : [];
@@ -269,7 +256,7 @@ export const HomeScreen = () => {
         return {
           icon: Utensils,
           title: t('home.primaryActionAddMeal'),
-          subtitle: `${t('home.nextMeal')} ${t(nextMealLabel)}`,
+          subtitle: `${t('home.logMeal')} ${t(nextMealLabel)}`,
         };
       case 'log_weight':
         return {
@@ -459,8 +446,7 @@ export const HomeScreen = () => {
                   </View>
                   <View style={styles.agendaContent}>
                     <Text style={[styles.agendaTitle, { color: colors.textPrimary }]}>
-                      {t('home.nextMeal')}
-                      {t(nextMealLabel)}
+                      {t('home.logMeal')} {t(nextMealLabel)}
                     </Text>
                     <Text style={[styles.agendaSubtitle, { color: colors.textSecondary }]}>
                       {isNextMealLogged

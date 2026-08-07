@@ -1,6 +1,7 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 import { MealType } from '../../../types/requests.types';
+import type { MealItem, MealLog } from '../../../types/requests.types';
 import {
   DietCopyMode,
   WeekCopyOp,
@@ -11,9 +12,60 @@ import {
   getSequentialActivationPlan,
   getVisibleWeekRange,
 } from './dietCopyPlanner';
+import {
+  buildMealCopyDraft,
+  validateMealCopyDestination,
+  type MealCopyDestination,
+  type MealCopySource,
+} from './mealCopyPlanner';
 
 // Re-exported so existing imports keep working and callers share one source of truth.
 export { getISOWeekString, getVisibleWeekRange } from './dietCopyPlanner';
+
+/**
+ * Copy one registered or planned meal into a new date/type without touching
+ * any existing destination rows.
+ */
+export const copyMealToDate = async (
+  userId: string,
+  source: MealCopySource,
+  destination: MealCopyDestination,
+): Promise<MealLog> => {
+  if (!userId) throw new Error('No user');
+  validateMealCopyDestination(destination);
+
+  let sourceWithItems = source;
+
+  if (source.log?.id) {
+    const { data: sourceLog, error: sourceLogError } = await supabase
+      .from('meal_logs')
+      .select('*')
+      .eq('id', source.log.id)
+      .eq('user_id', userId)
+      .single();
+
+    if (sourceLogError) throw sourceLogError;
+
+    const { data: sourceItems, error: sourceItemsError } = await supabase
+      .from('meal_items')
+      .select('*')
+      .eq('meal_log_id', source.log.id)
+      .eq('user_id', userId)
+      .returns<MealItem[]>();
+
+    if (sourceItemsError) throw sourceItemsError;
+    sourceWithItems = { log: sourceLog, items: sourceItems ?? [] };
+  }
+
+  const draft = buildMealCopyDraft(sourceWithItems, destination, userId);
+  const { data, error } = await supabase.rpc('copy_meal_to_date', {
+    p_log: draft.log,
+    p_items: draft.items,
+  });
+
+  if (error) throw error;
+  return data;
+};
 
 /**
  * Check if sequential activation would overwrite data.

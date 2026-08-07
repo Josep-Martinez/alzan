@@ -64,6 +64,11 @@ import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
+import {
+  DEFAULT_NEXT_MEAL_CUTOFF_HOURS,
+  getMaxNextMealCutoffHours,
+  normalizeNextMealCutoffHours,
+} from '../../modules/nutrition/services/nextMealPlanner';
 import { useSetNutritionVacationDates, useVacationDateSet } from '../../modules/nutrition/hooks/useNutritionData';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import type { TranslationKey } from '../../i18n/locales/en';
@@ -147,7 +152,8 @@ type NutritionSectionInfoKey =
   | 'recipeSearch'
   | 'autoPlanning'
   | 'data'
-  | 'shoppingList';
+  | 'shoppingList'
+  | 'nextMeal';
 
 const SHOPPING_LIST_DAYS: Array<{
   value: ShoppingListStartDay;
@@ -286,6 +292,9 @@ export const NutritionSettingsScreen = () => {
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
   const shoppingListStartDay = normalizeShoppingListStartDay(preferences?.nutrition_prefs?.shopping_list_start_day);
+  const storedNextMealCutoffHours = preferences?.nutrition_prefs?.next_meal_cutoff_hours;
+  const maxNextMealCutoffHours = getMaxNextMealCutoffHours(notifSettings?.meals, enabledMeals);
+  const nextMealCutoffHours = normalizeNextMealCutoffHours(storedNextMealCutoffHours, maxNextMealCutoffHours);
   const storedDefaultHydrationMl = preferences?.nutrition_prefs?.default_hydration_ml;
   const defaultHydrationMl =
     typeof storedDefaultHydrationMl === 'number' && Number.isFinite(storedDefaultHydrationMl)
@@ -308,6 +317,8 @@ export const NutritionSettingsScreen = () => {
     defaultHydrationMl > 0 ? String(defaultHydrationMl) : '',
   );
   const [isDefaultHydrationSaving, setIsDefaultHydrationSaving] = useState(false);
+  const [nextMealCutoffInput, setNextMealCutoffInput] = useState(() => String(nextMealCutoffHours));
+  const [isNextMealCutoffSaving, setIsNextMealCutoffSaving] = useState(false);
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [vacationCalendarMonth, setVacationCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [vacationCalendarRangeAnchor, setVacationCalendarRangeAnchor] = useState(() => startOfMonth(new Date()));
@@ -414,6 +425,10 @@ export const NutritionSettingsScreen = () => {
   useEffect(() => {
     setDefaultHydrationInput(defaultHydrationMl > 0 ? String(defaultHydrationMl) : '');
   }, [defaultHydrationMl]);
+
+  useEffect(() => {
+    setNextMealCutoffInput(String(nextMealCutoffHours));
+  }, [nextMealCutoffHours]);
 
   useEffect(() => {
     if (!showVacationModal || isLoadingVacationDates) return;
@@ -580,6 +595,35 @@ export const NutritionSettingsScreen = () => {
       Alert.alert(t('common.error'), t('nutrition.defaultHydrationSaveError'));
     } finally {
       setIsDefaultHydrationSaving(false);
+    }
+  };
+
+  const handleNextMealCutoffInputChange = (value: string) => {
+    const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
+    const [whole, decimals] = sanitized.split('.');
+    setNextMealCutoffInput(decimals === undefined ? whole.slice(0, 5) : `${whole.slice(0, 5)}.${decimals.slice(0, 2)}`);
+  };
+
+  const getNextMealCutoffDraftHours = () => {
+    const parsed = Number(nextMealCutoffInput);
+    if (!Number.isFinite(parsed)) return DEFAULT_NEXT_MEAL_CUTOFF_HOURS;
+
+    return normalizeNextMealCutoffHours(parsed, maxNextMealCutoffHours);
+  };
+
+  const saveNextMealCutoff = async () => {
+    const nextHours = getNextMealCutoffDraftHours();
+    if (nextHours === nextMealCutoffHours || isNextMealCutoffSaving) return;
+
+    setIsNextMealCutoffSaving(true);
+    try {
+      await updateNutritionPrefs({ next_meal_cutoff_hours: nextHours });
+      setNextMealCutoffInput(String(nextHours));
+    } catch (error) {
+      console.error('[NutritionSettings] Error saving next meal cutoff:', error);
+      Alert.alert(t('common.error'), t('nutrition.nextMealTimingSaveError'));
+    } finally {
+      setIsNextMealCutoffSaving(false);
     }
   };
 
@@ -967,6 +1011,10 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.dailyMealsInfoModalTitle',
       bodyKey: 'nutrition.dailyMealsInfoModalBody',
     },
+    nextMeal: {
+      titleKey: 'nutrition.nextMealTimingInfoModalTitle',
+      bodyKey: 'nutrition.nextMealTimingInfoModalBody',
+    },
     nutritionDay: {
       titleKey: 'nutrition.nutritionDayInfoModalTitle',
       bodyKey: 'nutrition.nutritionDayInfoModalBody',
@@ -1047,7 +1095,72 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 2. Día nutricional */}
+          {/* 2. Margen de siguiente comida */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.nextMealTimingTitle'), 'nextMeal')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <View style={styles.hydrationSettingContent}>
+                <View style={styles.hydrationSettingHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.nextMealTimingLabel')}
+                    </Text>
+                    <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.nextMealTimingHint', { max: maxNextMealCutoffHours })}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.hydrationInputRow}>
+                  <View
+                    style={[
+                      styles.hydrationInputShell,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                        borderColor: themeColors.border,
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.hydrationInput, { color: themeColors.textPrimary }]}
+                      value={nextMealCutoffInput}
+                      onChangeText={handleNextMealCutoffInputChange}
+                      placeholder={t('nutrition.nextMealTimingPlaceholder')}
+                      placeholderTextColor={themeColors.textSecondary}
+                      keyboardType="decimal-pad"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={5}
+                    />
+                    <Text style={[styles.hydrationInputUnit, { color: themeColors.textSecondary }]}>h</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.hydrationSaveButton,
+                      {
+                        backgroundColor:
+                          isNextMealCutoffSaving || getNextMealCutoffDraftHours() === nextMealCutoffHours
+                            ? themeColors.border
+                            : themeColors.primary,
+                      },
+                    ]}
+                    onPress={saveNextMealCutoff}
+                    disabled={isNextMealCutoffSaving || getNextMealCutoffDraftHours() === nextMealCutoffHours}
+                    activeOpacity={0.8}
+                  >
+                    {isNextMealCutoffSaving ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.hydrationSaveButtonText}>{t('common.save')}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 3. Día nutricional */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.nutritionDayTitle'), 'nutritionDay')}
             <View style={[styles.card, dynamicStyles.glassCard]}>

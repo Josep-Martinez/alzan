@@ -4,6 +4,8 @@ import {
   buildEditableRecipeSignature,
   buildRecipeSoftDeletePayload,
   canSubmitRecipeDraft,
+  getRecipeSaveMode,
+  getSavedRecipeDraftState,
   getMealSourceRecipeIdForSave,
   getPresetRecipeDraftMode,
   isOwnUserRecipe,
@@ -91,6 +93,17 @@ function run() {
     true,
   );
 
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: ' Tortilla ',
+      originalSignature,
+      currentSignature: originalSignature,
+    }),
+    'no-changes',
+  );
+
   const changedWeightSignature = buildEditableRecipeSignature({
     name: 'Tortilla',
     ingredients: [
@@ -128,10 +141,115 @@ function run() {
     true,
   );
 
+  const removedIngredientSignature = buildEditableRecipeSignature({
+    name: 'Tortilla',
+    ingredients: [{ ingredientId: 'egg', quantity: 120, unit: 'g' }],
+  });
+  const replacedIngredientSignature = buildEditableRecipeSignature({
+    name: 'Tortilla',
+    ingredients: [
+      { ingredientId: 'egg', quantity: 120, unit: 'g' },
+      { ingredientId: 'sweet-potato', quantity: 200, unit: 'g' },
+    ],
+  });
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: 'Tortilla',
+      originalSignature,
+      currentSignature: changedWeightSignature,
+    }),
+    'update-existing',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: 'Tortilla',
+      originalSignature,
+      currentSignature: addedIngredientSignature,
+    }),
+    'update-existing',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: 'Tortilla',
+      originalSignature,
+      currentSignature: removedIngredientSignature,
+    }),
+    'update-existing',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: 'Tortilla',
+      originalSignature,
+      currentSignature: replacedIngredientSignature,
+    }),
+    'update-existing',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: 'recipe-1',
+      originalName: 'Tortilla',
+      currentName: 'Tortilla de patata',
+      originalSignature,
+      currentSignature: changedWeightSignature,
+    }),
+    'create-new',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: null,
+      originalName: null,
+      currentName: 'Nueva receta',
+      originalSignature: null,
+      currentSignature: originalSignature,
+    }),
+    'create-new',
+  );
+
+  assert.equal(
+    getRecipeSaveMode({
+      editingRecipeId: null,
+      originalName: 'Entrecot a la plancha',
+      currentName: 'Entrecot a la plancha',
+      originalSignature,
+      currentSignature: originalSignature,
+    }),
+    'no-changes',
+  );
+
   assert.deepEqual(buildRecipeSoftDeletePayload('2026-07-06T14:25:00.000Z'), {
     deleted_at: '2026-07-06T14:25:00.000Z',
     updated_at: '2026-07-06T14:25:00.000Z',
   });
+
+  assert.deepEqual(
+    getSavedRecipeDraftState({
+      recipeId: 'new-recipe-id',
+      recipeName: 'Tortilla nueva',
+      recipeUpdatedAt: '2026-08-07T13:30:00.000Z',
+      recipeSignature: 'new-signature',
+    }),
+    {
+      editingRecipeId: 'new-recipe-id',
+      editingRecipeName: 'Tortilla nueva',
+      editingRecipeUpdatedAt: '2026-08-07T13:30:00.000Z',
+      editingRecipeSignature: 'new-signature',
+      mealSourceRecipeId: 'new-recipe-id',
+    },
+  );
 }
 
 run();

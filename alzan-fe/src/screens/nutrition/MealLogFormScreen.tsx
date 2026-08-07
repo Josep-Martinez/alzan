@@ -42,6 +42,8 @@ import {
   canSubmitRecipeDraft,
   getMealSourceRecipeIdForSave,
   getPresetRecipeDraftMode,
+  getRecipeSaveMode,
+  getSavedRecipeDraftState,
   isOwnUserRecipe,
 } from '../../modules/nutrition/services/recipeEditing';
 import {
@@ -241,6 +243,7 @@ export const MealLogFormScreen = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [isBarcodeLookupPending, setIsBarcodeLookupPending] = useState(false);
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
+  const [editingSavedRecipeName, setEditingSavedRecipeName] = useState<string | null>(null);
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
   const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
   const [mealSourceRecipeId, setMealSourceRecipeId] = useState<string | null>(
@@ -444,6 +447,15 @@ export const MealLogFormScreen = () => {
 
   const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
   const isEditingRecipe = editingSavedRecipeId !== null;
+  const recipeSaveMode = getRecipeSaveMode({
+    editingRecipeId: editingSavedRecipeId,
+    originalName: editingSavedRecipeName,
+    currentName: name,
+    originalSignature: editingRecipeSignature,
+    currentSignature: currentRecipeSignature,
+  });
+  const isUpdatingExistingRecipe = recipeSaveMode === 'update-existing';
+  const isSavingRecipeAsNew = recipeSaveMode === 'create-new' && editingRecipeSignature !== null;
   const canSubmitRecipe = canSubmitRecipeDraft({
     name,
     ingredientsLength: ingredients.length,
@@ -502,6 +514,7 @@ export const MealLogFormScreen = () => {
     setName(editableRecipe.name);
     setIngredients(transformedIngredients);
     setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeName(editableRecipe.name);
     setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
     setEditingRecipeSignature(draftMode.originalSignature);
     setMealSourceRecipeId(editableRecipe.id);
@@ -531,6 +544,7 @@ export const MealLogFormScreen = () => {
     }
 
     setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeName(editableRecipe.name);
     setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
     setEditingRecipeSignature(draftMode.originalSignature);
     setMealSourceRecipeId(editableRecipe.id);
@@ -716,6 +730,7 @@ export const MealLogFormScreen = () => {
     // Set the name from the selected item
     setName(item.name);
     setEditingSavedRecipeId(null);
+    setEditingSavedRecipeName(item.itemType === 'recipe' ? item.name : null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
     setMealSourceRecipeId(selectedRecipeId);
@@ -733,7 +748,7 @@ export const MealLogFormScreen = () => {
         if (recipeIngredients.length > 0) {
           const transformedIngredients = mapRecipeIngredientsToMealComponents(recipeIngredients);
           setIngredients(transformedIngredients);
-          setEditingRecipeSignature(null);
+          setEditingRecipeSignature(buildRecipeSignature(item.name, transformedIngredients));
           setSearchMessage({ type: 'info', text: t('nutrition.ingredientsAddedAutomatically') });
         }
       } catch (error) {
@@ -963,6 +978,7 @@ export const MealLogFormScreen = () => {
 
   const handleSaveCurrentRecipe = async () => {
     if (isSaving) return;
+    if (recipeSaveMode === 'no-changes') return;
 
     if (!name.trim()) {
       Alert.alert(t('nutrition.missingMealNameTitle'), t('nutrition.missingMealNameMessage'));
@@ -1005,106 +1021,58 @@ export const MealLogFormScreen = () => {
       }
 
       const normalizedName = normalizeName(name.trim());
-      let recipeId = editingSavedRecipeId;
+      const recipeIdToUpdate = isUpdatingExistingRecipe ? editingSavedRecipeId : null;
       const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients, name.trim());
-
-      if (recipeId) {
-        if (!editingSavedRecipeUpdatedAt) {
-          Alert.alert(t('common.error'), t('nutrition.recipeUpdateConflictMessage'));
-          return;
-        }
-
-        const nextUpdatedAt = new Date().toISOString();
-        const { error: updateRecipeError } = await supabase
-          .from('recipes')
-          .update({
-            name_es: name.trim(),
-            name_norm_es: normalizedName,
-            ...nutritionSnapshot,
-            updated_at: nextUpdatedAt,
-          })
-          .eq('id', recipeId)
-          .eq('owner_user_id', currentUserId)
-          .eq('source', 'user')
-          .is('deleted_at', null)
-          .eq('updated_at', editingSavedRecipeUpdatedAt);
-
-        if (updateRecipeError) {
-          console.error('[MealLogForm] Error updating recipe:', updateRecipeError);
-          Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-          return;
-        }
-
-        const { data: refreshedRecipe, error: refreshedRecipeError } = await supabase
-          .from('recipes')
-          .select('id')
-          .eq('id', recipeId)
-          .eq('owner_user_id', currentUserId)
-          .eq('source', 'user')
-          .is('deleted_at', null)
-          .eq('updated_at', nextUpdatedAt)
-          .limit(1)
-          .returns<{ id: string }[]>();
-
-        if (refreshedRecipeError) {
-          console.error('[MealLogForm] Error validating optimistic update:', refreshedRecipeError);
-          Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-          return;
-        }
-
-        if (!refreshedRecipe || refreshedRecipe.length === 0) {
-          Alert.alert(t('common.error'), t('nutrition.recipeUpdateConflictMessage'));
-          return;
-        }
-
-        const { error: deleteItemsError } = await supabase.from('recipe_items').delete().eq('recipe_id', recipeId);
-        if (deleteItemsError) {
-          console.error('[MealLogForm] Error replacing recipe items:', deleteItemsError);
-          Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-          return;
-        }
-      } else {
-        const { data: insertedRecipes, error: insertRecipeError } = await supabase
-          .from('recipes')
-          .insert({
-            name_es: name.trim(),
-            name_norm_es: normalizedName,
-            owner_user_id: currentUserId,
-            source: 'user',
-            visibility: defaultRecipeVisibility,
-            ...nutritionSnapshot,
-          })
-          .select('id')
-          .limit(1)
-          .returns<{ id: string }[]>();
-
-        if (insertRecipeError || !insertedRecipes || insertedRecipes.length === 0) {
-          console.error('[MealLogForm] Error creating recipe:', insertRecipeError);
-          Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-          return;
-        }
-
-        recipeId = insertedRecipes[0].id;
-      }
-
       const recipeItemsPayload = ingredients.map((ingredient, index) => ({
-        recipe_id: recipeId as string,
         ingredient_id: resolvedRecipeIngredientIds[index] as string,
         order_index: index,
         quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g' as const,
       }));
 
-      const { error: insertItemsError } = await supabase.from('recipe_items').insert(recipeItemsPayload);
-      if (insertItemsError) {
-        console.error('[MealLogForm] Error saving recipe items:', insertItemsError);
+      const { data: savedRecipe, error: saveRecipeError } = await supabase.rpc('save_user_recipe_atomic', {
+        p_recipe_id: recipeIdToUpdate as string,
+        p_expected_updated_at: editingSavedRecipeUpdatedAt as string,
+        p_name_es: name.trim(),
+        p_name_norm_es: normalizedName,
+        p_visibility: defaultRecipeVisibility,
+        p_nutrition: nutritionSnapshot,
+        p_items: recipeItemsPayload,
+      });
+
+      if (saveRecipeError) {
+        console.error('[MealLogForm] Error saving recipe atomically:', saveRecipeError);
+        if (saveRecipeError.message.includes('RECIPE_UPDATE_CONFLICT')) {
+          Alert.alert(t('common.error'), t('nutrition.recipeUpdateConflictMessage'));
+          return;
+        }
         Alert.alert(t('common.error'), t('nutrition.saveMealError'));
         return;
       }
 
-      if (!isEditingRecipe && defaultRecipeVisibility === 'public' && recipeId) {
+      const savedRecipeId =
+        savedRecipe &&
+        typeof savedRecipe === 'object' &&
+        !Array.isArray(savedRecipe) &&
+        typeof savedRecipe.id === 'string'
+          ? savedRecipe.id
+          : null;
+      const savedRecipeUpdatedAt =
+        savedRecipe &&
+        typeof savedRecipe === 'object' &&
+        !Array.isArray(savedRecipe) &&
+        typeof savedRecipe.updated_at === 'string'
+          ? savedRecipe.updated_at
+          : null;
+
+      if (!savedRecipeId || !savedRecipeUpdatedAt) {
+        Alert.alert(t('common.error'), t('nutrition.saveMealError'));
+        return;
+      }
+
+      if (!isUpdatingExistingRecipe && defaultRecipeVisibility === 'public') {
         try {
-          await publishRecipe(recipeId);
+          await publishRecipe(savedRecipeId);
         } catch (error) {
           console.error('[MealLogForm] Error publishing newly created recipe:', error);
         }
@@ -1116,11 +1084,23 @@ export const MealLogFormScreen = () => {
         queryClient.invalidateQueries({ queryKey: ['recipeFavoriteIds'] }),
         queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] }),
       ]);
-      setEditingSavedRecipeId(null);
-      setEditingSavedRecipeUpdatedAt(null);
-      setEditingRecipeSignature(null);
-      const successTitle = isEditingRecipe ? t('nutrition.recipeUpdatedTitle') : t('nutrition.recipeSavedTitle');
-      const successMessage = isEditingRecipe ? t('nutrition.recipeUpdatedMessage') : t('nutrition.recipeSavedMessage');
+      const savedDraftState = getSavedRecipeDraftState({
+        recipeId: savedRecipeId,
+        recipeName: name.trim(),
+        recipeUpdatedAt: savedRecipeUpdatedAt,
+        recipeSignature: currentRecipeSignature,
+      });
+      setEditingSavedRecipeId(savedDraftState.editingRecipeId);
+      setEditingSavedRecipeName(savedDraftState.editingRecipeName);
+      setEditingSavedRecipeUpdatedAt(savedDraftState.editingRecipeUpdatedAt);
+      setEditingRecipeSignature(savedDraftState.editingRecipeSignature);
+      setMealSourceRecipeId(savedDraftState.mealSourceRecipeId);
+      const successTitle = isUpdatingExistingRecipe
+        ? t('nutrition.recipeUpdatedTitle')
+        : t('nutrition.recipeSavedTitle');
+      const successMessage = isUpdatingExistingRecipe
+        ? t('nutrition.recipeUpdatedMessage')
+        : t('nutrition.recipeSavedMessage');
 
       if (isRecipeEditorOnly) {
         Alert.alert(successTitle, successMessage, [{ text: t('common.ok'), onPress: () => navigation.goBack() }]);
@@ -1362,6 +1342,7 @@ export const MealLogFormScreen = () => {
     setMealSearchFilter('recipe');
     setMealRecipePage(1);
     setEditingSavedRecipeId(null);
+    setEditingSavedRecipeName(null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
     setMealSourceRecipeId(null);
@@ -1915,7 +1896,7 @@ export const MealLogFormScreen = () => {
                     styles.recipeBuilderSaveButton,
                     {
                       backgroundColor:
-                        canSubmitRecipe && !isSaving
+                        canSubmitRecipe && recipeSaveMode !== 'no-changes' && !isSaving
                           ? themeColors.primary
                           : isDark
                             ? 'rgba(255,255,255,0.14)'
@@ -1923,25 +1904,37 @@ export const MealLogFormScreen = () => {
                     },
                   ]}
                   onPress={handleSaveCurrentRecipe}
-                  disabled={!canSubmitRecipe || isSaving}
+                  disabled={!canSubmitRecipe || recipeSaveMode === 'no-changes' || isSaving}
                 >
                   <View style={styles.recipeBuilderSaveButtonContent}>
                     {isSaving ? (
                       <>
                         <ActivityIndicator size="small" color="#FFFFFF" />
                         <Text style={styles.recipeBuilderSaveButtonText}>
-                          {isEditingRecipe ? t('nutrition.editingRecipeAction') : t('nutrition.savingRecipeAction')}
+                          {isUpdatingExistingRecipe
+                            ? t('nutrition.updatingRecipeAction')
+                            : t('nutrition.savingRecipeAction')}
                         </Text>
                       </>
                     ) : (
                       <Text style={styles.recipeBuilderSaveButtonText}>
-                        {isEditingRecipe ? t('nutrition.editRecipeAction') : t('nutrition.saveRecipeAction')}
+                        {recipeSaveMode === 'no-changes'
+                          ? t('nutrition.noRecipeChangesAction')
+                          : isUpdatingExistingRecipe
+                            ? t('nutrition.updateRecipeAction')
+                            : isSavingRecipeAsNew
+                              ? t('nutrition.saveAsNewRecipeAction')
+                              : t('nutrition.saveRecipeAction')}
                       </Text>
                     )}
                   </View>
                 </TouchableOpacity>
                 <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
-                  {t('nutrition.saveRecipeHint')}
+                  {isUpdatingExistingRecipe
+                    ? t('nutrition.updateRecipeHint')
+                    : isSavingRecipeAsNew
+                      ? t('nutrition.saveAsNewRecipeHint')
+                      : t('nutrition.saveRecipeHint')}
                 </Text>
               </View>
 
