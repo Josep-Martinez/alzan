@@ -337,6 +337,118 @@ export type Database = {
           },
         ];
       };
+      activity_session_sections: {
+        Row: {
+          avg_cadence: number | null;
+          avg_heart_rate: number | null;
+          avg_power_w: number | null;
+          calories_kcal: number | null;
+          created_at: string;
+          distance_m: number | null;
+          duration_s: number | null;
+          duration_type: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m: number | null;
+          id: string;
+          is_group: boolean;
+          label: string | null;
+          max_heart_rate: number | null;
+          max_power_w: number | null;
+          notes: string | null;
+          order_index: number;
+          pace_s_per_100m: number | null;
+          pace_s_per_km: number | null;
+          parent_section_id: string | null;
+          phase_type: Database['public']['Enums']['phase_type_enum'];
+          repetition_index: number | null;
+          repetitions: number;
+          rpe: number | null;
+          session_id: string;
+          source_template_step_id: string | null;
+          speed_m_per_s: number | null;
+          user_id: string;
+        };
+        Insert: {
+          avg_cadence?: number | null;
+          avg_heart_rate?: number | null;
+          avg_power_w?: number | null;
+          calories_kcal?: number | null;
+          created_at?: string;
+          distance_m?: number | null;
+          duration_s?: number | null;
+          duration_type: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m?: number | null;
+          id?: string;
+          is_group?: boolean;
+          label?: string | null;
+          max_heart_rate?: number | null;
+          max_power_w?: number | null;
+          notes?: string | null;
+          order_index: number;
+          pace_s_per_100m?: number | null;
+          pace_s_per_km?: number | null;
+          parent_section_id?: string | null;
+          phase_type: Database['public']['Enums']['phase_type_enum'];
+          repetition_index?: number | null;
+          repetitions?: number;
+          rpe?: number | null;
+          session_id: string;
+          source_template_step_id?: string | null;
+          speed_m_per_s?: number | null;
+          user_id: string;
+        };
+        Update: {
+          avg_cadence?: number | null;
+          avg_heart_rate?: number | null;
+          avg_power_w?: number | null;
+          calories_kcal?: number | null;
+          created_at?: string;
+          distance_m?: number | null;
+          duration_s?: number | null;
+          duration_type?: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m?: number | null;
+          id?: string;
+          is_group?: boolean;
+          label?: string | null;
+          max_heart_rate?: number | null;
+          max_power_w?: number | null;
+          notes?: string | null;
+          order_index?: number;
+          pace_s_per_100m?: number | null;
+          pace_s_per_km?: number | null;
+          parent_section_id?: string | null;
+          phase_type?: Database['public']['Enums']['phase_type_enum'];
+          repetition_index?: number | null;
+          repetitions?: number;
+          rpe?: number | null;
+          session_id?: string;
+          source_template_step_id?: string | null;
+          speed_m_per_s?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'activity_session_sections_parent_section_id_fkey';
+            columns: ['parent_section_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_session_sections';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_session_sections_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_sessions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_session_sections_source_template_step_id_fkey';
+            columns: ['source_template_step_id'];
+            isOneToOne: false;
+            referencedRelation: 'endurance_workout_steps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       activity_session_superset_links: {
         Row: {
           created_at: string;
@@ -465,6 +577,7 @@ export type Database = {
           notes: string | null;
           pending_watch_metrics: Json | null;
           pool_type: string | null;
+          pre_wearable_merge_snapshot: Json | null;
           provider: Database['public']['Enums']['provider_enum'];
           provider_activity_id: string | null;
           pte: number | null;
@@ -550,6 +663,7 @@ export type Database = {
           notes?: string | null;
           pending_watch_metrics?: Json | null;
           pool_type?: string | null;
+          pre_wearable_merge_snapshot?: Json | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
           pte?: number | null;
@@ -635,6 +749,7 @@ export type Database = {
           notes?: string | null;
           pending_watch_metrics?: Json | null;
           pool_type?: string | null;
+          pre_wearable_merge_snapshot?: Json | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
           pte?: number | null;
@@ -2178,10 +2293,14 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          next_processing_at: string;
           object_type: string;
           payload: Json | null;
           payload_hash: string;
           processed_at: string | null;
+          processing_attempts: number;
+          processing_error: string | null;
+          processing_status: string;
           provider: Database['public']['Enums']['wearable_provider_enum'];
           received_at: string;
           related_id: string | null;
@@ -2198,10 +2317,14 @@ export type Database = {
         Insert: {
           created_at?: string;
           id?: string;
+          next_processing_at?: string;
           object_type: string;
           payload?: Json | null;
           payload_hash: string;
           processed_at?: string | null;
+          processing_attempts?: number;
+          processing_error?: string | null;
+          processing_status?: string;
           provider: Database['public']['Enums']['wearable_provider_enum'];
           received_at?: string;
           related_id?: string | null;
@@ -2218,10 +2341,14 @@ export type Database = {
         Update: {
           created_at?: string;
           id?: string;
+          next_processing_at?: string;
           object_type?: string;
           payload?: Json | null;
           payload_hash?: string;
           processed_at?: string | null;
+          processing_attempts?: number;
+          processing_error?: string | null;
+          processing_status?: string;
           provider?: Database['public']['Enums']['wearable_provider_enum'];
           received_at?: string;
           related_id?: string | null;
@@ -3005,6 +3132,45 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      provider_deauthorization_jobs: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          encrypted_access_token: string;
+          expires_at: string;
+          id: string;
+          last_error: string | null;
+          next_attempt_at: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at: string;
+          user_reference_hash: string;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          encrypted_access_token: string;
+          expires_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at?: string;
+          user_reference_hash: string;
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          encrypted_access_token?: string;
+          expires_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          provider?: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at?: string;
+          user_reference_hash?: string;
+        };
+        Relationships: [];
       };
       provider_oauth_states: {
         Row: {
@@ -5092,6 +5258,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      copy_completed_activity_session: {
+        Args: { p_session_id: string; p_target_date: string };
+        Returns: string;
+      };
       copy_meal_to_date: {
         Args: { p_items: Json; p_log: Json };
         Returns: {
@@ -5122,6 +5292,11 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      create_manual_endurance_activity: {
+        Args: { p_sections: Json; p_session: Json };
+        Returns: string;
+      };
+      delete_coros_user_data: { Args: { p_user_id: string }; Returns: Json };
       delete_training_template: {
         Args: { p_template_id: string; p_template_kind: string };
         Returns: boolean;
@@ -5217,6 +5392,7 @@ export type Database = {
           notes: string | null;
           pending_watch_metrics: Json | null;
           pool_type: string | null;
+          pre_wearable_merge_snapshot: Json | null;
           provider: Database['public']['Enums']['provider_enum'];
           provider_activity_id: string | null;
           pte: number | null;

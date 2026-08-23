@@ -23,7 +23,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
 import { useEnduranceTemplateSteps } from '../../hooks/useEnduranceSessions';
@@ -51,10 +51,10 @@ import {
   Upload,
 } from 'lucide-react-native';
 import { Alert } from '../../components/common/Alert';
-import { ActivitySession, EnduranceWorkoutStep } from '../../types/requests.types';
+import { ActivitySession, ActivitySessionSection, EnduranceWorkoutStep } from '../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
-import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { useUploadPolyline } from '../../hooks/useActivityPolyline';
 import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
@@ -67,6 +67,11 @@ import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.helper';
+import { CopyCompletedSessionModal } from '../../modules/training/components/CopyCompletedSessionModal';
+import { useCopyCompletedSession } from '../../modules/training/hooks/useCopyCompletedSession';
+import { getSessionLocalDate } from '../../modules/training/services/copyCompletedSessionService';
+import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -238,6 +243,7 @@ export const EnduranceSessionDetailScreen = () => {
   const { getOptionLabel } = useSportCatalog();
   const updateSet = useUpdateWorkoutSet();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
+  const copyCompletedSession = useCopyCompletedSession();
 
   // State for editing sets (gym only)
   const [editingSet, setEditingSet] = useState<{
@@ -256,11 +262,32 @@ export const EnduranceSessionDetailScreen = () => {
 
   const [routePolyline, setRoutePolyline] = useState<string | null>(initialSession?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
   const handleMapInteractionStart = useCallback(() => setMapScrollEnabled(false), []);
   const handleMapInteractionEnd = useCallback(() => setMapScrollEnabled(true), []);
+
+  const sourceDate = getSessionLocalDate(session);
+  const copyInitialDate = useMemo(() => parseISO(getDefaultCopyTargetDate()), []);
+  const handleCopyCompletedSession = useCallback(
+    async (targetDate: string) => {
+      await copyCompletedSession.mutateAsync({
+        sessionId: session.id,
+        sourceDate,
+        targetDate,
+      });
+      setCopyModalVisible(false);
+      Alert.alert(
+        t('training.copyCompletedSessionSuccessTitle'),
+        t('training.copyCompletedSessionSuccessMessage', {
+          date: formatLocalizedDate(parseISO(targetDate), { en: 'MMM d, yyyy', es: "d 'de' MMMM 'de' yyyy" }),
+        }),
+      );
+    },
+    [copyCompletedSession, session.id, sourceDate, t],
+  );
 
   // Route upload mutation
   const uploadPolyline = useUploadPolyline({
@@ -324,6 +351,21 @@ export const EnduranceSessionDetailScreen = () => {
 
   const resolvedSessionId = isPendingSession ? undefined : session.id;
 
+  const { data: corosDevice } = useQuery({
+    queryKey: ['corosDevice', session.device_id],
+    queryFn: async () => {
+      if (!session.device_id) return null;
+      const { data, error } = await supabase
+        .from('devices')
+        .select('device_name, device_model')
+        .eq('id', session.device_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: session.provider === 'coros' && !!session.device_id,
+  });
+
   // Fetch workout sets for gym sessions
   const { data: sessionDetail } = useSessionDetail(session.sport_type === 'strength' ? resolvedSessionId : undefined);
   const exerciseGroups = sessionDetail?.exerciseGroups || [];
@@ -345,6 +387,21 @@ export const EnduranceSessionDetailScreen = () => {
   // Fetch laps
   const { data: laps } = useSessionLaps(resolvedSessionId);
   const { data: heartRateZones } = useSessionHeartRateZones(resolvedSessionId);
+  const { data: activitySections = [] } = useQuery({
+    queryKey: ['activitySessionSections', resolvedSessionId],
+    queryFn: async (): Promise<ActivitySessionSection[]> => {
+      if (!resolvedSessionId) return [];
+      const { data, error } = await supabase
+        .from('activity_session_sections')
+        .select('*')
+        .eq('session_id', resolvedSessionId)
+        .order('order_index')
+        .order('repetition_index', { ascending: true, nullsFirst: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!resolvedSessionId,
+  });
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(resolvedSessionId);
 
   // Fetch template details to get surface and environment type
@@ -1374,6 +1431,79 @@ export const EnduranceSessionDetailScreen = () => {
     );
   };
 
+  const renderRecordedBreakdown = () => {
+    if (activitySections.length === 0) return null;
+
+    const topLevelSections = activitySections.filter(section => section.parent_section_id == null);
+    const formatSectionMetric = (section: ActivitySessionSection) => {
+      const metrics: string[] = [];
+      if (section.distance_m != null) {
+        const distance = convertDistanceToUi(section.distance_m, 2);
+        metrics.push(`${distance.value} ${distance.unit}`);
+      }
+      if (section.duration_s != null) metrics.push(formatDuration(section.duration_s));
+      if (section.pace_s_per_km != null)
+        metrics.push(`${t('training.pace')} ${formatDuration(section.pace_s_per_km)}/km`);
+      if (section.pace_s_per_100m != null)
+        metrics.push(`${t('training.pacePer100m')} ${formatDuration(section.pace_s_per_100m)}`);
+      if (section.speed_m_per_s != null)
+        metrics.push(convertSpeedToUi(section.speed_m_per_s, session.sport_type).label);
+      if (section.avg_heart_rate != null) metrics.push(`${Math.round(section.avg_heart_rate)} bpm`);
+      if (section.max_heart_rate != null) metrics.push(`${Math.round(section.max_heart_rate)} bpm max`);
+      if (section.avg_power_w != null) metrics.push(`${Math.round(section.avg_power_w)} W`);
+      if (section.max_power_w != null) metrics.push(`${Math.round(section.max_power_w)} W max`);
+      if (section.avg_cadence != null) metrics.push(`${Math.round(section.avg_cadence)} rpm`);
+      if (section.elev_gain_m != null) metrics.push(`+${Math.round(section.elev_gain_m)} m`);
+      if (section.calories_kcal != null) metrics.push(`${Math.round(section.calories_kcal)} kcal`);
+      if (section.rpe != null) metrics.push(`RPE ${section.rpe}`);
+      return metrics.join(' · ');
+    };
+
+    const renderSection = (section: ActivitySessionSection, nested = false) => {
+      const children = activitySections.filter(child => child.parent_section_id === section.id);
+      const phaseLabel = section.is_group ? t('training.repCaps') : t(getPhaseLabel(section.phase_type));
+      const phaseColor = section.is_group ? themeColors.primary : getPhaseColor(section.phase_type);
+      return (
+        <View key={section.id} style={[styles.stepRow, nested && styles.childStepRow]}>
+          <View style={[styles.phaseIndicator, { backgroundColor: phaseColor }, nested && { minHeight: 24 }]} />
+          <View style={styles.stepContent}>
+            <View style={styles.stepHeader}>
+              <Text style={[styles.stepPhase, { color: phaseColor }]}>{phaseLabel}</Text>
+              {section.is_group && <Text style={styles.repText}>{section.repetitions}x</Text>}
+              {!section.is_group && section.repetition_index != null && (
+                <Text style={[styles.repetitionLabel, { color: themeColors.textSecondary }]}>
+                  {t('training.repetitionNumber', { number: section.repetition_index })}
+                </Text>
+              )}
+            </View>
+            {formatSectionMetric(section) ? (
+              <Text style={[styles.stepDetailText, dynamicStyles.sublabel]}>{formatSectionMetric(section)}</Text>
+            ) : null}
+            {section.notes ? (
+              <Text style={[styles.stepDetailText, dynamicStyles.sublabel]}>{section.notes}</Text>
+            ) : null}
+            {children.length > 0 && (
+              <View style={styles.childStepsContainer}>{children.map(child => renderSection(child, true))}</View>
+            )}
+          </View>
+        </View>
+      );
+    };
+
+    return (
+      <View style={styles.sectionContainer}>
+        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('training.advancedBreakdown')}</Text>
+        <GlassCard style={[styles.stepsCard, dynamicStyles.glassCard]}>
+          {topLevelSections.map((section, index) => (
+            <View key={section.id} style={index < topLevelSections.length - 1 ? styles.stepBorder : undefined}>
+              {renderSection(section)}
+            </View>
+          ))}
+        </GlassCard>
+      </View>
+    );
+  };
+
   if (isPendingSession) {
     const isWaitingForSession = !!activeSessionId && (isSessionLoading || isSessionFetching);
     return (
@@ -1498,6 +1628,15 @@ export const EnduranceSessionDetailScreen = () => {
                 locale: getDateFnsLocale(),
               })}
             </Text>
+            {session.provider === 'coros' && (
+              <Text style={[styles.providerAttribution, { color: themeColors.textSecondary }]}>
+                {corosDevice?.device_model || corosDevice?.device_name
+                  ? t('training.dataProvidedByCorosDevice', {
+                      device: corosDevice.device_model || corosDevice.device_name,
+                    })
+                  : t('training.dataProvidedByCoros')}
+              </Text>
+            )}
             {(session.sport_subtype ||
               session.surface ||
               session.base_load ||
@@ -1783,6 +1922,16 @@ export const EnduranceSessionDetailScreen = () => {
               navigation.replace('EnduranceSessionDetail', { sessionId: newSessionId })
             }
           />
+
+          {session.status === 'completed' && !isPendingSession ? (
+            <View style={styles.copySessionSection}>
+              <PrimaryButton
+                title={t('training.copyCompletedSession')}
+                onPress={() => setCopyModalVisible(true)}
+                variant="outline"
+              />
+            </View>
+          ) : null}
 
           {!isGymSession && (session.notes || template?.notes) && (
             <View style={styles.sectionContainer}>
@@ -2168,9 +2317,19 @@ export const EnduranceSessionDetailScreen = () => {
           )}
 
           {/* Keep programmed workout at the very bottom of the detail screen */}
+          {renderRecordedBreakdown()}
           {renderProgrammedWorkoutSection()}
         </ScrollView>
       </SafeAreaView>
+
+      <CopyCompletedSessionModal
+        visible={copyModalVisible}
+        sourceName={session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+        sourceDate={sourceDate}
+        initialDate={copyInitialDate}
+        onCancel={() => setCopyModalVisible(false)}
+        onCopy={handleCopyCompletedSession}
+      />
 
       {/* Rename Activity Modal */}
       <Modal visible={renameVisible} transparent animationType="fade" onRequestClose={() => setRenameVisible(false)}>
@@ -2263,7 +2422,7 @@ export const EnduranceSessionDetailScreen = () => {
                 <View style={styles.modalInputGroup}>
                   <TextInput
                     style={[styles.modalBigInput, { color: themeColors.textPrimary }]}
-                    keyboardType="number-pad"
+                    {...INTEGER_INPUT_PROPS}
                     value={editReps}
                     onChangeText={setEditReps}
                     selectTextOnFocus
@@ -2276,7 +2435,7 @@ export const EnduranceSessionDetailScreen = () => {
                 <View style={styles.modalInputGroup}>
                   <TextInput
                     style={[styles.modalBigInput, { color: themeColors.textPrimary }]}
-                    keyboardType="decimal-pad"
+                    {...DECIMAL_INPUT_PROPS}
                     value={editWeight}
                     onChangeText={setEditWeight}
                     selectTextOnFocus
@@ -2337,6 +2496,9 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     gap: spacing.s,
   },
+  copySessionSection: {
+    marginBottom: spacing.l,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2392,6 +2554,11 @@ const styles = StyleSheet.create({
   date: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  providerAttribution: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    fontWeight: '600',
   },
   statsContainer: {
     gap: spacing.m,
@@ -2499,6 +2666,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+  repetitionLabel: {
+    ...typography.caption,
   },
   repBadge: {
     backgroundColor: colors.surfaceHighlight,

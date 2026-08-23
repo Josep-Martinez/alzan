@@ -807,6 +807,10 @@ type ExternalRawPayloadsV2Table = {
     related_id: string | null;
     received_at: string;
     processed_at: string | null;
+    processing_status: string;
+    processing_attempts: number;
+    next_processing_at: string;
+    processing_error: string | null;
     created_at: string;
   };
   Insert: {
@@ -827,6 +831,10 @@ type ExternalRawPayloadsV2Table = {
     related_id?: string | null;
     received_at?: string;
     processed_at?: string | null;
+    processing_status?: string;
+    processing_attempts?: number;
+    next_processing_at?: string;
+    processing_error?: string | null;
     created_at?: string;
   };
   Update: {
@@ -847,6 +855,10 @@ type ExternalRawPayloadsV2Table = {
     related_id?: string | null;
     received_at?: string;
     processed_at?: string | null;
+    processing_status?: string;
+    processing_attempts?: number;
+    next_processing_at?: string;
+    processing_error?: string | null;
     created_at?: string;
   };
   Relationships: [];
@@ -1271,6 +1283,9 @@ export type ActivityStreamUpdate = Update<"activity_streams">;
 export type ActivityLap = Row<"activity_laps">;
 export type ActivityLapInsert = Insert<"activity_laps">;
 export type ActivityLapUpdate = Update<"activity_laps">;
+export type ActivitySessionSection = Row<"activity_session_sections">;
+export type ActivitySessionSectionInsert = Insert<"activity_session_sections">;
+export type ActivitySessionSectionUpdate = Update<"activity_session_sections">;
 export type ActivityHeartRateZone = Row<"activity_heart_rate_zones">;
 export type ActivityHeartRateZoneInsert = Insert<"activity_heart_rate_zones">;
 export type ActivityHeartRateZoneUpdate = Update<"activity_heart_rate_zones">;
