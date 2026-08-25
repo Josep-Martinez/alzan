@@ -1,4 +1,4 @@
-import { MenuImportDocument, MenuImportMealType } from './menuImportContract';
+import { MenuImportDocument, MenuImportMealType, MenuImportMealTypeInput } from './menuImportContract';
 
 export type MenuImportConflictDecision = 'replace' | 'keep_both' | 'ignore';
 
@@ -53,7 +53,7 @@ export type MenuImportMealConflict = {
 export type MenuImportPreviewMeal = {
   key: string;
   date: string;
-  meal_type: MenuImportMealType;
+  meal_type: MenuImportMealTypeInput;
   name: string;
   ingredients: MenuImportPreviewIngredient[];
   macros: MenuImportMacros;
@@ -63,6 +63,7 @@ export type MenuImportPreviewMeal = {
 export type MenuImportPreview = {
   menuName: string;
   calendarSnapshot: MenuImportCalendarSnapshotRef;
+  existingLogs: MenuImportExistingLog[];
   resolutions: MenuImportIngredientResolution[];
   meals: MenuImportPreviewMeal[];
 };
@@ -86,15 +87,55 @@ const EMPTY_MACROS: MenuImportMacros = {
   fats_g: 0,
 };
 
+const SEARCH_STOP_WORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'con', 'por', 'para']);
+
 const normalizeIngredientName = (name: string): string =>
   name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
-const getMealSlotKey = (date: string, mealType: MenuImportMealType): string => `${date}:${mealType}`;
+const tokenizeIngredientName = (name: string): string[] => {
+  const tokens = normalizeIngredientName(name)
+    .split(' ')
+    .filter(Boolean)
+    .map(token => {
+      if (token.length > 4 && token.endsWith('es')) return token.slice(0, -2);
+      if (token.length > 3 && token.endsWith('s')) return token.slice(0, -1);
+      return token;
+    });
+  const meaningfulTokens = tokens.filter(token => !SEARCH_STOP_WORDS.has(token));
+  return Array.from(new Set(meaningfulTokens.length > 0 ? meaningfulTokens : tokens));
+};
+
+const getIngredientCandidateScore = (query: string, candidateName: string): number => {
+  const normalizedQuery = normalizeIngredientName(query);
+  const normalizedCandidate = normalizeIngredientName(candidateName);
+  const queryTokens = tokenizeIngredientName(query);
+  const candidateTokens = tokenizeIngredientName(candidateName);
+  let score = 0;
+
+  if (normalizedCandidate === normalizedQuery) score += 1200;
+  if (normalizedCandidate.startsWith(normalizedQuery)) score += 700;
+  if (normalizedCandidate.includes(normalizedQuery)) score += 520;
+
+  const matchingTokens = queryTokens.filter(queryToken =>
+    candidateTokens.some(
+      candidateToken =>
+        candidateToken === queryToken || candidateToken.includes(queryToken) || queryToken.includes(candidateToken),
+    ),
+  ).length;
+  if (matchingTokens === queryTokens.length && queryTokens.length > 0) score += 640;
+  score += matchingTokens * 140;
+  score -= Math.max(0, candidateTokens.length - queryTokens.length) * 20;
+
+  return score;
+};
+
+const getMealSlotKey = (date: string, mealType: MenuImportMealTypeInput): string => `${date}:${mealType}`;
 
 const getUniqueIngredientNames = (document: MenuImportDocument): Map<string, string> => {
   const names = new Map<string, string>();
@@ -130,8 +171,13 @@ const prepareCandidates = (
   ingredientKey: string,
 ): MenuImportIngredientCandidate[] => {
   const validCandidates = candidates.filter(isValidCandidate);
-  const exactCandidate = validCandidates.find(candidate => normalizeIngredientName(candidate.name) === ingredientKey);
-  const orderedCandidates = exactCandidate ? [exactCandidate, ...validCandidates] : validCandidates;
+  const orderedCandidates = [...validCandidates].sort((first, second) => {
+    const scoreDifference =
+      getIngredientCandidateScore(ingredientKey, second.name) - getIngredientCandidateScore(ingredientKey, first.name);
+    if (scoreDifference !== 0) return scoreDifference;
+
+    return normalizeIngredientName(first.name).localeCompare(normalizeIngredientName(second.name));
+  });
   const candidateIds = new Set<string>();
   const uniqueCandidates: MenuImportIngredientCandidate[] = [];
 
@@ -146,6 +192,31 @@ const prepareCandidates = (
   }
 
   return uniqueCandidates;
+};
+
+const hasEquivalentMeaningfulTokens = (first: string, second: string): boolean => {
+  const firstTokens = tokenizeIngredientName(first);
+  const secondTokens = tokenizeIngredientName(second);
+
+  return (
+    firstTokens.length > 0 &&
+    firstTokens.length === secondTokens.length &&
+    firstTokens.every(token => secondTokens.includes(token))
+  );
+};
+
+const selectSafeCandidate = (
+  ingredientKey: string,
+  candidates: MenuImportIngredientCandidate[],
+): MenuImportIngredientCandidate | null => {
+  const exactCandidates = candidates.filter(candidate => normalizeIngredientName(candidate.name) === ingredientKey);
+  if (exactCandidates.length === 1) return exactCandidates[0] ?? null;
+  if (exactCandidates.length > 1) return null;
+
+  const equivalentCandidates = candidates.filter(candidate =>
+    hasEquivalentMeaningfulTokens(ingredientKey, candidate.name),
+  );
+  return equivalentCandidates.length === 1 ? (equivalentCandidates[0] ?? null) : null;
 };
 
 export async function resolveMenuImportIngredients(
@@ -165,8 +236,7 @@ export async function resolveMenuImportIngredients(
         try {
           const searchResults = await search(ingredientKey);
           const candidates = prepareCandidates(searchResults, ingredientKey);
-          const selectedCandidate =
-            candidates.find(candidate => normalizeIngredientName(candidate.name) === ingredientKey) ?? null;
+          const selectedCandidate = selectSafeCandidate(ingredientKey, candidates);
 
           return {
             ingredientKey,
@@ -244,9 +314,12 @@ export function buildMenuImportPreview(
         const ingredientKey = normalizeIngredientName(ingredient.name);
         return buildPreviewIngredient(ingredient.name, ingredient.quantity_g, resolutionsByKey.get(ingredientKey));
       });
-      const conflictingLogs = existingLogs.filter(
-        existingLog => existingLog.date === day.date && existingLog.meal_type === meal.meal_type,
-      );
+      const conflictingLogs =
+        meal.meal_type === 'unspecified'
+          ? []
+          : existingLogs.filter(
+              existingLog => existingLog.date === day.date && existingLog.meal_type === meal.meal_type,
+            );
 
       meals.push({
         key: `days[${dayIndex}].meals[${mealIndex}]`,
@@ -263,9 +336,34 @@ export function buildMenuImportPreview(
   return {
     menuName: document.menu_name,
     calendarSnapshot,
+    existingLogs,
     resolutions,
     meals,
   };
+}
+
+export function setMenuImportMealType(
+  preview: MenuImportPreview,
+  mealKey: string,
+  mealType: MenuImportMealType,
+): MenuImportPreview {
+  const selectedMeal = preview.meals.find(meal => meal.key === mealKey);
+  if (!selectedMeal) return preview;
+
+  const conflictingLogs = preview.existingLogs.filter(
+    existingLog => existingLog.date === selectedMeal.date && existingLog.meal_type === mealType,
+  );
+  const meals = preview.meals.map(meal =>
+    meal.key === mealKey
+      ? {
+          ...meal,
+          meal_type: mealType,
+          conflict: conflictingLogs.length > 0 ? { existingLogs: conflictingLogs, decision: null } : null,
+        }
+      : meal,
+  );
+
+  return { ...preview, meals };
 }
 
 export function selectMenuImportIngredient(
@@ -309,6 +407,66 @@ export function selectMenuImportIngredient(
   };
 }
 
+export function updateMenuImportIngredientCandidates(
+  preview: MenuImportPreview,
+  ingredientKey: string,
+  candidates: MenuImportIngredientCandidate[],
+): MenuImportPreview {
+  const normalizedIngredientKey = normalizeIngredientName(ingredientKey);
+  const resolution = preview.resolutions.find(item => item.ingredientKey === normalizedIngredientKey);
+  if (!resolution) return preview;
+
+  const preparedCandidates = prepareCandidates(candidates, normalizedIngredientKey);
+  const resolutions = preview.resolutions.map(item =>
+    item.ingredientKey === normalizedIngredientKey
+      ? { ...item, candidates: preparedCandidates, selectedCandidate: null }
+      : item,
+  );
+  const meals = preview.meals.map(meal => {
+    const ingredients = meal.ingredients.map(ingredient =>
+      ingredient.ingredientKey === normalizedIngredientKey
+        ? { ...ingredient, selectedCandidate: null, macros: null }
+        : ingredient,
+    );
+
+    return {
+      ...meal,
+      ingredients,
+      macros: calculateMealMacros(ingredients),
+    };
+  });
+
+  return { ...preview, resolutions, meals };
+}
+
+export function removeMenuImportIngredient(
+  preview: MenuImportPreview,
+  mealKey: string,
+  ingredientIndex: number,
+): MenuImportPreview {
+  const selectedMeal = preview.meals.find(meal => meal.key === mealKey);
+  if (!selectedMeal || ingredientIndex < 0 || ingredientIndex >= selectedMeal.ingredients.length) {
+    return preview;
+  }
+
+  const meals = preview.meals.map(meal => {
+    if (meal.key !== mealKey) return meal;
+
+    const ingredients = meal.ingredients.filter((_, index) => index !== ingredientIndex);
+    return {
+      ...meal,
+      ingredients,
+      macros: calculateMealMacros(ingredients),
+    };
+  });
+  const remainingIngredientKeys = new Set(
+    meals.flatMap(meal => meal.ingredients.map(ingredient => ingredient.ingredientKey)),
+  );
+  const resolutions = preview.resolutions.filter(resolution => remainingIngredientKeys.has(resolution.ingredientKey));
+
+  return { ...preview, resolutions, meals };
+}
+
 export function setMenuImportConflictDecision(
   preview: MenuImportPreview,
   mealKey: string,
@@ -338,6 +496,7 @@ export function setMenuImportConflictDecision(
 }
 
 export function isMenuImportPreviewReady(preview: MenuImportPreview): boolean {
+  const everyMealTypeIsResolved = preview.meals.every(meal => meal.meal_type !== 'unspecified');
   const everyIngredientIsResolved = preview.meals.every(meal =>
     meal.conflict?.decision === 'ignore'
       ? true
@@ -347,5 +506,5 @@ export function isMenuImportPreviewReady(preview: MenuImportPreview): boolean {
     meal => meal.conflict === null || meal.conflict.decision !== null,
   );
 
-  return everyIngredientIsResolved && everyConflictHasDecision;
+  return everyMealTypeIsResolved && everyIngredientIsResolved && everyConflictHasDecision;
 }
