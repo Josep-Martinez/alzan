@@ -16,6 +16,14 @@ assert.ok(prompt.includes('varias comidas'));
 assert.ok(prompt.includes('fecha y una hora o un tipo de comida inequívoco'));
 assert.ok(!prompt.includes('Ctrl+V o Cmd+V'));
 assert.ok(prompt.includes('adjunta una foto o documento'));
+assert.ok(prompt.includes('Desglosa solo un nivel los platos compuestos'));
+assert.ok(prompt.includes('Mantén ajoaceite, mayonesa, pesto, bechamel'));
+assert.ok(prompt.includes('combina ingredientes idénticos dentro de la misma comida'));
+assert.ok(prompt.includes('comillas dobles ASCII'));
+assert.ok(prompt.includes('10 comidas por día'));
+assert.ok(prompt.includes('30 ingredientes por comida'));
+assert.ok(prompt.includes('500 nombres únicos'));
+assert.ok(prompt.includes('entre 0.1 y 10000'));
 assert.ok(prompt.length < 8_000);
 
 console.log('menuImportAiPrompt tests passed');

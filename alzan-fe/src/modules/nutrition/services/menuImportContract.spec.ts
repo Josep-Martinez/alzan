@@ -91,6 +91,35 @@ if (validResult.ok) {
   assert.equal(validResult.value.days[0]?.weekday, 'lunes');
 }
 
+// Mobile Safari can replace JSON delimiters with typographic quotes. The
+// frontend accepts only this unambiguous presentation change, not structural repairs.
+const mobileJson = JSON.stringify(menu({ days: [day({ weekday: 'lunes' })] })).replace(/"/g, '“');
+const mobileResult = parseMenuImportJson(`\u00a0${mobileJson}\u00a0`);
+assert.equal(mobileResult.ok, true);
+if (mobileResult.ok) {
+  assert.equal(mobileResult.value.days[0]?.meals[0]?.ingredients[0]?.name, 'Copos de avena');
+}
+
+const fencedMobileResult = parseMenuImportJson('\ufeff```json\n' + mobileJson + '\n```\u00a0');
+assert.equal(fencedMobileResult.ok, true);
+
+let quoteIndex = 0;
+const pairedMobileJson = JSON.stringify(menu()).replace(/"/g, () => (quoteIndex++ % 2 === 0 ? '“' : '”'));
+assert.equal(parseMenuImportJson(pairedMobileJson).ok, true);
+
+const curlyQuoteInName = menu({
+  days: [day({ meals: [meal({ ingredients: [ingredient({ name: 'Queso “La Vaca”' })] })] })],
+});
+const curlyQuoteInNameResult = parseMenuImportJson(JSON.stringify(curlyQuoteInName));
+assert.equal(curlyQuoteInNameResult.ok, true);
+if (curlyQuoteInNameResult.ok) {
+  assert.equal(curlyQuoteInNameResult.value.days[0]?.meals[0]?.ingredients[0]?.name, 'Queso “La Vaca”');
+}
+
+assert.equal(parseMenuImportJson(`Antes del JSON\n${JSON.stringify(menu())}`).ok, false);
+assert.equal(parseMenuImportJson(JSON.stringify(menu()).replace(/"/g, "'")).ok, false);
+assert.equal(parseMenuImportJson(`${JSON.stringify(menu())}${JSON.stringify(menu())}`).ok, false);
+
 const exampleDocument = readTemplateJson('alzan-menu-plan-v1.example.json');
 assert.equal(parseMenuImportJson(exampleDocument).ok, true);
 

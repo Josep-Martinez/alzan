@@ -3,6 +3,7 @@ import {
   MENU_IMPORT_MAX_TOTAL_INGREDIENTS,
   MENU_IMPORT_MAX_UNIQUE_INGREDIENTS,
 } from './menuImportContract';
+import { MENU_IMPORT_JSON_OUTPUT_RULES } from './menuImportPromptRules';
 
 export const MENU_IMPORT_TEMPLATE = `{
   "format": "alzan-menu-plan",
@@ -67,6 +68,7 @@ INGREDIENTES
 
 VALIDACIÓN
 - Comprueba fechas, weekday, comidas con ingredientes, cantidades positivas y propiedades permitidas.
+${MENU_IMPORT_JSON_OUTPUT_RULES}
 - Si todo es válido, devuelve solo el JSON siguiendo esta plantilla. Devuelve un informe de bloqueo solo cuando falte el DOCX de nutrición o una fecha/comida no pueda representarse fielmente con el contrato; nunca bloquees por la ausencia de archivos de entrenamiento:
 
 PLANTILLA JSON

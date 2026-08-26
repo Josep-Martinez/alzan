@@ -1,5 +1,6 @@
 import { MENU_IMPORT_MAX_DAYS, MENU_IMPORT_MAX_TOTAL_INGREDIENTS } from './menuImportContract';
 import { MENU_IMPORT_TEMPLATE } from './menuImportTemplate';
+import { MENU_IMPORT_JSON_OUTPUT_RULES } from './menuImportPromptRules';
 
 export type MenuImportAiPromptOptions = {
   currentDate: string;
@@ -25,6 +26,15 @@ INGREDIENTES Y CANTIDADES
 - No añadas alimentos que no estén visibles, escritos o incluidos en la receta.
 - Si no puedes identificar con seguridad un alimento, devuelve un informe de bloqueo que identifique el ingrediente; no inventes una coincidencia.
 
+CRITERIO CULINARIO
+- Desglosa solo un nivel los platos compuestos reconocibles en sus componentes principales: por ejemplo, paella en arroz, proteínas, verduras y aceite; croqueta en relleno, bechamel, rebozado y aceite absorbido; o tarta en su base y relleno.
+- No desgloses alimentos simples o productos habituales como pan, queso, yogur, jamón, galletas, cereales, pasta cocida, arroz cocido, conservas, cremas, salsas, aliños o condimentos.
+- Mantén ajoaceite, mayonesa, pesto, bechamel y cualquier otra salsa como un ingrediente independiente. Nunca desmontes una salsa salvo que el usuario lo pida expresamente.
+- El nombre del plato puede conservarse en meal.name, pero no debe aparecer como ingrediente si es una preparación compuesta que has desglosado.
+- Puedes inferir los componentes esenciales de un plato conocido, pero no ingredientes opcionales, guarniciones o acompañamientos que no estén indicados o visibles.
+- Las cantidades representan lo consumido; reparte una ración estimada entre sus componentes y combina ingredientes idénticos dentro de la misma comida sumando sus gramos.
+- No descompongas pan, agua, sal o especias nutricionalmente insignificantes en materias primas; en frituras estima solo el aceite absorbido.
+
 FECHAS Y TIPO DE COMIDA
 - Si la entrada contiene exactamente una comida y no indica fecha, usa ${currentDate}.
 - Si contiene exactamente una comida y no indica hora ni tipo, usa meal_type: "unspecified". Alzan pedirá al usuario que elija el tipo antes de importar.
@@ -38,12 +48,8 @@ FIDELIDAD
 - Un menú puede contener como máximo ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales.
 
 SALIDA
-- Si los datos son suficientes, responde únicamente con JSON válido, sin markdown ni comentarios.
-- La raíz solo contiene format, version, menu_name y days.
-- Cada day solo contiene date, weekday y meals.
-- Cada meal solo contiene meal_type, name e ingredients.
-- Cada ingredient solo contiene name y quantity_g.
-- Los gramos son números JSON positivos, nunca texto con unidades.
+${MENU_IMPORT_JSON_OUTPUT_RULES}
+- Los nombres deben ser breves y estar dentro de los límites del contrato; no añadas propiedades adicionales.
 
 PLANTILLA
 ${MENU_IMPORT_TEMPLATE.trim()}
