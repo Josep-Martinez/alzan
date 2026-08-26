@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabaseClient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Alert } from '../../components/common/Alert';
+import { CalendarDatePickerModal } from '../../components/common/CalendarDatePickerModal';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../i18n/dateLocale';
 import { format, parseISO } from 'date-fns';
@@ -199,10 +200,10 @@ export const StartWorkoutScreen = () => {
     }
   };
 
-  const handleConfirmDate = () => {
+  const handleConfirmDate = (nextDate: Date = tempDate) => {
     setShowDatePicker(false);
-    setSelectedDate(tempDate);
-    updateWorkoutPlanDate(tempDate);
+    setSelectedDate(nextDate);
+    updateWorkoutPlanDate(nextDate);
   };
 
   const handleCancelDate = () => {
@@ -398,34 +399,49 @@ export const StartWorkoutScreen = () => {
         </LiquidGlassFooter>
       </View>
 
-      {/* Date Picker Modal for iOS/Android */}
-      {showDatePicker && (
-        <Modal transparent animationType="fade" visible={showDatePicker} onRequestClose={handleCancelDate}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleCancelDate}>
-            <View style={[styles.pickerContainer, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={handleCancelDate}>
-                  <Text style={[styles.pickerButton, { color: themeColors.textSecondary }]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <Text style={[styles.pickerTitle, { color: themeColors.textPrimary }]}>{t('training.selectDate')}</Text>
-                <TouchableOpacity onPress={handleConfirmDate}>
-                  <Text style={[styles.pickerButton, { color: themeColors.primary, fontWeight: '700' }]}>
-                    {t('common.done')}
+      {Platform.OS === 'web' ? (
+        <CalendarDatePickerModal
+          visible={showDatePicker}
+          value={tempDate}
+          title={t('training.selectDate')}
+          maximumDate={new Date()}
+          onCancel={handleCancelDate}
+          onConfirm={date => handleConfirmDate(date)}
+        />
+      ) : (
+        /* Date Picker Modal for iOS/Android */
+        showDatePicker && (
+          <Modal transparent animationType="fade" visible={showDatePicker} onRequestClose={handleCancelDate}>
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleCancelDate}>
+              <View style={[styles.pickerContainer, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+                <View style={styles.pickerHeader}>
+                  <TouchableOpacity onPress={handleCancelDate}>
+                    <Text style={[styles.pickerButton, { color: themeColors.textSecondary }]}>
+                      {t('common.cancel')}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.pickerTitle, { color: themeColors.textPrimary }]}>
+                    {t('training.selectDate')}
                   </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity onPress={handleConfirmDate}>
+                    <Text style={[styles.pickerButton, { color: themeColors.primary, fontWeight: '700' }]}>
+                      {t('common.done')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                  locale={getLocaleTag()}
+                  textColor={themeColors.textPrimary}
+                />
               </View>
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-                locale={getLocaleTag()}
-                textColor={themeColors.textPrimary}
-              />
-            </View>
-          </TouchableOpacity>
-        </Modal>
+            </TouchableOpacity>
+          </Modal>
+        )
       )}
     </LinearGradient>
   );

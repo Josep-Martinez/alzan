@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar, ChevronRight } from 'lucide-react-native';
-import { formatISO, isValid, parseISO } from 'date-fns';
+import { formatISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import { CalendarDatePickerModal } from '../../../components/common/CalendarDatePickerModal';
 import { formatLocalizedDate } from '../../../i18n/dateLocale';
 import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
 import { useCopyTargetSessionCount } from '../hooks/useCopyCompletedSession';
@@ -32,6 +33,7 @@ export const CopyCompletedSessionModal = ({
   const { colors: themeColors, isDark } = useTrainingStyles();
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [showNativePicker, setShowNativePicker] = useState(false);
+  const [showWebCalendar, setShowWebCalendar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const targetDate = toIsoDate(selectedDate);
@@ -45,49 +47,12 @@ export const CopyCompletedSessionModal = ({
   useEffect(() => {
     if (!visible) {
       setShowNativePicker(false);
+      setShowWebCalendar(false);
       return;
     }
     setSelectedDate(initialDate);
     setErrorMessage(null);
   }, [initialDate, visible]);
-
-  const openWebPicker = useCallback(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.value = targetDate;
-    input.style.position = 'fixed';
-    input.style.left = '-9999px';
-    input.style.opacity = '0';
-
-    const cleanup = () => {
-      input.removeEventListener('change', handleChange);
-      input.removeEventListener('blur', cleanup);
-      input.remove();
-    };
-    const handleChange = () => {
-      const nextDate = parseISO(input.value);
-      if (input.value && isValid(nextDate)) {
-        if (input.value === sourceDate) setErrorMessage(t('training.copyCompletedSessionSameDate'));
-        else {
-          setSelectedDate(nextDate);
-          setErrorMessage(null);
-        }
-      }
-      cleanup();
-    };
-
-    input.addEventListener('change', handleChange);
-    input.addEventListener('blur', cleanup);
-    document.body.appendChild(input);
-    try {
-      if (typeof input.showPicker === 'function') input.showPicker();
-      else input.click();
-    } catch {
-      input.click();
-    }
-  }, [sourceDate, t, targetDate]);
 
   const handleCopy = async () => {
     if (isSubmitting) return;
@@ -140,7 +105,7 @@ export const CopyCompletedSessionModal = ({
           <TouchableOpacity
             style={[styles.dateButton, { borderColor: themeColors.border }]}
             onPress={() => {
-              if (Platform.OS === 'web') openWebPicker();
+              if (Platform.OS === 'web') setShowWebCalendar(true);
               else setShowNativePicker(true);
             }}
             accessibilityRole="button"
@@ -170,6 +135,25 @@ export const CopyCompletedSessionModal = ({
                     setErrorMessage(null);
                   }
                 } else setShowNativePicker(false);
+              }}
+            />
+          ) : null}
+
+          {Platform.OS === 'web' ? (
+            <CalendarDatePickerModal
+              visible={showWebCalendar}
+              value={selectedDate}
+              title={t('training.copyCompletedSessionDate')}
+              isDateDisabled={date => toIsoDate(date) === sourceDate}
+              onCancel={() => setShowWebCalendar(false)}
+              onConfirm={date => {
+                setShowWebCalendar(false);
+                if (toIsoDate(date) === sourceDate) {
+                  setErrorMessage(t('training.copyCompletedSessionSameDate'));
+                } else {
+                  setSelectedDate(date);
+                  setErrorMessage(null);
+                }
               }}
             />
           ) : null}

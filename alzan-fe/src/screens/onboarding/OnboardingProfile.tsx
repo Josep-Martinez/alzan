@@ -8,6 +8,7 @@ import { useOnboarding } from '../../hooks/useOnboarding';
 import { OnboardingProgress } from '../../components/OnboardingProgress';
 import { OnboardingBackButton } from '../../components/OnboardingBackButton';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { CalendarDatePickerModal } from '../../components/common/CalendarDatePickerModal';
 import { OnboardingStep, SEX_OPTIONS } from '../../types/onboarding.types';
 import { Sex } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
@@ -141,45 +142,9 @@ export const OnboardingProfile = () => {
     prefer_not_to_say: 'Prefiero no decirlo',
   };
 
-  const toHtmlDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, '0');
-    const day = `${date.getDate()}`.padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const handleOpenDatePicker = () => {
     if (isWeb) {
-      if (typeof document === 'undefined') return;
-
-      const input = document.createElement('input');
-      input.type = 'date';
-      input.min = toHtmlDate(minDate);
-      input.max = toHtmlDate(maxDate);
-      input.value = toHtmlDate(dateOfBirth || defaultDate);
-      input.style.position = 'fixed';
-      input.style.left = '-9999px';
-      input.style.opacity = '0';
-
-      const cleanup = () => {
-        if (input.parentNode) {
-          input.parentNode.removeChild(input);
-        }
-      };
-
-      input.addEventListener('change', () => {
-        if (input.value) {
-          const [year, month, day] = input.value.split('-').map(Number);
-          if (year && month && day) {
-            applySelectedDate(new Date(year, month - 1, day));
-          }
-        }
-        cleanup();
-      });
-
-      input.addEventListener('blur', cleanup);
-      document.body.appendChild(input);
-      input.click();
+      setShowDatePicker(true);
       return;
     }
 
@@ -298,6 +263,21 @@ export const OnboardingProfile = () => {
               </View>
             </View>
           </Modal>
+        )}
+
+        {isWeb && showDatePicker && (
+          <CalendarDatePickerModal
+            visible={showDatePicker}
+            value={dateOfBirth || defaultDate}
+            title={t('onboarding.birthDate')}
+            minimumDate={minDate}
+            maximumDate={maxDate}
+            onCancel={() => setShowDatePicker(false)}
+            onConfirm={date => {
+              applySelectedDate(date);
+              setShowDatePicker(false);
+            }}
+          />
         )}
 
         {isAndroid && showDatePicker && (

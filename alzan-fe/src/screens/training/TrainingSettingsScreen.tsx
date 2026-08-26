@@ -19,6 +19,7 @@ import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
+import { CalendarDatePickerModal } from '../../components/common/CalendarDatePickerModal';
 import { useAuth } from '../../context/AuthContext';
 import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import { generateTrainingPDF } from '../../modules/training/services/trainingPdfExportService';
@@ -99,6 +100,7 @@ const TrainingSettingsScreen = () => {
   const [showDeleteRangeMode, setShowDeleteRangeMode] = useState(false);
   const [deleteStart, setDeleteStart] = useState(new Date());
   const [deleteEnd, setDeleteEnd] = useState(new Date());
+  const [activeDeleteDatePicker, setActiveDeleteDatePicker] = useState<'start' | 'end' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeSectionInfo, setActiveSectionInfo] = useState<TrainingSectionInfoKey | null>(null);
 
@@ -561,28 +563,48 @@ const TrainingSettingsScreen = () => {
               ) : (
                 <>
                   <Text style={[styles.label, dynamicStyles.label]}>{t('training.from')}</Text>
-                  <DateTimePicker
-                    value={deleteStart}
-                    mode="date"
-                    display="default"
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    onChange={(e, d) => {
-                      if (d) {
-                        setDeleteStart(d);
-                        if (d > deleteEnd) setDeleteEnd(d);
-                      }
-                    }}
-                  />
+                  {Platform.OS === 'web' ? (
+                    <TouchableOpacity
+                      style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                      onPress={() => setActiveDeleteDatePicker('start')}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ color: themeColors.textPrimary }}>{format(deleteStart, 'dd/MM/yyyy')}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={deleteStart}
+                      mode="date"
+                      display="default"
+                      themeVariant={isDark ? 'dark' : 'light'}
+                      onChange={(e, d) => {
+                        if (d) {
+                          setDeleteStart(d);
+                          if (d > deleteEnd) setDeleteEnd(d);
+                        }
+                      }}
+                    />
+                  )}
 
                   <Text style={[styles.label, dynamicStyles.label]}>{t('training.until')}</Text>
-                  <DateTimePicker
-                    value={deleteEnd}
-                    mode="date"
-                    display="default"
-                    minimumDate={deleteStart}
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    onChange={(e, d) => d && setDeleteEnd(d)}
-                  />
+                  {Platform.OS === 'web' ? (
+                    <TouchableOpacity
+                      style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                      onPress={() => setActiveDeleteDatePicker('end')}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ color: themeColors.textPrimary }}>{format(deleteEnd, 'dd/MM/yyyy')}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={deleteEnd}
+                      mode="date"
+                      display="default"
+                      minimumDate={deleteStart}
+                      themeVariant={isDark ? 'dark' : 'light'}
+                      onChange={(e, d) => d && setDeleteEnd(d)}
+                    />
+                  )}
 
                   <View style={styles.modalButtons}>
                     <TouchableOpacity onPress={() => setShowDeleteRangeMode(false)} style={styles.modalBtnCancel}>
@@ -609,6 +631,25 @@ const TrainingSettingsScreen = () => {
             </View>
           </View>
         </Modal>
+
+        {Platform.OS === 'web' && activeDeleteDatePicker ? (
+          <CalendarDatePickerModal
+            visible
+            value={activeDeleteDatePicker === 'start' ? deleteStart : deleteEnd}
+            title={activeDeleteDatePicker === 'start' ? t('training.from') : t('training.until')}
+            minimumDate={activeDeleteDatePicker === 'end' ? deleteStart : undefined}
+            onCancel={() => setActiveDeleteDatePicker(null)}
+            onConfirm={date => {
+              if (activeDeleteDatePicker === 'start') {
+                setDeleteStart(date);
+                if (date > deleteEnd) setDeleteEnd(date);
+              } else {
+                setDeleteEnd(date);
+              }
+              setActiveDeleteDatePicker(null);
+            }}
+          />
+        ) : null}
       </SafeAreaView>
     </LinearGradient>
   );

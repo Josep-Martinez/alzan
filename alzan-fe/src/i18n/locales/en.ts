@@ -14,6 +14,8 @@ const en = {
     finish: 'Finish',
     skip: 'Skip',
     done: 'Done',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
     loadMore: 'Load more',
     ok: 'OK',
     add10s: '+10s',

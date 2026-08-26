@@ -181,9 +181,9 @@ Expected: PASS with matching English/Spanish translation object shapes and a typ
 
 Use props `{ visible, sourceName, initialDate, minimumDate, maximumDate, mealTypes, onCancel, onCopy }`, where `onCopy` receives `{ date, mealType }` and returns a promise. Keep the step as `'date' | 'mealType'`, reset to date step and today whenever the modal opens, and ignore duplicate submits while loading.
 
-- [ ] **Step 2: Implement native date selection**
+- [ ] **Step 2: Implement cross-platform date selection**
 
-On iOS/Android, render `DateTimePicker` with the selected date, `minimumDate`, `maximumDate`, and locale-aware display. On web, create a hidden browser `<input type="date">` on demand, set its `min` and `max` to the shared bounds, and update the same React Native date display after `change`. Use `Platform.OS` only at the boundary so the rest of the flow is shared.
+On iOS/Android, render `DateTimePicker` with the selected date, `minimumDate`, `maximumDate`, and locale-aware display. On web, render the shared visible `CalendarDatePickerModal` with the same bounds and update the React Native date display after confirmation. Use `Platform.OS` only at the boundary so the rest of the flow is shared; never create or open hidden HTML date inputs.
 
 - [ ] **Step 3: Implement type selection and states**
 

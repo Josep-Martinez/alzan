@@ -14,6 +14,8 @@ assert.deepEqual(
   { ok: true },
 );
 
+assert.deepEqual(validateCopyTargetDate({ sourceDate: '2026-08-16', targetDate: '2026-08-26' }), { ok: true });
+
 assert.deepEqual(validateCopyTargetDate({ sourceDate: '2026-08-23', targetDate: '2026-08-23' }), {
   ok: false,
   reason: 'same_date',

@@ -16,6 +16,8 @@ export default {
     finish: 'Finalizar',
     skip: 'Saltar',
     done: 'Listo',
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
     loadMore: 'Cargar más',
     ok: 'OK',
     add10s: '+10s',

@@ -60,6 +60,7 @@ import { generateDietPDF } from '../../modules/nutrition/services/pdfExportServi
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNativeCard';
+import { CalendarDatePickerModal } from '../../components/common/CalendarDatePickerModal';
 import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
@@ -347,6 +348,7 @@ export const NutritionSettingsScreen = () => {
   const [showDeleteRangeMode, setShowDeleteRangeMode] = useState(false);
   const [deleteStart, setDeleteStart] = useState(new Date());
   const [deleteEnd, setDeleteEnd] = useState(new Date());
+  const [activeDeleteDatePicker, setActiveDeleteDatePicker] = useState<'start' | 'end' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Track loading state for each meal toggle
@@ -2053,33 +2055,53 @@ export const NutritionSettingsScreen = () => {
                   </Text>
 
                   <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('nutrition.startDate')}</Text>
-                  <DateTimePicker
-                    value={deleteStart}
-                    mode="date"
-                    display="default"
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    minimumDate={subDays(new Date(), 365)}
-                    maximumDate={new Date()}
-                    onChange={(e, d) => {
-                      if (d) {
-                        setDeleteStart(d);
-                        if (d > deleteEnd) {
-                          setDeleteEnd(d);
+                  {Platform.OS === 'web' ? (
+                    <TouchableOpacity
+                      style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                      onPress={() => setActiveDeleteDatePicker('start')}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ color: themeColors.textPrimary }}>{format(deleteStart, 'dd/MM/yyyy')}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={deleteStart}
+                      mode="date"
+                      display="default"
+                      themeVariant={isDark ? 'dark' : 'light'}
+                      minimumDate={subDays(new Date(), 365)}
+                      maximumDate={new Date()}
+                      onChange={(e, d) => {
+                        if (d) {
+                          setDeleteStart(d);
+                          if (d > deleteEnd) {
+                            setDeleteEnd(d);
+                          }
                         }
-                      }
-                    }}
-                  />
+                      }}
+                    />
+                  )}
 
                   <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('nutrition.endDate')}</Text>
-                  <DateTimePicker
-                    value={deleteEnd}
-                    mode="date"
-                    display="default"
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    minimumDate={deleteStart}
-                    maximumDate={new Date()}
-                    onChange={(e, d) => d && setDeleteEnd(d)}
-                  />
+                  {Platform.OS === 'web' ? (
+                    <TouchableOpacity
+                      style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                      onPress={() => setActiveDeleteDatePicker('end')}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ color: themeColors.textPrimary }}>{format(deleteEnd, 'dd/MM/yyyy')}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={deleteEnd}
+                      mode="date"
+                      display="default"
+                      themeVariant={isDark ? 'dark' : 'light'}
+                      minimumDate={deleteStart}
+                      maximumDate={new Date()}
+                      onChange={(e, d) => d && setDeleteEnd(d)}
+                    />
+                  )}
 
                   <View style={styles.modalButtons}>
                     <TouchableOpacity onPress={() => setShowDeleteRangeMode(false)} style={styles.modalBtnCancel}>
@@ -2209,6 +2231,26 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
         </Modal>
+
+        {Platform.OS === 'web' && activeDeleteDatePicker ? (
+          <CalendarDatePickerModal
+            visible
+            value={activeDeleteDatePicker === 'start' ? deleteStart : deleteEnd}
+            title={activeDeleteDatePicker === 'start' ? t('nutrition.startDate') : t('nutrition.endDate')}
+            minimumDate={activeDeleteDatePicker === 'start' ? subDays(new Date(), 365) : deleteStart}
+            maximumDate={new Date()}
+            onCancel={() => setActiveDeleteDatePicker(null)}
+            onConfirm={date => {
+              if (activeDeleteDatePicker === 'start') {
+                setDeleteStart(date);
+                if (date > deleteEnd) setDeleteEnd(date);
+              } else {
+                setDeleteEnd(date);
+              }
+              setActiveDeleteDatePicker(null);
+            }}
+          />
+        ) : null}
 
         {/* Overwrite Warning Modal */}
         <Modal visible={showOverwriteModal} animationType="fade" transparent>

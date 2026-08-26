@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { formatISO, isValid, parseISO } from 'date-fns';
+import { formatISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import { CalendarDatePickerModal } from '../../../components/common/CalendarDatePickerModal';
 import { formatLocalizedDate } from '../../../i18n/dateLocale';
 import { MEAL_TYPE_LABELS } from '../constants';
 import type { MealType } from '../../../types/requests.types';
@@ -61,6 +62,7 @@ export const CopyMealModal = ({
   const [selectedDate, setSelectedDate] = useState(() => clampDate(initialDate, minimumDate, maximumDate));
   const [selectedMealType, setSelectedMealType] = useState<MealType | null>(mealTypes[0] ?? null);
   const [showNativePicker, setShowNativePicker] = useState(false);
+  const [showWebCalendar, setShowWebCalendar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -69,6 +71,7 @@ export const CopyMealModal = ({
   useEffect(() => {
     if (!visible) {
       setShowNativePicker(false);
+      setShowWebCalendar(false);
       return;
     }
 
@@ -78,49 +81,10 @@ export const CopyMealModal = ({
     setErrorMessage(null);
   }, [initialDate, maximumDate, mealTypeKey, minimumDate, visible]);
 
-  const openWebPicker = useCallback(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.value = toIsoDate(selectedDate);
-    input.min = toIsoDate(minimumDate);
-    input.max = toIsoDate(maximumDate);
-    input.style.position = 'fixed';
-    input.style.left = '-9999px';
-    input.style.opacity = '0';
-
-    const cleanup = () => {
-      input.removeEventListener('change', handleChange);
-      input.removeEventListener('blur', cleanup);
-      input.remove();
-    };
-    const handleChange = () => {
-      const nextDate = parseISO(input.value);
-      if (input.value && isValid(nextDate)) {
-        setSelectedDate(clampDate(nextDate, minimumDate, maximumDate));
-      }
-      cleanup();
-    };
-
-    input.addEventListener('change', handleChange);
-    input.addEventListener('blur', cleanup);
-    document.body.appendChild(input);
-    try {
-      if (typeof input.showPicker === 'function') input.showPicker();
-      else input.click();
-    } catch {
-      input.click();
-    }
-  }, [maximumDate, minimumDate, selectedDate]);
-
-  const selectDate = useCallback(
-    (date: Date) => {
-      setSelectedDate(clampDate(date, minimumDate, maximumDate));
-      setShowNativePicker(false);
-    },
-    [maximumDate, minimumDate],
-  );
+  const selectDate = (date: Date) => {
+    setSelectedDate(clampDate(date, minimumDate, maximumDate));
+    setShowNativePicker(false);
+  };
 
   const handleContinue = () => {
     if (mealTypes.length === 0) return;
@@ -174,7 +138,7 @@ export const CopyMealModal = ({
               <TouchableOpacity
                 style={[styles.dateButton, { borderColor: themeColors.border }]}
                 onPress={() => {
-                  if (Platform.OS === 'web') openWebPicker();
+                  if (Platform.OS === 'web') setShowWebCalendar(true);
                   else setShowNativePicker(true);
                 }}
                 accessibilityRole="button"
@@ -201,6 +165,21 @@ export const CopyMealModal = ({
                   onChange={(_event, date) => {
                     if (date) selectDate(date);
                     else setShowNativePicker(false);
+                  }}
+                />
+              ) : null}
+
+              {Platform.OS === 'web' ? (
+                <CalendarDatePickerModal
+                  visible={showWebCalendar}
+                  value={selectedDate}
+                  title={t('nutrition.copyMealDateStep')}
+                  minimumDate={minimumDate}
+                  maximumDate={maximumDate}
+                  onCancel={() => setShowWebCalendar(false)}
+                  onConfirm={date => {
+                    selectDate(date);
+                    setShowWebCalendar(false);
                   }}
                 />
               ) : null}
