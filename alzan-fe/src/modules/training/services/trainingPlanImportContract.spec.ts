@@ -53,6 +53,37 @@ if (parsed.ok) {
   assert.equal(parsed.value.weeks[0].sessions[1].modality, 'gym');
 }
 
+const mobileTrainingJson = JSON.stringify(validDocument).replace(/"/g, '“');
+const mobileTrainingResult = parseTrainingPlanJson(`\u00a0${mobileTrainingJson}\u00a0`);
+assert.equal(mobileTrainingResult.ok, true);
+if (mobileTrainingResult.ok) {
+  assert.equal(mobileTrainingResult.value.plan_name, 'Base 4 semanas');
+  assert.equal(mobileTrainingResult.value.weeks[0]?.sessions[0]?.sport, 'running');
+}
+
+const fencedMobileTrainingResult = parseTrainingPlanJson('\ufeff```json\n' + mobileTrainingJson + '\n```\u00a0');
+assert.equal(fencedMobileTrainingResult.ok, true);
+
+let trainingQuoteIndex = 0;
+const pairedMobileTrainingJson = JSON.stringify(validDocument).replace(/"/g, () =>
+  trainingQuoteIndex++ % 2 === 0 ? '“' : '”',
+);
+assert.equal(parseTrainingPlanJson(pairedMobileTrainingJson).ok, true);
+
+const curlyQuoteInTrainingName = {
+  ...validDocument,
+  plan_name: 'Plan “Base”',
+};
+const curlyQuoteInTrainingNameResult = parseTrainingPlanJson(JSON.stringify(curlyQuoteInTrainingName));
+assert.equal(curlyQuoteInTrainingNameResult.ok, true);
+if (curlyQuoteInTrainingNameResult.ok) {
+  assert.equal(curlyQuoteInTrainingNameResult.value.plan_name, 'Plan “Base”');
+}
+
+assert.equal(parseTrainingPlanJson(`Antes del JSON\n${JSON.stringify(validDocument)}`).ok, false);
+assert.equal(parseTrainingPlanJson(JSON.stringify(validDocument).replace(/"/g, "'")).ok, false);
+assert.equal(parseTrainingPlanJson(`${JSON.stringify(validDocument)}${JSON.stringify(validDocument)}`).ok, false);
+
 const normalizedMetadata = parseTrainingPlanJson(
   JSON.stringify({
     ...validDocument,

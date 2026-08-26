@@ -1,3 +1,4 @@
+import { normalizeImportJsonText } from '../../../services/normalizeImportJsonText';
 import { getImportedTemplateFamilyKey, getTrainingPlanSessionSignature } from './trainingPlanImportPlanner';
 import { getProgressionWeekIndex } from '../helpers/enduranceProgression.helper';
 import { resolveTrainingImportMetadata } from '../helpers/trainingPlanImportMetadata.helper';
@@ -598,7 +599,11 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
   try {
     parsed = JSON.parse(rawText);
   } catch {
-    return { ok: false, errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON' }] };
+    try {
+      parsed = JSON.parse(normalizeImportJsonText(rawText));
+    } catch {
+      return { ok: false, errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON' }] };
+    }
   }
   const errors: TrainingPlanValidationError[] = [];
   if (!isRecord(parsed))
