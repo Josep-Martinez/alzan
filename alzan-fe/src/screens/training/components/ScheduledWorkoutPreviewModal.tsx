@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -34,6 +35,7 @@ import {
   GymPreviewTemplate,
 } from '../../../modules/training/services/scheduledWorkoutPreviewService';
 import { getPhaseLabel } from '../helpers/phase.helper';
+import { isCompactPreviewLayout } from './scheduledWorkoutPreviewLayout.helper';
 
 export type ScheduledWorkoutPreviewPlan = {
   id: string;
@@ -92,6 +94,8 @@ export const ScheduledWorkoutPreviewModal = ({
   const { colors, isDark } = useTrainingStyles();
   const { units } = useUnitConversion();
   const { getOptionLabel } = useSportCatalog();
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactLayout = isCompactPreviewLayout(viewportWidth);
   const distanceUnit = units.distance === 'mi' ? 'miles' : 'km';
 
   const labels = React.useMemo<PreviewLabels>(
@@ -304,30 +308,34 @@ export const ScheduledWorkoutPreviewModal = ({
           </ScrollView>
 
           {!plan.isCompleted ? (
-            <View style={styles.actionRow}>
-              {onAssociateCompletedAction ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[styles.secondaryButton, { borderColor: colors.primary }]}
-                  onPress={onAssociateCompletedAction}
-                >
-                  <Link2 size={15} color={colors.primary} />
-                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
-                    {t('training.associateCompletedWorkout')}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-              {onMoveAction ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[styles.secondaryButton, { borderColor: colors.primary }]}
-                  onPress={onMoveAction}
-                >
-                  <CalendarDays size={15} color={colors.primary} />
-                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
-                    {t('training.moveWorkout')}
-                  </Text>
-                </TouchableOpacity>
+            <View style={[styles.actionRow, isCompactLayout && styles.compactActionRow]}>
+              {onAssociateCompletedAction || onMoveAction ? (
+                <View style={[styles.secondaryActions, isCompactLayout && styles.compactSecondaryActions]}>
+                  {onAssociateCompletedAction ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={[styles.secondaryButton, { borderColor: colors.primary }]}
+                      onPress={onAssociateCompletedAction}
+                    >
+                      <Link2 size={15} color={colors.primary} />
+                      <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                        {t('training.associateCompletedWorkout')}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {onMoveAction ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={[styles.secondaryButton, { borderColor: colors.primary }]}
+                      onPress={onMoveAction}
+                    >
+                      <CalendarDays size={15} color={colors.primary} />
+                      <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                        {t('training.moveWorkout')}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               ) : null}
               {onPrimaryAction ? (
                 <TouchableOpacity
@@ -335,6 +343,7 @@ export const ScheduledWorkoutPreviewModal = ({
                   disabled={primaryActionDisabled}
                   style={[
                     styles.primaryButton,
+                    isCompactLayout && styles.compactPrimaryButton,
                     { backgroundColor: primaryActionDisabled ? colors.textSecondary : colors.primary },
                   ]}
                   onPress={onPrimaryAction}
@@ -531,10 +540,26 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: spacing.s,
     marginTop: spacing.s,
   },
+  compactActionRow: {
+    flexDirection: 'column',
+  },
+  secondaryActions: {
+    flex: 2,
+    minWidth: 0,
+    flexDirection: 'row',
+    gap: spacing.s,
+  },
+  compactSecondaryActions: {
+    flex: 0,
+    width: '100%',
+  },
   secondaryButton: {
+    flex: 1,
+    minWidth: 0,
     minHeight: 48,
     borderRadius: 16,
     borderWidth: 1,
@@ -545,23 +570,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
   },
   secondaryButtonText: {
+    flexShrink: 1,
     fontWeight: '800',
     fontSize: 13,
+    lineHeight: 16,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
   primaryButton: {
     flex: 1,
-    height: 48,
+    minWidth: 0,
+    minHeight: 48,
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+  },
+  compactPrimaryButton: {
+    flex: 0,
+    width: '100%',
+    minHeight: 52,
   },
   primaryButtonText: {
+    flexShrink: 1,
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13,
+    lineHeight: 16,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
 });

@@ -2412,6 +2412,7 @@ const en = {
     deleteWorkoutOnlyThis: 'Delete only this workout',
     deleteWorkoutAllFuture: 'Delete all future workouts',
     deleteWorkoutError: 'Could not delete the workout.',
+    detailActions: 'Workout actions',
     deleteFutureWorkoutsError: 'Could not delete future workouts.',
     recurringTemplateTitle: 'Recurring template',
     recurringTemplateWarning:

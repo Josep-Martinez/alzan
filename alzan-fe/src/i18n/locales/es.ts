@@ -2602,6 +2602,7 @@ export default {
     deleteWorkoutOnlyThis: 'Eliminar solo este entrenamiento',
     deleteWorkoutAllFuture: 'Eliminar todos los entrenamientos futuros',
     deleteWorkoutError: 'No se pudo eliminar el entrenamiento.',
+    detailActions: 'Acciones del entrenamiento',
     deleteFutureWorkoutsError: 'No se pudieron eliminar los entrenamientos futuros.',
     recurringTemplateTitle: 'Plantilla recurrente',
     recurringTemplateWarning:

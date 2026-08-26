@@ -200,6 +200,10 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
       queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
+      queryClient.invalidateQueries({ queryKey: ['activitySession'] });
+      queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
+      queryClient.invalidateQueries({ queryKey: ['activitySessionSections'] });
     },
   });
 

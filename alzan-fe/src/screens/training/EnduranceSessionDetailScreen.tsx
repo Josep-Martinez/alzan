@@ -26,7 +26,7 @@ import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../co
 import { format, parseISO } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
-import { useEnduranceTemplateSteps } from '../../hooks/useEnduranceSessions';
+import { useEnduranceSessions, useEnduranceTemplateSteps } from '../../hooks/useEnduranceSessions';
 import {
   fetchEnduranceStepProgressions,
   applyProgressionsForPlannedDate,
@@ -49,6 +49,8 @@ import {
   X,
   Route,
   Upload,
+  MoreVertical,
+  Trash2,
 } from 'lucide-react-native';
 import { Alert } from '../../components/common/Alert';
 import { ActivitySession, ActivitySessionSection, EnduranceWorkoutStep } from '../../types/requests.types';
@@ -58,7 +60,6 @@ import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { useUploadPolyline } from '../../hooks/useActivityPolyline';
 import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
-import { Tooltip } from '../../components/common/Tooltip';
 import { RouteMap } from '../../components/common/RouteMap';
 import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
 import { ImportReviewBlocks } from './components/ImportReviewBlocks';
@@ -72,6 +73,7 @@ import { useCopyCompletedSession } from '../../modules/training/hooks/useCopyCom
 import { getSessionLocalDate } from '../../modules/training/services/copyCompletedSessionService';
 import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
+import { canDeleteActivitySession } from './helpers/trainingDetailActions.helper';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -244,6 +246,7 @@ export const EnduranceSessionDetailScreen = () => {
   const updateSet = useUpdateWorkoutSet();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
   const copyCompletedSession = useCopyCompletedSession();
+  const { deleteSession } = useEnduranceSessions({ enabled: false });
 
   // State for editing sets (gym only)
   const [editingSet, setEditingSet] = useState<{
@@ -263,6 +266,7 @@ export const EnduranceSessionDetailScreen = () => {
   const [routePolyline, setRoutePolyline] = useState<string | null>(initialSession?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
   const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
@@ -667,6 +671,25 @@ export const EnduranceSessionDetailScreen = () => {
     queryClient.invalidateQueries({ queryKey: ['activitySession', session.id] });
   }, [session, renameValue, queryClient, t]);
 
+  const handleDeleteSession = useCallback(() => {
+    if (!canDeleteActivitySession(session.id, isPendingSession, deleteSession.isPending)) return;
+
+    setActionsVisible(false);
+    Alert.alert(t('training.deleteWorkoutTitle'), t('training.deleteActivityMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          void deleteSession.mutateAsync(session.id).then(
+            () => navigation.goBack(),
+            () => Alert.alert(t('common.error'), t('training.deleteWorkoutError')),
+          );
+        },
+      },
+    ]);
+  }, [deleteSession, isPendingSession, navigation, session.id, t]);
+
   const handlePickStrengthActivityFile = useCallback(() => {
     if (!session) return;
 
@@ -711,6 +734,36 @@ export const EnduranceSessionDetailScreen = () => {
       },
     );
   }, [applyStrengthActivityImport, session, t]);
+
+  const handleRouteFileAction = useCallback(() => {
+    setActionsVisible(false);
+    if (routePolyline) {
+      Alert.alert(t('training.replaceRouteTitle'), t('training.replaceRouteMessage'), [
+        { text: t('training.close'), style: 'cancel' },
+        {
+          text: t('training.confirm'),
+          onPress: () => uploadPolyline.mutate({ sessionId: session.id }),
+        },
+      ]);
+    } else {
+      uploadPolyline.mutate({ sessionId: session.id });
+    }
+  }, [routePolyline, session.id, t, uploadPolyline]);
+
+  const handleActivityFileAction = useCallback(() => {
+    setActionsVisible(false);
+    if (session.imported_at) {
+      Alert.alert(t('training.replaceActivityFile'), t('training.replaceActivityFileMessage'), [
+        { text: t('training.close'), style: 'cancel' },
+        {
+          text: t('training.confirm'),
+          onPress: handlePickStrengthActivityFile,
+        },
+      ]);
+    } else {
+      handlePickStrengthActivityFile();
+    }
+  }, [handlePickStrengthActivityFile, session.imported_at, t]);
 
   const config = SPORTS_CONFIG[session.sport_type] || SPORTS_CONFIG.other;
   // Explicitly use Dumbbell for gym/strength sessions, otherwise use config icon
@@ -1532,73 +1585,17 @@ export const EnduranceSessionDetailScreen = () => {
             <Text style={[styles.backText, { color: themeColors.primary }]}>{t('common.back')}</Text>
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.headerTitle]}>{t('training.detail')}</Text>
-          {/* Small upload icon — route files for endurance, activity files for strength */}
-          {!isGymSession ? (
-            <Tooltip text={routePolyline ? t('training.replaceRoute') : t('training.uploadRoute')} placement="bottom">
-              {tipProps => (
-                <Pressable
-                  {...tipProps}
-                  style={[styles.headerRouteButton, { backgroundColor: themeColors.primary + '18' }]}
-                  onPress={() => {
-                    if (routePolyline) {
-                      Alert.alert(t('training.replaceRouteTitle'), t('training.replaceRouteMessage'), [
-                        { text: t('training.close'), style: 'cancel' },
-                        {
-                          text: t('training.confirm'),
-                          onPress: () => uploadPolyline.mutate({ sessionId: session.id }),
-                        },
-                      ]);
-                    } else {
-                      uploadPolyline.mutate({ sessionId: session.id });
-                    }
-                  }}
-                  disabled={uploadPolyline.isPending}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {uploadPolyline.isPending ? (
-                    <ActivityIndicator size="small" color={themeColors.primary} />
-                  ) : routePolyline ? (
-                    <Route size={16} color={themeColors.primary} />
-                  ) : (
-                    <Upload size={16} color={themeColors.primary} />
-                  )}
-                </Pressable>
-              )}
-            </Tooltip>
-          ) : (
-            <Tooltip
-              text={session.imported_at ? t('training.replaceActivityFile') : t('training.uploadActivityFile')}
-              placement="bottom"
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityLabel={t('training.detailActions')}
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setActionsVisible(true)}
+              style={[styles.headerRouteButton, { backgroundColor: themeColors.primary + '18' }]}
             >
-              {tipProps => (
-                <Pressable
-                  {...tipProps}
-                  style={[styles.headerRouteButton, { backgroundColor: themeColors.primary + '18' }]}
-                  onPress={() => {
-                    if (session.imported_at) {
-                      Alert.alert(t('training.replaceActivityFile'), t('training.replaceActivityFileMessage'), [
-                        { text: t('training.close'), style: 'cancel' },
-                        {
-                          text: t('training.confirm'),
-                          onPress: handlePickStrengthActivityFile,
-                        },
-                      ]);
-                    } else {
-                      handlePickStrengthActivityFile();
-                    }
-                  }}
-                  disabled={applyStrengthActivityImport.isPending}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {applyStrengthActivityImport.isPending ? (
-                    <ActivityIndicator size="small" color={themeColors.primary} />
-                  ) : (
-                    <Upload size={16} color={themeColors.primary} />
-                  )}
-                </Pressable>
-              )}
-            </Tooltip>
-          )}
+              <MoreVertical size={18} color={themeColors.primary} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView scrollEnabled={mapScrollEnabled} contentContainerStyle={[styles.content, { paddingBottom: 100 }]}>
@@ -2331,6 +2328,65 @@ export const EnduranceSessionDetailScreen = () => {
         onCopy={handleCopyCompletedSession}
       />
 
+      <Modal visible={actionsVisible} transparent animationType="fade" onRequestClose={() => setActionsVisible(false)}>
+        <View style={styles.actionsMenuOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setActionsVisible(false)} />
+          <View style={[styles.actionsMenu, { backgroundColor: themeColors.cardBackground }]}>
+            {!isGymSession ? (
+              <TouchableOpacity
+                accessibilityLabel={routePolyline ? t('training.replaceRoute') : t('training.uploadRoute')}
+                accessibilityRole="button"
+                disabled={uploadPolyline.isPending}
+                onPress={handleRouteFileAction}
+                style={styles.fileAction}
+              >
+                {uploadPolyline.isPending ? (
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                ) : routePolyline ? (
+                  <Route size={18} color={themeColors.primary} />
+                ) : (
+                  <Upload size={18} color={themeColors.primary} />
+                )}
+                <Text style={[styles.fileActionText, { color: themeColors.primary }]}>
+                  {routePolyline ? t('training.replaceRoute') : t('training.uploadRoute')}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                accessibilityLabel={
+                  session.imported_at ? t('training.replaceActivityFile') : t('training.uploadActivityFile')
+                }
+                accessibilityRole="button"
+                disabled={applyStrengthActivityImport.isPending}
+                onPress={handleActivityFileAction}
+                style={styles.fileAction}
+              >
+                {applyStrengthActivityImport.isPending ? (
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                ) : (
+                  <Upload size={18} color={themeColors.primary} />
+                )}
+                <Text style={[styles.fileActionText, { color: themeColors.primary }]}>
+                  {session.imported_at ? t('training.replaceActivityFile') : t('training.uploadActivityFile')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              accessibilityLabel={t('training.deleteWorkoutTitle')}
+              accessibilityRole="button"
+              disabled={!canDeleteActivitySession(session.id, isPendingSession, deleteSession.isPending)}
+              onPress={handleDeleteSession}
+              style={styles.deleteAction}
+            >
+              <Trash2 size={18} color={themeColors.danger} />
+              <Text style={[styles.deleteActionText, { color: themeColors.danger }]}>
+                {t('training.deleteWorkoutTitle')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Rename Activity Modal */}
       <Modal visible={renameVisible} transparent animationType="fade" onRequestClose={() => setRenameVisible(false)}>
         <View style={styles.modalContainer}>
@@ -2505,6 +2561,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.l,
     paddingVertical: spacing.m,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
   },
   backButton: {
     padding: spacing.s,
@@ -3081,5 +3142,46 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionsMenuOverlay: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingTop: 72,
+    paddingHorizontal: spacing.l,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  actionsMenu: {
+    minWidth: 220,
+    borderRadius: borderRadius.m,
+    padding: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fileAction: {
+    minHeight: 44,
+    borderRadius: borderRadius.s,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  fileActionText: {
+    ...typography.body,
+    fontWeight: '600',
+  },
+  deleteAction: {
+    minHeight: 44,
+    borderRadius: borderRadius.s,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  deleteActionText: {
+    ...typography.body,
+    fontWeight: '600',
   },
 });

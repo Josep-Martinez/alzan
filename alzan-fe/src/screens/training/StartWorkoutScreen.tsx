@@ -423,7 +423,7 @@ export const StartWorkoutScreen = () => {
                   <Text style={[styles.pickerTitle, { color: themeColors.textPrimary }]}>
                     {t('training.selectDate')}
                   </Text>
-                  <TouchableOpacity onPress={handleConfirmDate}>
+                  <TouchableOpacity onPress={() => handleConfirmDate()}>
                     <Text style={[styles.pickerButton, { color: themeColors.primary, fontWeight: '700' }]}>
                       {t('common.done')}
                     </Text>
