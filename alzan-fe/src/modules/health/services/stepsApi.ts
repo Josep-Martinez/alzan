@@ -43,6 +43,27 @@ export const stepsApi = {
   },
 
   /**
+   * Manual step totals for an inclusive date range.
+   */
+  async getManualForRange(userId: string, fromDate: string, toDate: string): Promise<StepsRow[]> {
+    const { data, error } = await supabase
+      .from('daily_steps')
+      .select('id, date, total_steps, source, is_manual, source_package')
+      .eq('user_id', userId)
+      .eq('source', 'manual')
+      .is('source_package', null)
+      .gte('date', fromDate)
+      .lte('date', toDate)
+      .order('date', { ascending: true });
+
+    if (error) {
+      console.error('[stepsApi.getManualForRange] Error:', error);
+      throw error;
+    }
+    return (data as StepsRow[]) ?? [];
+  },
+
+  /**
    * Insert or overwrite the manual step total for a day.
    * One manual value per day, scoped to source_package IS NULL.
    */

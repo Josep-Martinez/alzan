@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { aggregateStepsByDate } from '../services/stepsAggregation';
 import { stepsApi } from '../services/stepsApi';
 import { healthQueryKeys } from './healthQueryKeys';
+import { isManualStepsRangeValid } from '../helpers/stepsRange.helper';
 
 /**
  * Daily step rows for the last `days` days (oldest first). Used by the chart.
@@ -49,6 +50,18 @@ export const useManualStepsForDate = (date: Date) => {
   });
 };
 
+export const useManualStepsForRange = (fromDate: Date, toDate: Date, enabled = true) => {
+  const { user } = useAuth();
+  const fromDateKey = format(fromDate, 'yyyy-MM-dd');
+  const toDateKey = format(toDate, 'yyyy-MM-dd');
+
+  return useQuery({
+    queryKey: [...healthQueryKeys.steps(user?.id), 'manual-range', fromDateKey, toDateKey],
+    queryFn: () => stepsApi.getManualForRange(user!.id, fromDateKey, toDateKey),
+    enabled: enabled && !!user?.id && isManualStepsRangeValid(fromDate, toDate),
+  });
+};
+
 export const useUpsertManualSteps = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -61,6 +74,33 @@ export const useUpsertManualSteps = () => {
         steps: params.steps,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+};
+
+export type ManualStepsRangeRow = { date: Date; steps: number };
+
+export const useUpsertManualStepsRange = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (params: { rows: ManualStepsRangeRow[] }) => {
+      if (!user?.id) throw new Error('No authenticated user');
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await Promise.all(
+        params.rows.map(row =>
+          stepsApi.upsertManual({
+            date: format(row.date, 'yyyy-MM-dd'),
+            steps: row.steps,
+            timezone,
+          }),
+        ),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
