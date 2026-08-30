@@ -6,12 +6,12 @@ const referenceDate = new Date(2026, 7, 5, 12);
 const range = getNutritionCalendarRange(referenceDate);
 const currentWeek = startOfWeek(referenceDate, { weekStartsOn: 1 });
 
-assert.equal(range.weeks.length, 9);
-assert.equal(range.currentWeekIndex, 4);
-assert.equal(range.weeks[0].getTime(), addWeeks(currentWeek, -4).getTime());
-assert.equal(range.weeks[8].getTime(), addWeeks(currentWeek, 4).getTime());
+assert.equal(range.weeks.length, 11);
+assert.equal(range.currentWeekIndex, 5);
+assert.equal(range.weeks[0].getTime(), addWeeks(currentWeek, -5).getTime());
+assert.equal(range.weeks[10].getTime(), addWeeks(currentWeek, 5).getTime());
 assert.equal(range.minimumDate.getTime(), range.weeks[0].getTime());
-assert.equal(range.maximumDate.getTime(), endOfWeek(range.weeks[8], { weekStartsOn: 1 }).getTime());
+assert.equal(range.maximumDate.getTime(), endOfWeek(range.weeks[10], { weekStartsOn: 1 }).getTime());
 assert.ok(referenceDate >= range.minimumDate && referenceDate <= range.maximumDate);
 
 console.log('nutritionCalendarRange: all tests passed');

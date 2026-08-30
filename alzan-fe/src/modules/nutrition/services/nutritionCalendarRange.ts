@@ -1,6 +1,7 @@
 import { addWeeks, endOfWeek, startOfDay, startOfWeek } from 'date-fns';
 
-const WEEKS_BUFFER = 4;
+// Keep five complete weeks available in both directions, including the current week.
+const WEEKS_BUFFER = 5;
 
 export interface NutritionCalendarRange {
   weeks: Date[];

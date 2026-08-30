@@ -138,9 +138,9 @@ export const TrainingHomeScreen = () => {
   const timezone = preferences?.timezone || getDeviceTimezone();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Calculate range for dots (e.g. +/- 45 days to cover typical scrolling)
+  // Calculate range for dots (e.g. +/- 52 days to cover the fifth future week)
   // We can optimize this to only fetch current view, but a fixed range is simpler for now
-  const DOTS_RANGE_DAYS = 45;
+  const DOTS_RANGE_DAYS = 52;
   const dotsStartDate = React.useMemo(() => subDays(startOfDay(new Date()), DOTS_RANGE_DAYS), []);
   const dotsEndDate = React.useMemo(() => addDays(startOfDay(new Date()), DOTS_RANGE_DAYS), []);
   const [showAddModal, setShowAddModal] = useState(false);

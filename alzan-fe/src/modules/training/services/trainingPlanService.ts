@@ -3,6 +3,7 @@ import { startOfWeek, addWeeks, getISOWeek, getYear, format, addDays } from 'dat
 import { WorkoutPlanInsert } from '../../../types/requests.types';
 import { RecurringEnduranceTemplate } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
+import { getTrainingHorizonWeek } from './trainingCalendarRange';
 import { isDateWithinTemplateRecurrence, shouldAutoPropagateTemplate } from '../helpers/trainingPropagation.helper';
 
 /**
@@ -31,19 +32,6 @@ const getDateFromISOWeekString = (isoStr: string): Date => {
 
   // Add (week - 1) weeks
   return addWeeks(startWeek1, week - 1);
-};
-
-/**
- * Get the visible week range for training horizon
- * Using same logic as diet: Current + 4 weeks
- */
-const getTrainingHorizonWeek = (): Date => {
-  const today = new Date();
-  const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-  // Horizon is Current (W0) + 4 weeks = W4 (5 weeks total including current)
-  // Or rather, the END of the visible range.
-  // We want to verify plans up to 4 weeks in the future.
-  return addWeeks(currentWeekStart, 4);
 };
 
 const getPlannedDateForWeekday = (weekStart: Date, dayOfWeek: number): Date => {
