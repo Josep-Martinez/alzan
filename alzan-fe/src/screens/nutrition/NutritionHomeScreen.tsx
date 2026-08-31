@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Utensils, Settings, Plus, BookOpen, CalendarCheck } from 'lucide-react-native';
+import { Settings, Plus, BookOpen, CalendarCheck, MoreVertical, Copy, MoveRight, Trash2, X } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -13,7 +13,17 @@ import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLo
 import {
   useUpsertMealLog,
   useDeleteMealLog,
+  useRestoreMealLog,
   useCopyMeal,
+  useMoveMeal,
+  useMoveMealById,
+  useCopyMealsToDate,
+  useMoveMealsToDate,
+  useCopyDayToDate,
+  useCopyMealRange,
+  useMoveMealRange,
+  useMealLogs,
+  useSaveMealWithIngredients,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -25,6 +35,14 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
 import { MealType } from '../../types/requests.types';
+import {
+  createDeletedMealUndoAction,
+  createMovedMealUndoAction,
+  isMealUndoAvailable,
+  MEAL_UNDO_WINDOW_MS,
+  MealUndoAction,
+} from '../../modules/nutrition/services/mealUndoPlanner';
+import { UndoToast } from '../../components/common/UndoToast';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +51,17 @@ import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
 import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
+import { QuickMealEditModal } from '../../modules/nutrition/components/QuickMealEditModal';
+import { MealBatchActionsMenu, MealBatchAction } from '../../modules/nutrition/components/MealBatchActionsMenu';
+import {
+  MealBatchActionModal,
+  MealBatchModalMode,
+  MealBatchModalOperation,
+  MealBatchModalValues,
+} from '../../modules/nutrition/components/MealBatchActionModal';
+import type { MealRange } from '../../modules/nutrition/services/mealBatchPlanner';
 import { getNutritionHomeMenuImportTarget, getNutritionHomeRecipeLibraryTarget } from './nutritionHeaderActions';
+import type { IngredientInput } from '../../modules/nutrition/types/db';
 
 // Helper to group meals
 const groupMealsByType = (meals: DailyMealItem[]) => {
@@ -59,6 +87,11 @@ const groupMealsByType = (meals: DailyMealItem[]) => {
   return groups;
 };
 
+type MealTransferAction = {
+  type: 'copy' | 'move';
+  meal: DailyMealItem;
+};
+
 export const NutritionHomeScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
@@ -74,8 +107,24 @@ export const NutritionHomeScreen = () => {
 
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
-  const [mealToCopy, setMealToCopy] = useState<DailyMealItem | null>(null);
+  const [mealTransferAction, setMealTransferAction] = useState<MealTransferAction | null>(null);
+  const [quickEditMeal, setQuickEditMeal] = useState<DailyMealItem | null>(null);
+  const [isBatchMenuVisible, setIsBatchMenuVisible] = useState(false);
+  const [isMealSelectionMode, setIsMealSelectionMode] = useState(false);
+  const [selectedMealIds, setSelectedMealIds] = useState<Set<string>>(new Set());
+  const [batchModal, setBatchModal] = useState<{
+    mode: MealBatchModalMode;
+    operation: MealBatchModalOperation;
+  } | null>(null);
   const nutritionCalendarRange = React.useMemo(() => getNutritionCalendarRange(new Date()), []);
+  const transferMealLogsQuery = useMealLogs(
+    format(nutritionCalendarRange.minimumDate, 'yyyy-MM-dd'),
+    format(nutritionCalendarRange.maximumDate, 'yyyy-MM-dd'),
+  );
+  const defaultBatchDestinationDate = React.useMemo(() => {
+    const nextDate = addDays(selectedDate, 1);
+    return nextDate <= nutritionCalendarRange.maximumDate ? nextDate : selectedDate;
+  }, [nutritionCalendarRange.maximumDate, selectedDate]);
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isAutoSelectedDateRef = React.useRef(true);
@@ -182,7 +231,32 @@ export const NutritionHomeScreen = () => {
   // Actions
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
+  const restoreMealLog = useRestoreMealLog();
   const copyMeal = useCopyMeal();
+  const moveMeal = useMoveMeal();
+  const moveMealById = useMoveMealById();
+  const copyMeals = useCopyMealsToDate();
+  const moveMeals = useMoveMealsToDate();
+  const duplicateDay = useCopyDayToDate();
+  const copyMealRange = useCopyMealRange();
+  const moveMealRange = useMoveMealRange();
+  const saveMeal = useSaveMealWithIngredients();
+  const [undoAction, setUndoAction] = useState<MealUndoAction | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showUndoAction = React.useCallback((action: MealUndoAction) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction(action);
+    undoTimerRef.current = setTimeout(() => setUndoAction(null), MEAL_UNDO_WINDOW_MS);
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
 
   // The floating "+" defaults the meal slot to the current time of day so the
   // user lands in the right section without scrolling to find it. Falls back to
@@ -202,6 +276,11 @@ export const NutritionHomeScreen = () => {
   };
 
   const handleEditMeal = (item: DailyMealItem) => {
+    if (item.log?.id) {
+      setQuickEditMeal(item);
+      return;
+    }
+
     navigation.navigate('MealLogForm', {
       date: formattedDate,
       mealItem: item,
@@ -210,14 +289,146 @@ export const NutritionHomeScreen = () => {
   };
 
   const handleCopyMeal = (item: DailyMealItem) => {
-    setMealToCopy(item);
+    setMealTransferAction({ type: 'copy', meal: item });
   };
 
-  const handleCopyMealSubmit = async ({ date, mealType }: CopyMealDestination) => {
-    if (!mealToCopy) return;
+  const handleMoveMeal = (item: DailyMealItem) => {
+    if (!item.log?.id) return;
+    setMealTransferAction({ type: 'move', meal: item });
+  };
 
-    await copyMeal.mutateAsync({ source: mealToCopy, date, mealType });
-    setMealToCopy(null);
+  const handleBatchMenuAction = (action: MealBatchAction) => {
+    if (action === 'import-menu') {
+      navigation.navigate(getNutritionHomeMenuImportTarget().screen);
+      return;
+    }
+
+    if (action === 'select') {
+      setSelectedMealIds(new Set());
+      setIsMealSelectionMode(true);
+      return;
+    }
+
+    if (action === 'duplicate-day') {
+      setBatchModal({ mode: 'day', operation: 'copy' });
+      return;
+    }
+
+    setBatchModal({ mode: 'range', operation: action === 'copy-range' ? 'copy' : 'move' });
+  };
+
+  const toggleMealSelection = (item: DailyMealItem) => {
+    if (!item.log?.id) return;
+    setSelectedMealIds(previous => {
+      const next = new Set(previous);
+      if (next.has(item.log!.id)) next.delete(item.log!.id);
+      else next.add(item.log!.id);
+      return next;
+    });
+  };
+
+  const openSelectedMealsModal = (operation: MealBatchModalOperation) => {
+    if (selectedMealIds.size === 0) return;
+    setBatchModal({ mode: 'selection', operation });
+  };
+
+  const deleteSelectedMeals = () => {
+    if (selectedMealIds.size === 0) return;
+
+    Alert.alert(t('nutrition.batchDeleteTitle'), t('nutrition.batchDeleteConfirm', { count: selectedMealIds.size }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('nutrition.batchDeleteAction'),
+        style: 'destructive',
+        onPress: async () => {
+          const count = selectedMealIds.size;
+          try {
+            for (const mealId of selectedMealIds) await deleteMealLog.mutateAsync(mealId);
+            setIsMealSelectionMode(false);
+            setSelectedMealIds(new Set());
+            Alert.alert(t('nutrition.batchSuccessTitle'), t('nutrition.batchDeleteSuccess', { count }));
+          } catch (error) {
+            console.error('Error deleting selected meals:', error);
+            Alert.alert(t('common.error'), t('nutrition.batchDeleteError'));
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleBatchSubmit = async (values: MealBatchModalValues) => {
+    if (!batchModal) return;
+    let result: { processedCount: number };
+
+    if (batchModal.mode === 'selection') {
+      if (!values.destinationDate) throw new Error('A destination date is required');
+      result = await (batchModal.operation === 'copy' ? copyMeals : moveMeals).mutateAsync({
+        mealIds: Array.from(selectedMealIds),
+        destinationDate: values.destinationDate,
+      });
+    } else if (batchModal.mode === 'day') {
+      if (!values.destinationDate) throw new Error('A destination date is required');
+      result = await duplicateDay.mutateAsync({ sourceDate: formattedDate, destinationDate: values.destinationDate });
+    } else {
+      if (!values.sourceStartDate || !values.sourceEndDate || !values.destinationStartDate) {
+        throw new Error('A complete date range is required');
+      }
+      const range: MealRange = { startDate: values.sourceStartDate, endDate: values.sourceEndDate };
+      result = await (batchModal.operation === 'copy' ? copyMealRange : moveMealRange).mutateAsync({
+        range,
+        destinationStartDate: values.destinationStartDate,
+      });
+    }
+
+    setBatchModal(null);
+    setIsMealSelectionMode(false);
+    setSelectedMealIds(new Set());
+    Alert.alert(
+      t('nutrition.batchSuccessTitle'),
+      t(
+        batchModal.operation === 'copy' || batchModal.mode === 'day'
+          ? 'nutrition.batchCopySuccess'
+          : 'nutrition.batchMoveSuccess',
+        {
+          count: result.processedCount,
+        },
+      ),
+    );
+  };
+
+  const handleMealTransferSubmit = async ({ date, mealType }: CopyMealDestination) => {
+    if (!mealTransferAction) return;
+
+    if (mealTransferAction.type === 'move') {
+      const sourceLog = mealTransferAction.meal.log;
+      if (!sourceLog) return;
+
+      await moveMeal.mutateAsync({ source: mealTransferAction.meal, date, mealType });
+      setMealTransferAction(null);
+      showUndoAction(
+        createMovedMealUndoAction({
+          logId: sourceLog.id,
+          previous: { date: sourceLog.date, mealType: sourceLog.meal_type },
+          current: { date, mealType },
+          expiresAt: Date.now() + MEAL_UNDO_WINDOW_MS,
+        }),
+      );
+
+      const destinationDate = parseISO(date);
+      if (isValid(destinationDate)) {
+        isAutoSelectedDateRef.current = false;
+        setSelectedDate(destinationDate);
+        requestAnimationFrame(() => {
+          daySwitcherRef.current?.scrollToDate(destinationDate);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        });
+      }
+
+      return;
+    }
+
+    await copyMeal.mutateAsync({ source: mealTransferAction.meal, date, mealType });
+    setMealTransferAction(null);
 
     Alert.alert(
       t('nutrition.copyMealSuccessTitle'),
@@ -226,6 +437,26 @@ export const NutritionHomeScreen = () => {
         mealType: t(MEAL_TYPE_LABELS[mealType]),
       }),
     );
+  };
+
+  const handleQuickMealSave = async (ingredients: IngredientInput[]) => {
+    if (!quickEditMeal?.log) return;
+
+    await saveMeal.mutateAsync({ log: quickEditMeal.log, ingredients });
+    setQuickEditMeal(null);
+    Alert.alert(t('nutrition.quickEditSavedTitle'), t('nutrition.quickEditSavedMessage'));
+  };
+
+  const openFullMealEditor = () => {
+    if (!quickEditMeal) return;
+
+    const item = quickEditMeal;
+    setQuickEditMeal(null);
+    navigation.navigate('MealLogForm', {
+      date: item.log?.date ?? formattedDate,
+      mealItem: item,
+      isExtra: item.status === 'extra_meal',
+    });
   };
 
   const handleCheckMeal = (item: DailyMealItem) => {
@@ -255,7 +486,8 @@ export const NutritionHomeScreen = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteMealLog.mutateAsync(item.logId!);
+            const snapshot = await deleteMealLog.mutateAsync(item.logId!);
+            showUndoAction(createDeletedMealUndoAction(snapshot, Date.now() + MEAL_UNDO_WINDOW_MS));
           } catch (error) {
             console.error('Error deleting meal:', error);
             Alert.alert(t('common.error'), t('nutrition.deleteMealError'));
@@ -263,6 +495,33 @@ export const NutritionHomeScreen = () => {
         },
       },
     ]);
+  };
+
+  const handleUndoMealAction = async () => {
+    const action = undoAction;
+    if (!action || !isMealUndoAvailable(action) || isUndoing) return;
+
+    setIsUndoing(true);
+    try {
+      if (action.kind === 'move') {
+        await moveMealById.mutateAsync({
+          logId: action.logId,
+          current: { date: action.current.date, meal_type: action.current.mealType },
+          date: action.previous.date,
+          mealType: action.previous.mealType,
+        });
+      } else {
+        await restoreMealLog.mutateAsync(action.snapshot);
+      }
+
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setUndoAction(null);
+    } catch (error) {
+      console.error('Error undoing meal action:', error);
+      Alert.alert(t('common.error'), t('nutrition.undoMealError'));
+    } finally {
+      setIsUndoing(false);
+    }
   };
 
   // Derived Groups
@@ -307,14 +566,6 @@ export const NutritionHomeScreen = () => {
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.topAction}
-              onPress={() => navigation.navigate(getNutritionHomeMenuImportTarget().screen)}
-              accessibilityRole="button"
-              accessibilityLabel={t('nutrition.menuImportOpenAccessibility')}
-            >
-              <Utensils color={themeColors.textPrimary} size={24} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.topAction}
               onPress={() => {
                 const target = getNutritionHomeRecipeLibraryTarget(formattedDate);
                 navigation.navigate(target.screen, target.params);
@@ -331,6 +582,14 @@ export const NutritionHomeScreen = () => {
               accessibilityLabel={t('tabs.settings')}
             >
               <Settings color={themeColors.textPrimary} size={24} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.topAction}
+              onPress={() => setIsBatchMenuVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.nutritionActions')}
+            >
+              <MoreVertical color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
           </View>
         </View>
@@ -350,6 +609,81 @@ export const NutritionHomeScreen = () => {
           ref={scrollViewRef}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: topFromScreenBottom + 96 }]}
         >
+          {isMealSelectionMode ? (
+            <View style={[styles.selectionToolbar, { backgroundColor: themeColors.surfaceSolid }]}>
+              <View style={styles.selectionToolbarHeader}>
+                <View style={styles.selectionTitleCopy}>
+                  <Text style={[styles.selectionTitle, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.selectMeals')}
+                  </Text>
+                  <Text style={[styles.selectionCount, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.selectedMealsCount', { count: selectedMealIds.size })}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsMealSelectionMode(false);
+                    setSelectedMealIds(new Set());
+                  }}
+                  style={styles.selectionClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.cancelSelection')}
+                >
+                  <X size={20} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.selectionActions}>
+                <TouchableOpacity
+                  onPress={() => openSelectedMealsModal('copy')}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchCopyAction')}
+                  style={[
+                    styles.selectionAction,
+                    { borderColor: themeColors.primary },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <Copy size={17} color={themeColors.primary} />
+                  <Text style={[styles.selectionActionText, { color: themeColors.primary }]}>
+                    {t('nutrition.batchCopyAction')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => openSelectedMealsModal('move')}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchMoveAction')}
+                  style={[
+                    styles.selectionAction,
+                    { backgroundColor: themeColors.primary },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <MoveRight size={17} color="#FFFFFF" />
+                  <Text style={styles.selectionActionTextLight}>{t('nutrition.batchMoveAction')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={deleteSelectedMeals}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchDeleteAction')}
+                  style={[
+                    styles.selectionAction,
+                    styles.selectionDeleteAction,
+                    { borderColor: themeColors.danger },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <Trash2 size={17} color={themeColors.danger} />
+                  <Text style={[styles.selectionActionText, { color: themeColors.danger }]}>
+                    {t('nutrition.batchDeleteAction')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+
           {/* Calorie Summary Header */}
           <CalorieEquationHeader
             calories={{
@@ -396,8 +730,12 @@ export const NutritionHomeScreen = () => {
                 onAdd={() => handleAddFood(type)}
                 onEditMeal={handleEditMeal}
                 onCopyMeal={handleCopyMeal}
+                onMoveMeal={handleMoveMeal}
                 onCheckMeal={handleCheckMeal}
                 onDeleteMeal={handleDeleteMeal}
+                selectionMode={isMealSelectionMode}
+                isMealSelected={item => !!item.log?.id && selectedMealIds.has(item.log.id)}
+                onToggleMeal={toggleMealSelection}
                 isSecondary={isSecondary}
                 showMacros={macroDisplay === 'per_meal'}
               />
@@ -417,15 +755,75 @@ export const NutritionHomeScreen = () => {
         </ScrollView>
 
         <CopyMealModal
-          visible={mealToCopy !== null}
-          sourceName={mealToCopy?.displayName ?? ''}
-          initialDate={currentNutritionDate}
+          visible={mealTransferAction !== null}
+          variant={mealTransferAction?.type ?? 'copy'}
+          sourceName={mealTransferAction?.meal.displayName ?? ''}
+          initialDate={mealTransferAction?.type === 'move' ? selectedDate : currentNutritionDate}
+          initialMealType={mealTransferAction?.type === 'move' ? mealTransferAction.meal.mealType : undefined}
           minimumDate={nutritionCalendarRange.minimumDate}
           maximumDate={nutritionCalendarRange.maximumDate}
           mealTypes={displayMealTypes}
-          onCancel={() => setMealToCopy(null)}
-          onCopy={handleCopyMealSubmit}
+          existingMeals={transferMealLogsQuery.data ?? []}
+          sourceMealId={mealTransferAction?.type === 'move' ? mealTransferAction.meal.log?.id : undefined}
+          onCancel={() => setMealTransferAction(null)}
+          onCopy={handleMealTransferSubmit}
         />
+
+        <QuickMealEditModal
+          visible={quickEditMeal !== null}
+          meal={quickEditMeal}
+          onCancel={() => setQuickEditMeal(null)}
+          onSave={handleQuickMealSave}
+          onOpenFullEditor={openFullMealEditor}
+        />
+
+        <MealBatchActionsMenu
+          visible={isBatchMenuVisible}
+          onClose={() => setIsBatchMenuVisible(false)}
+          onSelect={handleBatchMenuAction}
+        />
+
+        <MealBatchActionModal
+          visible={batchModal !== null}
+          mode={batchModal?.mode ?? 'day'}
+          operation={batchModal?.operation ?? 'copy'}
+          selectedCount={selectedMealIds.size}
+          sourceDate={selectedDate}
+          initialDestinationDate={defaultBatchDestinationDate}
+          initialSourceEndDate={selectedDate}
+          minimumDate={nutritionCalendarRange.minimumDate}
+          maximumDate={nutritionCalendarRange.maximumDate}
+          onCancel={() => setBatchModal(null)}
+          onSubmit={handleBatchSubmit}
+        />
+
+        {undoAction ? (
+          <UndoToast
+            message={
+              undoAction.kind === 'move'
+                ? t('nutrition.mealMovedUndoMessage', {
+                    date: formatLocalizedDate(parseISO(undoAction.current.date), {
+                      en: 'MMM d, yyyy',
+                      es: "d 'de' MMM yyyy",
+                    }),
+                  })
+                : t('nutrition.mealDeletedUndoMessage')
+            }
+            actionLabel={t('nutrition.undoMealAction')}
+            accessibilityLabel={t('nutrition.undoMealAccessibility')}
+            onUndo={handleUndoMealAction}
+            onDismiss={() => {
+              if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+              setUndoAction(null);
+            }}
+            dismissAccessibilityLabel={t('common.close')}
+            isBusy={isUndoing}
+            bottomOffset={topFromScreenBottom + 12}
+            backgroundColor={themeColors.textPrimary}
+            textColor={themeColors.background}
+            actionColor={themeColors.primary}
+          />
+        ) : null}
 
         {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
         <TouchableOpacity
@@ -493,6 +891,33 @@ const styles = StyleSheet.create({
   vacationCopy: {
     flex: 1,
   },
+  selectionToolbar: {
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+  },
+  selectionToolbarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectionTitleCopy: { flex: 1 },
+  selectionTitle: { fontSize: 16, fontWeight: '800' },
+  selectionCount: { fontSize: 13, marginTop: 3 },
+  selectionClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  selectionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  selectionAction: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 130,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  selectionDeleteAction: { flexBasis: '100%' },
+  selectionActionText: { fontSize: 13, fontWeight: '800' },
+  selectionActionTextLight: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabled: { opacity: 0.45 },
   vacationTitle: {
     fontSize: 16,
     fontWeight: '700',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { Edit2, Trash2 } from 'lucide-react-native';
+import { CalendarDays, Check, Circle, Edit2, Trash2 } from 'lucide-react-native';
 import { DailyMealItem } from '../types';
 import { useMealItems } from '../hooks/useNutritionData';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
@@ -11,12 +11,26 @@ interface MealRowProps {
   onCheck: () => void;
   onEdit: () => void;
   onCopy: () => void;
+  onMove?: () => void;
   onDelete?: () => void;
   onSkip?: () => void;
   showMacros?: boolean;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete, showMacros = true }) => {
+export const MealRow: React.FC<MealRowProps> = ({
+  item,
+  onEdit,
+  onCopy,
+  onMove,
+  onDelete,
+  showMacros = true,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
+}) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const isPending = item.status === 'pending';
@@ -37,9 +51,14 @@ export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete
     >
       <View style={styles.info}>
         <TouchableOpacity
-          onPress={onCopy}
+          onPress={selectionMode ? onToggleSelect : onCopy}
           accessibilityRole="button"
-          accessibilityLabel={t('nutrition.copyMealAccessibility', { mealName: item.displayName })}
+          accessibilityLabel={
+            selectionMode
+              ? t('nutrition.selectMealAccessibility', { mealName: item.displayName })
+              : t('nutrition.copyMealAccessibility', { mealName: item.displayName })
+          }
+          disabled={selectionMode && !hasLog}
           style={styles.nameButton}
         >
           <Text style={[styles.name, { color: themeColors.textPrimary }]}>{item.displayName}</Text>
@@ -69,19 +88,52 @@ export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity
-          onPress={onEdit}
-          style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
-        >
-          <Edit2 size={16} color={themeColors.textSecondary} />
-        </TouchableOpacity>
-        {hasLog && onDelete && (
+        {selectionMode ? (
           <TouchableOpacity
-            onPress={onDelete}
-            style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
+            onPress={onToggleSelect}
+            disabled={!hasLog}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected, disabled: !hasLog }}
+            accessibilityLabel={t('nutrition.selectMealAccessibility', { mealName: item.displayName })}
+            style={[styles.selectionButton, !hasLog && styles.disabled]}
           >
-            <Trash2 size={16} color={themeColors.danger} />
+            {selected ? (
+              <Check size={22} color={themeColors.primary} />
+            ) : (
+              <Circle size={22} color={themeColors.textSecondary} />
+            )}
           </TouchableOpacity>
+        ) : (
+          <>
+            {hasLog && onMove && (
+              <TouchableOpacity
+                onPress={onMove}
+                accessibilityRole="button"
+                accessibilityLabel={t('nutrition.moveMealAccessibility', { mealName: item.displayName })}
+                style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
+              >
+                <CalendarDays size={16} color={themeColors.primary} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel={
+                hasLog ? t('nutrition.quickEditMealAccessibility', { mealName: item.displayName }) : t('common.edit')
+              }
+              style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
+            >
+              <Edit2 size={16} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+            {hasLog && onDelete && (
+              <TouchableOpacity
+                onPress={onDelete}
+                style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
+              >
+                <Trash2 size={16} color={themeColors.danger} />
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
     </View>
@@ -145,4 +197,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
   },
+  selectionButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabled: { opacity: 0.35 },
 });

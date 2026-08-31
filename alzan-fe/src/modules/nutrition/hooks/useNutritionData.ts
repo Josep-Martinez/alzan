@@ -12,10 +12,20 @@ import {
 } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import type { DailyMealItem } from '../types';
-import { copyMealToDate } from '../services/dietCopyService';
+import {
+  copyDayToDate,
+  copyMealRange,
+  copyMealToDate,
+  copyMealsToDate,
+  moveMealRange,
+  moveMealsToDate,
+  moveMealToDate,
+} from '../services/dietCopyService';
+import type { MealRange } from '../services/mealBatchPlanner';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
+import type { DeletedMealSnapshot } from '../services/mealUndoPlanner';
 
 const KEYS = {
   TEMPLATES: (userId: string) => ['dietTemplates', userId],
@@ -198,8 +208,28 @@ export function useUpsertMealLog() {
 
 export function useDeleteMealLog() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: nutritionService.deleteMealLog,
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error('No user');
+      return nutritionService.deleteMealLogWithSnapshot(user.id, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export function useRestoreMealLog() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (snapshot: DeletedMealSnapshot) => {
+      if (!user) throw new Error('No user');
+      await nutritionService.restoreDeletedMeal(user.id, snapshot);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
@@ -229,6 +259,129 @@ export function useCopyMeal() {
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
       queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
     },
+  });
+}
+
+export type MoveMealInput = CopyMealInput;
+
+export function useMoveMeal() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ source, date, mealType }: MoveMealInput) => {
+      if (!user) throw new Error('No user');
+      if (!source.log) throw new Error('A registered meal is required to move it');
+
+      return moveMealToDate(user.id, source.log, { date, mealType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export function useMoveMealById() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: {
+      logId: string;
+      current: Pick<MealLog, 'date' | 'meal_type'>;
+      date: string;
+      mealType: MealType;
+    }) => {
+      if (!user) throw new Error('No user');
+
+      return moveMealToDate(
+        user.id,
+        {
+          id: variables.logId,
+          date: variables.current.date,
+          meal_type: variables.current.meal_type,
+        },
+        { date: variables.date, mealType: variables.mealType },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+const invalidateNutritionMealQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+  queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+  queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+};
+
+export function useCopyMealsToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { mealIds: string[]; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyMealsToDate(user.id, variables.mealIds, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useMoveMealsToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { mealIds: string[]; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return moveMealsToDate(user.id, variables.mealIds, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useCopyDayToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { sourceDate: string; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyDayToDate(user.id, variables.sourceDate, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useCopyMealRange() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { range: MealRange; destinationStartDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyMealRange(user.id, variables.range, variables.destinationStartDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useMoveMealRange() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { range: MealRange; destinationStartDate: string }) => {
+      if (!user) throw new Error('No user');
+      return moveMealRange(user.id, variables.range, variables.destinationStartDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
   });
 }
 

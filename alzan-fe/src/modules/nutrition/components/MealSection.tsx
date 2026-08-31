@@ -13,10 +13,14 @@ interface MealSectionProps {
   onAdd: () => void;
   onEditMeal: (item: DailyMealItem) => void;
   onCopyMeal: (item: DailyMealItem) => void;
+  onMoveMeal?: (item: DailyMealItem) => void;
   onCheckMeal: (item: DailyMealItem) => void;
   onDeleteMeal?: (item: DailyMealItem) => void;
   isSecondary?: boolean;
   showMacros?: boolean;
+  selectionMode?: boolean;
+  isMealSelected?: (item: DailyMealItem) => boolean;
+  onToggleMeal?: (item: DailyMealItem) => void;
 }
 
 export const MealSection: React.FC<MealSectionProps> = ({
@@ -25,10 +29,14 @@ export const MealSection: React.FC<MealSectionProps> = ({
   onAdd,
   onEditMeal,
   onCopyMeal,
+  onMoveMeal,
   onCheckMeal,
   onDeleteMeal,
   isSecondary = false,
   showMacros = true,
+  selectionMode = false,
+  isMealSelected,
+  onToggleMeal,
 }) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
@@ -69,25 +77,31 @@ export const MealSection: React.FC<MealSectionProps> = ({
             item={meal}
             onEdit={() => onEditMeal(meal)}
             onCopy={() => onCopyMeal(meal)}
+            onMove={onMoveMeal ? () => onMoveMeal(meal) : undefined}
             onCheck={() => onCheckMeal(meal)}
             onDelete={onDeleteMeal ? () => onDeleteMeal(meal) : undefined}
             showMacros={showMacros}
+            selectionMode={selectionMode}
+            selected={isMealSelected?.(meal) ?? false}
+            onToggleSelect={() => onToggleMeal?.(meal)}
           />
         </View>
       ))}
 
-      <TouchableOpacity style={[styles.addButton, isSecondary && styles.addButtonSecondary]} onPress={onAdd}>
-        <Plus size={isSecondary ? 16 : 18} color={isSecondary ? themeColors.textSecondary : themeColors.primary} />
-        <Text
-          style={[
-            styles.addText,
-            isSecondary && styles.addTextSecondary,
-            { color: isSecondary ? themeColors.textSecondary : themeColors.primary },
-          ]}
-        >
-          {isSecondary ? t('nutrition.addSnack') : t('nutrition.addMeal')}
-        </Text>
-      </TouchableOpacity>
+      {!selectionMode ? (
+        <TouchableOpacity style={[styles.addButton, isSecondary && styles.addButtonSecondary]} onPress={onAdd}>
+          <Plus size={isSecondary ? 16 : 18} color={isSecondary ? themeColors.textSecondary : themeColors.primary} />
+          <Text
+            style={[
+              styles.addText,
+              isSecondary && styles.addTextSecondary,
+              { color: isSecondary ? themeColors.textSecondary : themeColors.primary },
+            ]}
+          >
+            {isSecondary ? t('nutrition.addSnack') : t('nutrition.addMeal')}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={[styles.divider, dynamicStyles.divider]} />
     </View>

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { AlertTriangle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { formatISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { CalendarDatePickerModal } from '../../../components/common/CalendarDatePickerModal';
@@ -19,6 +19,8 @@ import { formatLocalizedDate } from '../../../i18n/dateLocale';
 import { MEAL_TYPE_LABELS } from '../constants';
 import type { MealType } from '../../../types/requests.types';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
+import { findMealDestinationConflict, type MealDestinationConflict } from '../services/mealMovePlanner';
+import type { MealLog } from '../../../types/requests.types';
 
 export type CopyMealDestination = {
   date: string;
@@ -27,11 +29,15 @@ export type CopyMealDestination = {
 
 type CopyMealModalProps = {
   visible: boolean;
+  variant?: 'copy' | 'move';
   sourceName: string;
   initialDate: Date;
+  initialMealType?: MealType;
   minimumDate: Date;
   maximumDate: Date;
   mealTypes: MealType[];
+  existingMeals?: readonly Pick<MealLog, 'id' | 'date' | 'meal_type' | 'name'>[];
+  sourceMealId?: string;
   onCancel: () => void;
   onCopy: (destination: CopyMealDestination) => Promise<void>;
 };
@@ -48,11 +54,15 @@ const clampDate = (date: Date, minimumDate: Date, maximumDate: Date): Date => {
 
 export const CopyMealModal = ({
   visible,
+  variant = 'copy',
   sourceName,
   initialDate,
+  initialMealType,
   minimumDate,
   maximumDate,
   mealTypes,
+  existingMeals = [],
+  sourceMealId,
   onCancel,
   onCopy,
 }: CopyMealModalProps) => {
@@ -67,6 +77,24 @@ export const CopyMealModal = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const mealTypeKey = mealTypes.join('|');
+  const titleKey = variant === 'move' ? 'nutrition.moveMealTitle' : 'nutrition.copyMealTitle';
+  const actionKey = variant === 'move' ? 'nutrition.moveMealAction' : 'nutrition.copyMealAction';
+  const errorKey = variant === 'move' ? 'nutrition.moveMealError' : 'nutrition.copyMealError';
+  const cancelKey = variant === 'move' ? 'nutrition.moveMealCancel' : 'nutrition.copyMealCancel';
+  const selectedInitialMealType =
+    initialMealType && mealTypes.includes(initialMealType) ? initialMealType : (mealTypes[0] ?? null);
+  const destinationConflict: MealDestinationConflict | null = useMemo(
+    () =>
+      selectedMealType
+        ? findMealDestinationConflict(
+            existingMeals,
+            sourceMealId,
+            { date: toIsoDate(selectedDate), mealType: selectedMealType },
+            variant,
+          )
+        : null,
+    [existingMeals, selectedDate, selectedMealType, sourceMealId, variant],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -77,9 +105,9 @@ export const CopyMealModal = ({
 
     setStep('date');
     setSelectedDate(clampDate(initialDate, minimumDate, maximumDate));
-    setSelectedMealType(mealTypes[0] ?? null);
+    setSelectedMealType(selectedInitialMealType);
     setErrorMessage(null);
-  }, [initialDate, maximumDate, mealTypeKey, minimumDate, visible]);
+  }, [initialDate, maximumDate, mealTypeKey, minimumDate, selectedInitialMealType, visible]);
 
   const selectDate = (date: Date) => {
     setSelectedDate(clampDate(date, minimumDate, maximumDate));
@@ -100,7 +128,7 @@ export const CopyMealModal = ({
     try {
       await onCopy({ date: toIsoDate(selectedDate), mealType: selectedMealType });
     } catch {
-      setErrorMessage(t('nutrition.copyMealError'));
+      setErrorMessage(t(errorKey));
     } finally {
       setIsSubmitting(false);
     }
@@ -117,7 +145,7 @@ export const CopyMealModal = ({
         <View style={[styles.content, { backgroundColor: themeColors.surfaceSolid }]}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('nutrition.copyMealTitle')}</Text>
+              <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t(titleKey)}</Text>
               <Text style={[styles.sourceName, { color: themeColors.textSecondary }]} numberOfLines={2}>
                 {sourceName}
               </Text>
@@ -125,7 +153,7 @@ export const CopyMealModal = ({
             <TouchableOpacity
               onPress={onCancel}
               accessibilityRole="button"
-              accessibilityLabel={t('nutrition.copyMealCancel')}
+              accessibilityLabel={t(cancelKey)}
               style={styles.closeButton}
             >
               <Text style={[styles.closeText, { color: themeColors.textSecondary }]}>×</Text>
@@ -191,9 +219,7 @@ export const CopyMealModal = ({
 
               <View style={styles.actions}>
                 <TouchableOpacity onPress={onCancel} style={styles.secondaryButton}>
-                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.copyMealCancel')}
-                  </Text>
+                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>{t(cancelKey)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleContinue}
@@ -251,13 +277,34 @@ export const CopyMealModal = ({
                 })}
               </ScrollView>
 
+              {destinationConflict ? (
+                <View
+                  style={[
+                    styles.conflictBanner,
+                    { backgroundColor: themeColors.warning + '16', borderColor: themeColors.warning + '55' },
+                  ]}
+                >
+                  <AlertTriangle size={20} color={themeColors.warning} />
+                  <View style={styles.conflictCopy}>
+                    <Text style={[styles.conflictTitle, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.mealTransferConflictTitle')}
+                    </Text>
+                    <Text style={[styles.conflictMessage, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.mealTransferConflictMessage', {
+                        mealType: t(MEAL_TYPE_LABELS[selectedMealType ?? mealTypes[0]]),
+                        existingMeal: destinationConflict.existingMealNames[0],
+                        count: destinationConflict.count,
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
               {errorMessage ? <Text style={[styles.error, { color: themeColors.danger }]}>{errorMessage}</Text> : null}
 
               <View style={styles.actions}>
                 <TouchableOpacity onPress={onCancel} disabled={isSubmitting} style={styles.secondaryButton}>
-                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.copyMealCancel')}
-                  </Text>
+                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>{t(cancelKey)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCopy}
@@ -271,7 +318,7 @@ export const CopyMealModal = ({
                   {isSubmitting ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>{t('nutrition.copyMealAction')}</Text>
+                    <Text style={styles.primaryButtonText}>{t(actionKey)}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -336,6 +383,18 @@ const styles = StyleSheet.create({
   },
   mealTypeText: { fontSize: 16, fontWeight: '700' },
   error: { fontSize: 13, lineHeight: 18, marginTop: 10 },
+  conflictBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 12,
+  },
+  conflictCopy: { flex: 1 },
+  conflictTitle: { fontSize: 14, fontWeight: '800' },
+  conflictMessage: { fontSize: 13, lineHeight: 18, marginTop: 3 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 22 },
   secondaryButton: { minHeight: 48, minWidth: 92, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { fontSize: 15, fontWeight: '700' },
