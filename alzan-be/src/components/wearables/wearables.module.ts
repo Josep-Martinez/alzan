@@ -22,6 +22,8 @@ import { SuuntoCloudSyncService } from './services/suunto-cloud-sync.service';
 import { CorosCloudSyncService } from './services/coros-cloud-sync.service';
 import { CorosWebhookService } from './services/coros-webhook.service';
 import { CorosConnectionService } from './services/coros-connection.service';
+import { CorosHistoryImportController } from './controllers/coros-history-import.controller';
+import { CorosHistoryImportService } from './services/coros-history-import.service';
 import { WearableImportLifecycleService } from './services/wearable-import-lifecycle.service';
 
 @Api(SwaggerApi.WEARABLES_API)
@@ -33,6 +35,7 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     ImportReviewController,
     CorosWebhookController,
     CorosConnectionController,
+    CorosHistoryImportController,
   ],
   providers: [
     RawPayloadService,
@@ -50,6 +53,7 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     CorosCloudSyncService,
     CorosWebhookService,
     CorosConnectionService,
+    CorosHistoryImportService,
   ],
   exports: [
     RawPayloadService,

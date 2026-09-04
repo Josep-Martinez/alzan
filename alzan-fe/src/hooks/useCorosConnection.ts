@@ -2,14 +2,16 @@ import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
+import type { DocumentPickerAsset } from 'expo-document-picker';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../components/common/Alert';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 import { wearablesLocalHealthApi } from '../modules/wearables';
+import type { CorosHistoryImportResult } from '../modules/wearables/localHealthSync.types';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
-import { useHealthDataConsent } from './useHealthDataConsent';
+import { appendDocumentAsset, postActivityImportForm } from '../services/activityImportApi';
 
 const COROS_PROVIDER = 'coros';
 const QUERY_KEY = ['corosConnection'];
@@ -84,7 +86,6 @@ const connectOnWeb = async (userId: string, authorizationUrl: string, redirectUr
 
 export function useCorosConnection() {
   const { user } = useAuth();
-  const { ensureHealthDataConsent } = useHealthDataConsent();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
@@ -98,15 +99,14 @@ export function useCorosConnection() {
   const connectionQuery = useQuery({
     queryKey: [...QUERY_KEY, user?.id],
     queryFn: () => (user ? getConnection(user.id) : null),
-    enabled: !!user && capabilityQuery.data?.enabled === true,
+    // Read existing connections even when rollout blocks new connections so
+    // users can still see and revoke an already-authorized COROS account.
+    enabled: !!user,
     staleTime: 2 * 60_000,
   });
 
   const syncMutation = useMutation({
-    mutationFn: async () => {
-      await ensureHealthDataConsent();
-      return wearablesLocalHealthApi.syncCoros();
-    },
+    mutationFn: () => wearablesLocalHealthApi.syncCoros(),
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
       if (result.status === 'running') {
@@ -118,12 +118,57 @@ export function useCorosConnection() {
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       Alert.alert(
         result.status === 'partial' ? t('settings.syncPartialTitle') : t('settings.syncCompleteTitle'),
-        t('settings.corosSyncSummary', {
-          imported: result.activities_imported,
-          skipped: result.activities_skipped ?? 0,
-          failed: result.activities_failed ?? 0,
-          healthDays: result.health_days_imported ?? 0,
-        }),
+        [
+          t('settings.corosSyncSummary', {
+            imported: result.activities_imported,
+            skipped: result.activities_skipped ?? 0,
+            failed: result.activities_failed ?? 0,
+            healthDays: result.health_days_imported ?? 0,
+          }),
+          result.backfill_complete === false
+            ? t('settings.corosBackfillInProgress', { date: result.backfill_next_date ?? '—' })
+            : result.backfill_complete === true
+              ? t('settings.corosBackfillComplete')
+              : null,
+          typeof result.fit_pending === 'number' && result.fit_pending > 0
+            ? t('settings.corosFitPending', { count: result.fit_pending })
+            : null,
+        ]
+          .filter((message): message is string => !!message)
+          .join('\n'),
+      );
+    },
+    onError: (error: Error) => Alert.alert(t('common.error'), error.message),
+  });
+
+  const importHistoryMutation = useMutation({
+    mutationFn: async (assets: DocumentPickerAsset[]): Promise<CorosHistoryImportResult> => {
+      if (assets.length === 0) throw new Error('COROS_HISTORY_FILES_REQUIRED');
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      const token = data.session?.access_token;
+      if (!token) throw new Error('User not authenticated');
+      const formData = new FormData();
+      for (const asset of assets) await appendDocumentAsset(formData, 'files', asset);
+      return postActivityImportForm<CorosHistoryImportResult>('/activity-imports/coros/history', token, formData);
+    },
+    onSuccess: result => {
+      invalidateTrainingCalendar(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      const failedFiles = result.errorsByFile.map(file => `${file.fileName}: ${file.code}`).join('\n');
+      Alert.alert(
+        t('settings.corosHistoryImportTitle'),
+        [
+          t('settings.corosHistoryImportSummary', {
+            imported: result.filesImported,
+            skipped: result.filesSkipped,
+            failed: result.filesFailed,
+          }),
+          failedFiles ? t('settings.corosHistoryImportErrors', { errors: failedFiles }) : null,
+        ]
+          .filter((message): message is string => !!message)
+          .join('\n'),
       );
     },
     onError: (error: Error) => Alert.alert(t('common.error'), error.message),
@@ -172,6 +217,10 @@ export function useCorosConnection() {
 
   const connect = useCallback(() => connectMutation.mutate(), [connectMutation]);
   const sync = useCallback(() => syncMutation.mutate(), [syncMutation]);
+  const importHistory = useCallback(
+    (assets: DocumentPickerAsset[]) => importHistoryMutation.mutate(assets),
+    [importHistoryMutation],
+  );
   const disconnect = useCallback(() => {
     Alert.alert(t('settings.disconnect'), 'COROS', [
       { text: t('common.cancel'), style: 'cancel' },
@@ -189,10 +238,12 @@ export function useCorosConnection() {
     isLoading: capabilityQuery.isLoading || connectionQuery.isLoading,
     isConnecting: connectMutation.isPending,
     isSyncing: syncMutation.isPending,
+    isImportingHistory: importHistoryMutation.isPending,
     isDisconnecting: disconnectMutation.isPending,
     lastSyncedAt: connectionQuery.data?.last_synced_at ?? null,
     connect,
     sync,
+    importHistory,
     disconnect,
   };
 }

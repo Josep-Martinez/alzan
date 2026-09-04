@@ -12,7 +12,7 @@ Implemented in this branch:
 - Alzan-owned Apple Health native module `NativeModules.AlzanAppleHealth` for read-only HealthKit sync, installed through `alzan-fe/plugins/withAlzanAppleHealth.js`.
 - Alzan-owned Android Health Connect native module `NativeModules.AlzanHealthConnect` for read-only Health Connect sync, installed through `alzan-fe/plugins/withAlzanHealthConnect.js`.
 - Polar AccessLink v1 manual sync through `POST /wearables/cloud/polar/sync`.
-- COROS OAuth, 90-day workout/FIT and daily-health backfill, three-day overlap sync, authenticated workout webhook queue, pilot rollout, encrypted tokens, and complete disconnect.
+- COROS direct OAuth through Partner API with three-month activity sync, FIT enrichment, historical FIT import, authenticated workout webhook queue, pilot rollout, encrypted tokens, and complete disconnect.
 - Health Connect origin discovery and selected-source persistence.
 - OAuth token hardening for future provider callbacks by moving tokens from visible `user_connections` rows into private `provider_connection_tokens`.
 - Connected Apps actions for Apple Health, Health Connect, and Polar in `alzan-fe/src/screens/settings/ConnectedAppsScreen.tsx`.
@@ -196,7 +196,9 @@ This endpoint requires an active Polar OAuth connection. It reads private tokens
 
 ### COROS cloud
 
-`POST /wearables/cloud/coros/sync` imports a 90-day first window and three-day overlapping deltas. COROS limits calls to 30 days, so the service splits the interval before calling `/v2/coros/sport/list` and `/coros/daily/query`.
+`POST /wearables/cloud/coros/sync` uses the direct COROS Partner API in windows of at most 30 days. The first sync covers the latest three months and later syncs use a safe overlap. History older than three months is imported through `POST /activity-imports/coros/history` from FIT files exported by COROS Training Hub.
+
+`POST /activity-imports/coros/history` accepts up to 50 FIT files of at most 25 MiB each. It validates, deduplicates and writes each file independently, so a corrupt file does not discard the other imports.
 
 `POST /webhooks/coros/workouts` is public at the HTTP auth layer but requires constant-time validation of COROS `client` and `secret` headers. It persists each activity summary before returning `{"message":"ok","result":"0000"}`. `GET /webhooks/coros/status` returns `{"status":"ok"}`.
 

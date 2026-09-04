@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { DurationType, PhaseType, SportType, TargetType } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
 import { Alert } from '../../components/common/Alert';
@@ -61,16 +62,14 @@ import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
-import { formatPaceTime } from '../../utils/unitConversionUtils';
+import { formatDurationTime, formatPaceTime } from '../../utils/unitConversionUtils';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, parseLocalizedDecimal } from '../../utils/numericInput';
 import {
   calculateProgressionWeeks,
-  calculateStartDateFromEndAndWeeks,
   EligibleProgressionStep,
   ensureStepProgressionKeys,
   filterStepProgressionsBySteps,
   getEligibleProgressionSteps,
-  getNextScheduledDateString,
   normalizeStepProgressions,
   ProgressionBuilderStep,
   StepProgressionOverride,
@@ -82,11 +81,29 @@ import {
   getCurrentWeekdayForDate,
   hasValidRecurringDay,
   isScheduledWeekday,
+  isValidOptionalOneOffDate,
   isValidIsoDate,
   resolveOneOffDate,
   shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
+import {
+  calculateWeeklyEndDate,
+  getFirstWeeklyOccurrenceOnOrAfter,
+  getNextWeeklyOccurrence,
+  isValidDateOnly,
+  parsePositiveWholeWeeks,
+} from '../../modules/training/helpers/weeklyRecurrence.helper';
 import { getOneOffTrainingPlanDate } from '../../modules/training/services/oneOffTrainingPlanService';
+import {
+  formatEnduranceStepTarget,
+  PreviewLabels,
+} from '../../modules/training/helpers/scheduledWorkoutPreviewFormat.helper';
+import { sortByOrderIndex } from '../../modules/training/helpers/advancedEnduranceSession.helper';
+import {
+  cloneEditableState,
+  hasUnsavedChanges as compareUnsavedChanges,
+  serializeEditableState,
+} from '../../modules/training/helpers/unsavedChanges.helper';
 
 interface Step {
   id: string; // temp id
@@ -154,10 +171,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceWorkoutBuilder'>>();
   const { saveWorkout } = useEnduranceWorkoutBuilder();
-  const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
+  const { convertDistanceToUi } = useUnitConversion();
   const { preferences } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
-  const { options: sportCatalogOptions, getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
+  const {
+    options: sportCatalogOptions,
+    isLoading: isSportCatalogLoading,
+    getOptions,
+    getGroupLabel,
+    getOptionLabel,
+  } = useSportCatalog();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -207,6 +230,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [recurrenceWeeks, setRecurrenceWeeks] = useState<string>('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
   const [showRecurrenceStartPicker, setShowRecurrenceStartPicker] = useState(false);
+  const [isFormHydrated, setIsFormHydrated] = useState(!isEditMode);
+  const initialEditableStateSnapshotRef = useRef<string | null>(null);
+  const builderInitialStateRef = useRef<{
+    steps: Step[];
+    stepProgressions: StepProgressionOverride[];
+    snapshot: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isRecurring) {
@@ -214,29 +244,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
       // visible and persisted even though they do not repeat by weekday.
       return;
     }
-    const weeks = parseInt(recurrenceWeeks, 10);
-    if (isNaN(weeks) || weeks < 1) {
+    const scheduledDay = scheduledDays[0] ?? null;
+    const weeks = parsePositiveWholeWeeks(recurrenceWeeks);
+    const effectiveStart = getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, scheduledDay);
+    if (!effectiveStart || !weeks) {
       setRecurrenceEndDate('');
       return;
     }
-    const refStart = recurrenceStartDate || getNextScheduledDateString(new Date(), scheduledDays[0] ?? null);
-    if (!refStart) {
-      setRecurrenceEndDate('');
-      return;
-    }
-    try {
-      const parsedStart = new Date(`${refStart}T00:00:00`);
-      if (!isNaN(parsedStart.getTime())) {
-        const calculatedEnd = addDays(parsedStart, weeks * 7 - 1);
-        setRecurrenceEndDate(format(calculatedEnd, 'yyyy-MM-dd'));
-      } else {
-        setRecurrenceEndDate('');
-      }
-    } catch (err) {
-      console.error('[EnduranceWorkoutBuilderScreen] error calculating end date:', err);
-      setRecurrenceEndDate('');
-    }
-  }, [isEditMode, isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
+    const calculatedEnd = calculateWeeklyEndDate(effectiveStart, scheduledDay, weeks);
+    setRecurrenceEndDate(calculatedEnd || '');
+  }, [isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
 
   useEffect(() => {
     if (!isEditMode) setAutoDeleteAfterEnd(trainingSettings.autoDeleteExpiredTemplates);
@@ -308,39 +325,50 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
   const formatTime = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const rem = seconds % 3600;
-      const mins = Math.floor(rem / 60);
-      const secs = rem % 60;
-      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return formatDurationTime(seconds);
   };
 
   const formatTarget = (step: Step) => {
-    if (step.target_type === 'pace') {
-      const paceSeconds = step.target_min || 0;
-      const speedMps = paceSeconds ? 1000 / paceSeconds : 0;
-      if (!speedMps) return '';
-
-      const { label } = convertSpeedToUi(speedMps, sportType ?? undefined);
-      return label;
-    }
-    if (step.target_type === 'heart_rate') {
-      return `Zona ${step.target_min || step.target_max || '?'}`;
-    }
-    if (step.target_type === 'speed') {
-      const val = step.target_min || 0;
-      const mps = val / 3.6;
-      const { label } = convertSpeedToUi(mps, sportType!);
-      return label;
-    }
     if (step.target_type === 'none') return '';
 
-    return `${step.target_min || 0} - ${step.target_max || 0} ${step.target_type}`;
+    const labels: PreviewLabels = {
+      reps: t('training.repCaps'),
+      sets: t('training.setsLabel'),
+      time: t('training.time'),
+      rest: t('common.rest'),
+      hrZone: t('training.hrZone'),
+      heartRate: t('health.heartRate'),
+      pace: t('training.pace'),
+      speed: t('training.speed'),
+      power: t('training.power'),
+      distance: t('training.distanceParenAllCaps'),
+      duration: t('training.duration'),
+      load: t('training.load'),
+    };
+
+    return (
+      formatEnduranceStepTarget(
+        { ...step, hyrox_step_type: null },
+        (sportType ?? 'other') as SportType,
+        labels,
+        preferences.distance_unit === 'miles' ? 'miles' : 'km',
+        { includeLabel: false },
+      ) ?? ''
+    );
+  };
+
+  const renderStepTarget = (step: Step) => {
+    const target = formatTarget(step);
+    if (!target) return null;
+
+    return (
+      <View style={styles.detailRow}>
+        <Zap size={16} color={themeColors.textSecondary} />
+        <Text style={[styles.detailText, { color: isDark ? themeColors.textPrimary : themeColors.textSecondary }]}>
+          {target}
+        </Text>
+      </View>
+    );
   };
 
   // Load existing template for edit mode
@@ -368,7 +396,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     enabled: !!templateId,
   });
 
-  const { data: existingOneOffPlanDate = null } = useQuery({
+  const { data: existingOneOffPlanDate = null, isLoading: isExistingOneOffPlanDateLoading } = useQuery({
     queryKey: ['enduranceTemplateOneOffPlan', templateId, user?.id],
     queryFn: async () => {
       if (!templateId || !user) return null;
@@ -392,6 +420,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
     setScheduledDays(days);
+    const selectedDay = days[0];
+    if (selectedDay === undefined) {
+      setRecurrenceStartDate(null);
+      setRecurrenceEndDate('');
+      return;
+    }
+
+    const baseDate = isValidDateOnly(recurrenceStartDate)
+      ? recurrenceStartDate
+      : getNextWeeklyOccurrence(new Date(), selectedDay);
+    setRecurrenceStartDate(getFirstWeeklyOccurrenceOnOrAfter(baseDate, selectedDay));
+  };
+
+  const handleRecurrenceStartDateChange = (date: string) => {
+    if (!isValidDateOnly(date)) {
+      setRecurrenceStartDate(date);
+      return;
+    }
+
+    setRecurrenceStartDate(getFirstWeeklyOccurrenceOnOrAfter(date, scheduledDays[0] ?? null));
   };
 
   const isHydratingEditTemplate =
@@ -399,6 +447,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   useEffect(() => {
     hydratedTemplateIdRef.current = null;
+    initialEditableStateSnapshotRef.current = null;
+    setIsFormHydrated(!isEditMode);
   }, [templateId]);
 
   // Populate fields when template loads
@@ -465,80 +515,91 @@ export const EnduranceWorkoutBuilderScreen = () => {
       }
       setIsRecurring(isScheduledWeekday(existingTemplate.scheduled_day));
       setOneOffDate(null);
-      setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
-      setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
+      const existingScheduledDay = isScheduledWeekday(existingTemplate.scheduled_day)
+        ? existingTemplate.scheduled_day
+        : null;
+      const existingWeeks = calculateProgressionWeeks(
+        existingTemplate.recurrence_start_date,
+        existingTemplate.recurrence_end_date,
+      );
+      const normalizedExistingStart =
+        existingScheduledDay !== null
+          ? getFirstWeeklyOccurrenceOnOrAfter(existingTemplate.recurrence_start_date, existingScheduledDay)
+          : existingTemplate.recurrence_start_date || null;
+      setRecurrenceStartDate(normalizedExistingStart);
+      setRecurrenceEndDate(
+        existingScheduledDay !== null && existingWeeks > 0
+          ? calculateWeeklyEndDate(normalizedExistingStart, existingScheduledDay, existingWeeks) || ''
+          : existingTemplate.recurrence_end_date || '',
+      );
       const lifecycleData = existingTemplate as unknown as {
         auto_delete_after_end?: boolean | null;
       };
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
-      const weeks = calculateProgressionWeeks(
-        existingTemplate.recurrence_start_date,
-        existingTemplate.recurrence_end_date,
-      );
-      setRecurrenceWeeks(weeks > 0 ? String(weeks) : '');
-      setStepProgressions(
-        normalizeStepProgressions(
-          existingProgressions.map(progression => ({
-            progression_key: progression.progression_key,
-            week_index: progression.week_index,
-            duration_s: progression.duration_s,
-            distance_m: progression.distance_m,
-            target_type: progression.target_type,
-            target_min: progression.target_min,
-            target_max: progression.target_max,
-            repetitions: progression.repetitions,
-            load_kg: progression.load_kg,
-            reps: progression.reps,
-          })),
-        ),
+      setRecurrenceWeeks(existingWeeks > 0 ? String(existingWeeks) : '');
+      const normalizedProgressions = normalizeStepProgressions(
+        existingProgressions.map(progression => ({
+          progression_key: progression.progression_key,
+          week_index: progression.week_index,
+          duration_s: progression.duration_s,
+          distance_m: progression.distance_m,
+          target_type: progression.target_type,
+          target_min: progression.target_min,
+          target_max: progression.target_max,
+          repetitions: progression.repetitions,
+          load_kg: progression.load_kg,
+          reps: progression.reps,
+        })),
       );
 
       // Convert DB steps to UI format
       if (existingTemplate.endurance_workout_steps) {
         const dbSteps = existingTemplate.endurance_workout_steps;
-        const uiSteps: Step[] = dbSteps
-          .filter(s => !s.parent_step_id)
-          .sort((a, b) => a.order_index - b.order_index)
-          .map(s => ({
-            id: s.id,
-            progression_key: s.progression_key,
-            phase_type: s.phase_type,
-            duration_type: s.duration_type,
-            duration_s: s.duration_s,
-            distance_m: s.distance_m,
-            target_type: s.target_type,
-            target_min: s.target_min,
-            target_max: s.target_max,
-            repetitions: s.repetitions || 1,
-            is_group: s.is_group || false,
-            hyrox_step_type: s.hyrox_step_type,
-            hyrox_station_key: s.hyrox_station_key,
-            load_kg: s.load_kg,
-            reps: s.reps,
-            children: dbSteps
-              .filter(c => c.parent_step_id === s.id)
-              .sort((a, b) => a.order_index - b.order_index)
-              .map(c => ({
-                id: c.id,
-                progression_key: c.progression_key,
-                phase_type: c.phase_type,
-                duration_type: c.duration_type,
-                duration_s: c.duration_s,
-                distance_m: c.distance_m,
-                target_type: c.target_type,
-                target_min: c.target_min,
-                target_max: c.target_max,
-                repetitions: c.repetitions || 1,
-                is_group: false,
-                parent_step_id: s.id,
-                hyrox_step_type: c.hyrox_step_type,
-                hyrox_station_key: c.hyrox_station_key,
-                load_kg: c.load_kg,
-                reps: c.reps,
-              })),
-          })) as Step[];
-        setSteps(ensureStepProgressionKeys(uiSteps));
+        const uiSteps: Step[] = sortByOrderIndex(dbSteps.filter(s => !s.parent_step_id)).map(s => ({
+          id: s.id,
+          progression_key: s.progression_key,
+          phase_type: s.phase_type,
+          duration_type: s.duration_type,
+          duration_s: s.duration_s,
+          distance_m: s.distance_m,
+          target_type: s.target_type,
+          target_min: s.target_min,
+          target_max: s.target_max,
+          repetitions: s.repetitions || 1,
+          is_group: s.is_group || false,
+          hyrox_step_type: s.hyrox_step_type,
+          hyrox_station_key: s.hyrox_station_key,
+          load_kg: s.load_kg,
+          reps: s.reps,
+          children: sortByOrderIndex(dbSteps.filter(c => c.parent_step_id === s.id)).map(c => ({
+            id: c.id,
+            progression_key: c.progression_key,
+            phase_type: c.phase_type,
+            duration_type: c.duration_type,
+            duration_s: c.duration_s,
+            distance_m: c.distance_m,
+            target_type: c.target_type,
+            target_min: c.target_min,
+            target_max: c.target_max,
+            repetitions: c.repetitions || 1,
+            is_group: false,
+            parent_step_id: s.id,
+            hyrox_step_type: c.hyrox_step_type,
+            hyrox_station_key: c.hyrox_station_key,
+            load_kg: c.load_kg,
+            reps: c.reps,
+          })),
+        })) as Step[];
+        const hydratedSteps = ensureStepProgressionKeys(uiSteps);
+        setSteps(hydratedSteps);
+        // Reconcile stale progression rows before taking the initial snapshot.
+        // Otherwise the cleanup effect below can change the form immediately
+        // after hydration and incorrectly mark an untouched template as dirty.
+        setStepProgressions(filterStepProgressionsBySteps(hydratedSteps, normalizedProgressions));
+      } else {
+        setStepProgressions([]);
       }
+      setIsFormHydrated(true);
     }
   }, [
     existingProgressions,
@@ -550,6 +611,118 @@ export const EnduranceWorkoutBuilderScreen = () => {
   useEffect(() => {
     if (isEditMode) setOneOffDate(existingOneOffPlanDate);
   }, [existingOneOffPlanDate, isEditMode]);
+
+  const editableStateSnapshot = useMemo(
+    () =>
+      serializeEditableState({
+        name,
+        description,
+        trainingGoal,
+        sportType,
+        scheduledDays,
+        isRecurring,
+        oneOffDate,
+        recurrenceStartDate,
+        recurrenceEndDate,
+        recurrenceWeeks,
+        autoDeleteAfterEnd,
+        environmentType,
+        surface,
+        poolType,
+        stroke,
+        footballSessionType,
+        baseLoad,
+        contactLevel,
+        bootsUsed,
+        rival,
+        notes,
+        racketUsed,
+        climbingGrade,
+        wetsuit,
+        board,
+        skiType,
+        slopeType,
+        snowboardType,
+        golfClubFocus,
+        hyroxStationFocus,
+        steps,
+        stepProgressions,
+      }),
+    [
+      name,
+      description,
+      trainingGoal,
+      sportType,
+      scheduledDays,
+      isRecurring,
+      oneOffDate,
+      recurrenceStartDate,
+      recurrenceEndDate,
+      recurrenceWeeks,
+      autoDeleteAfterEnd,
+      environmentType,
+      surface,
+      poolType,
+      stroke,
+      footballSessionType,
+      baseLoad,
+      contactLevel,
+      bootsUsed,
+      rival,
+      notes,
+      racketUsed,
+      climbingGrade,
+      wetsuit,
+      board,
+      skiType,
+      slopeType,
+      snowboardType,
+      golfClubFocus,
+      hyroxStationFocus,
+      steps,
+      stepProgressions,
+    ],
+  );
+
+  useEffect(() => {
+    const editDataReady =
+      !isSportCatalogLoading &&
+      (!isEditMode ||
+        (!!existingTemplate &&
+          !isExistingProgressionsLoading &&
+          (!isExistingOneOffPlanDateLoading || existingTemplate.scheduled_day !== null)));
+
+    if (!isFormHydrated || !editDataReady || initialEditableStateSnapshotRef.current !== null) return;
+
+    // Passive effects reconcile catalog values, recurrence dates and progression
+    // rows after hydration. Capture the baseline on the next tick so those
+    // automatic changes are not reported as user edits.
+    const settleTimer = setTimeout(() => {
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+    }, 0);
+
+    return () => clearTimeout(settleTimer);
+  }, [
+    editableStateSnapshot,
+    existingTemplate,
+    isEditMode,
+    isExistingOneOffPlanDateLoading,
+    isExistingProgressionsLoading,
+    isFormHydrated,
+    isSportCatalogLoading,
+    sportCatalogOptions.length,
+  ]);
+
+  const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);
+
+  const builderEditableStateSnapshot = useMemo(
+    () => serializeEditableState({ steps, stepProgressions }),
+    [stepProgressions, steps],
+  );
+  const hasBuilderChanges =
+    currentView === 'builder' &&
+    builderInitialStateRef.current !== null &&
+    compareUnsavedChanges(builderInitialStateRef.current.snapshot, builderEditableStateSnapshot);
 
   // Progression rows are stored separately from the step tree. Reconcile them
   // whenever steps are edited so deleted steps cannot keep overriding the
@@ -600,13 +773,28 @@ export const EnduranceWorkoutBuilderScreen = () => {
   useEffect(() => {
     if (!sportType || sportCatalogOptions.length === 0) return;
 
+    // Some sports (for example HYROX) keep a legacy modality/surface value
+    // without exposing selectable catalog options. Preserve those values
+    // instead of turning an untouched edit into a false dirty state.
     const nextEnvironmentType =
-      environmentType && modalityOptions.some(option => option.option_key === environmentType) ? environmentType : null;
-    const nextSurface = surface && terrainOptions.some(option => option.option_key === surface) ? surface : null;
+      environmentType && (!hasModalityOptions || modalityOptions.some(option => option.option_key === environmentType))
+        ? environmentType
+        : null;
+    const nextSurface =
+      surface && (!hasTerrainOptions || terrainOptions.some(option => option.option_key === surface)) ? surface : null;
 
     if (environmentType !== nextEnvironmentType) setEnvironmentType(nextEnvironmentType);
     if (surface !== nextSurface) setSurface(nextSurface);
-  }, [environmentType, modalityOptions, sportCatalogOptions.length, sportType, surface, terrainOptions]);
+  }, [
+    environmentType,
+    hasModalityOptions,
+    hasTerrainOptions,
+    modalityOptions,
+    sportCatalogOptions.length,
+    sportType,
+    surface,
+    terrainOptions,
+  ]);
 
   const getStructuredGoals = () => {
     return goalOptions.map(option => ({
@@ -783,15 +971,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return isImportedDateDrivenTemplate ? recurrenceStartDate || existingTemplate.recurrence_start_date : null;
     }
     if (scheduledDay === null) return null;
-    if (recurrenceStartDate) {
-      return recurrenceStartDate;
-    }
-    const weeks = parseInt(recurrenceWeeks, 10);
-    if (recurrenceEndDate.trim() && !isNaN(weeks) && weeks >= 1) {
-      const calculatedStart = calculateStartDateFromEndAndWeeks(recurrenceEndDate.trim(), weeks);
-      if (calculatedStart) return calculatedStart;
-    }
-    return getNextScheduledDateString(new Date(), scheduledDay);
+    return getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, scheduledDay);
   };
 
   const getValidatedRecurrenceEndDate = (): string | null => {
@@ -799,7 +979,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return trimmedEndDate.length > 0 ? trimmedEndDate : null;
   };
 
-  const executeSave = async (detachFromImport = false) => {
+  const executeSave = async (detachFromImport = false, onSaved?: () => void) => {
     try {
       const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
       const isOneOff = !isRecurring && !!savedOneOffDate && !isImportedDateDrivenTemplate;
@@ -919,7 +1099,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           : isEditMode
             ? t('training.workoutUpdatedSuccessfully')
             : t('training.workoutSavedSuccessfully'),
-        [{ text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') }],
+        [{ text: t('common.ok'), onPress: onSaved ?? (() => navigation.navigate('TrainingHome')) }],
       );
     } catch (e) {
       console.error(e);
@@ -927,7 +1107,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (onSaved?: () => void) => {
     const missingFields: string[] = [];
     if (!name.trim()) {
       missingFields.push('name');
@@ -966,17 +1146,27 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (!hasValidRecurringDay(isRecurring, scheduledDays)) {
+    if (isRecurring && !hasValidRecurringDay(isRecurring, scheduledDays)) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
 
-    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+    if (isRecurring && !isValidIsoDate(getRecurrenceStartDateForSave(scheduledDays[0] ?? null))) {
+      Alert.alert(t('common.error'), t('training.recurrenceStartDateRequired'));
+      return;
+    }
+
+    if (isRecurring && recurrenceWeeks.trim() && !parsePositiveWholeWeeks(recurrenceWeeks)) {
+      Alert.alert(t('common.error'), t('training.recurrenceWeeksInvalid'));
+      return;
+    }
+
+    if (!isValidOptionalOneOffDate(isRecurring, isImportedDateDrivenTemplate, oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }
 
-    if (recurrenceEndDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEndDate.trim())) {
+    if (recurrenceEndDate.trim() && !isValidIsoDate(recurrenceEndDate.trim())) {
       Alert.alert(t('common.error'), t('training.recurrenceEndDateInvalid'));
       return;
     }
@@ -1017,7 +1207,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 await supabase.from('workout_plans').delete().in('id', idsToDelete);
               }
             }
-            await executeSave();
+            await executeSave(false, onSaved);
           },
         },
       ]);
@@ -1057,13 +1247,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   }
                 }
               }
-              await executeSave(true);
+              await executeSave(true, onSaved);
             },
           },
         ],
       );
     } else {
-      await executeSave();
+      await executeSave(false, onSaved);
     }
   };
 
@@ -1120,6 +1310,55 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const withProgressionKeys = (step: Step): Step => ensureStepProgressionKeys([step])[0];
+
+  const openWorkoutBuilder = () => {
+    const builderState = { steps: cloneEditableState(steps), stepProgressions: cloneEditableState(stepProgressions) };
+    builderInitialStateRef.current = {
+      ...builderState,
+      snapshot: serializeEditableState(builderState),
+    };
+    setCurrentView('builder');
+  };
+
+  const leaveWorkoutBuilder = () => {
+    builderInitialStateRef.current = null;
+    setCurrentView('main');
+  };
+
+  const discardWorkoutBuilderChanges = () => {
+    const initialBuilderState = builderInitialStateRef.current;
+    if (initialBuilderState) {
+      setSteps(cloneEditableState(initialBuilderState.steps));
+      setStepProgressions(cloneEditableState(initialBuilderState.stepProgressions));
+    }
+    leaveWorkoutBuilder();
+  };
+
+  const requestExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasEditableChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onSaveAndExit: onSaved => handleSave(onSaved),
+  });
+
+  const requestBuilderExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasBuilderChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onDiscard: discardWorkoutBuilderChanges,
+    onSaveAndExit: onSaved =>
+      handleSave(() => {
+        initialEditableStateSnapshotRef.current = editableStateSnapshot;
+        builderInitialStateRef.current = null;
+        onSaved();
+      }),
+  });
 
   const handleAddGroup = () => {
     const newGroup: Step = withProgressionKeys({
@@ -1397,6 +1636,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           </Text>
                         </Text>
                       </View>
+                      {renderStepTarget(child)}
                     </View>
                     {renderHyroxExtraDetails(child)}
                   </GlassCard>
@@ -1428,12 +1668,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{renderEstimatedValue(item)}</Text>
               </Text>
             </View>
-            {item.target_type !== 'none' && (
-              <View style={styles.detailRow}>
-                <Zap size={16} color={colors.textSecondary} />
-                <Text style={styles.detailText}>{formatTarget(item)}</Text>
-              </View>
-            )}
+            {renderStepTarget(item)}
             {renderHyroxExtraDetails(item)}
           </View>
         )}
@@ -2131,7 +2366,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         hasSteps={steps.length > 0}
         canDesignWorkout={structuredSport && showEditorAction}
         compact={compact}
-        onDesignWorkout={structuredSport && showEditorAction ? () => setCurrentView('builder') : undefined}
+        onDesignWorkout={structuredSport && showEditorAction ? openWorkoutBuilder : undefined}
       />
     );
   };
@@ -2147,15 +2382,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else if (!sportType) {
-                navigation.goBack();
+                requestExit(() => navigation.goBack());
               } else if (!['running', 'cycling', 'swimming', 'hyrox'].includes(sportType)) {
                 setSportType(null);
               } else if (sportType && !isEditMode) {
                 setSportType(null);
               } else {
-                navigation.goBack();
+                requestExit(() => navigation.goBack());
               }
             }}
             style={styles.headerButton}
@@ -2181,7 +2416,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             <TouchableOpacity
               onPress={() => {
                 if (currentView === 'builder') {
-                  setCurrentView('main');
+                  requestBuilderExit(leaveWorkoutBuilder);
                 } else {
                   handleSave();
                 }
@@ -3355,7 +3590,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           <TextInput
                             style={[styles.rowInput, { color: themeColors.textPrimary }]}
                             value={recurrenceStartDate || ''}
-                            onChangeText={setRecurrenceStartDate}
+                            onChangeText={handleRecurrenceStartDateChange}
                             placeholder="YYYY-MM-DD"
                             placeholderTextColor={themeColors.textSecondary}
                             textAlign="right"
@@ -3411,7 +3646,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 }}>
                           <Text style={{ fontSize: 13, color: themeColors.textSecondary, fontStyle: 'italic' }}>
                             {t('training.recurrenceEndDateCalculated', {
-                              date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'dd/MM/yyyy'),
+                              date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                                locale: getDateFnsLocale(),
+                              }),
                             })}
                           </Text>
                         </View>
@@ -3447,6 +3684,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           textAlign="right"
                         />
                       </View>
+                      {isValidDateOnly(recurrenceEndDate.trim()) && (
+                        <Text style={[styles.helperDescription, { color: themeColors.textSecondary }]}>
+                          {t('training.recurrenceEndDateCalculated', {
+                            date: format(new Date(`${recurrenceEndDate.trim()}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                              locale: getDateFnsLocale(),
+                            }),
+                          })}
+                        </Text>
+                      )}
                       <View style={styles.lifecycleToggleRow}>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.lifecycleToggleLabel, { color: themeColors.textPrimary }]}>
@@ -3618,7 +3864,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             onChange={(_event, selectedDate) => {
               setShowRecurrenceStartPicker(false);
               if (selectedDate) {
-                setRecurrenceStartDate(format(selectedDate, 'yyyy-MM-dd'));
+                handleRecurrenceStartDateChange(format(selectedDate, 'yyyy-MM-dd'));
               }
             }}
           />

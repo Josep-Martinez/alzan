@@ -1,3 +1,5 @@
+import { DEFAULT_ENDURANCE_METRIC_PRIORITY, type EnduranceMetricPriority } from './enduranceMetricPriority.helper';
+
 export type AdvancedSport = 'running' | 'cycling' | 'swimming';
 
 export type AdvancedPhaseType = 'warmup' | 'interval' | 'recovery' | 'cooldown' | 'relax';
@@ -32,6 +34,7 @@ export type AdvancedSectionDraft = {
 export type AdvancedTemplateStep = {
   id: string;
   parent_step_id: string | null;
+  order_index: number | null;
   is_group: boolean | null;
   phase_type: AdvancedPhaseType;
   duration_type: AdvancedDurationType;
@@ -56,6 +59,63 @@ export type AdvancedSerializedSection = AdvancedSectionDraft & {
 };
 
 export type AdvancedMetricField = 'duration' | 'distance' | 'intensity';
+
+type OrderedItem = {
+  order_index: number | null | undefined;
+};
+
+/**
+ * Sorts sibling records without mutating the source array. Records with the
+ * same or missing order keep their original relative position.
+ */
+export function sortByOrderIndex<T extends OrderedItem>(items: T[]): T[] {
+  return items
+    .map((item, sourceIndex) => ({ item, sourceIndex }))
+    .sort((left, right) => {
+      const leftOrder = left.item.order_index ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.item.order_index ?? Number.MAX_SAFE_INTEGER;
+      return leftOrder - rightOrder || left.sourceIndex - right.sourceIndex;
+    })
+    .map(({ item }) => item);
+}
+
+/**
+ * Materializes template steps in stable pre-order: each parent is followed
+ * by all of its ordered descendants before the next sibling is emitted.
+ * Orphaned records are appended in their stable database order so data is
+ * never silently lost if an old or invalid row is encountered.
+ */
+type HierarchicalTemplateStep = OrderedItem & {
+  id: string;
+  parent_step_id: string | null;
+};
+
+export function sortAdvancedTemplateSteps<T extends HierarchicalTemplateStep>(steps: T[]): T[] {
+  const siblingsByParent = new Map<string | null, T[]>();
+  for (const step of steps) {
+    const siblings = siblingsByParent.get(step.parent_step_id) ?? [];
+    siblings.push(step);
+    siblingsByParent.set(step.parent_step_id, siblings);
+  }
+
+  for (const [parentId, siblings] of siblingsByParent) {
+    siblingsByParent.set(parentId, sortByOrderIndex(siblings));
+  }
+
+  const visited = new Set<string>();
+  const ordered: T[] = [];
+  const visit = (step: T): void => {
+    if (visited.has(step.id)) return;
+    visited.add(step.id);
+    ordered.push(step);
+    for (const child of siblingsByParent.get(step.id) ?? []) visit(child);
+  };
+
+  for (const step of siblingsByParent.get(null) ?? []) visit(step);
+  for (const step of sortByOrderIndex(steps)) visit(step);
+
+  return ordered;
+}
 
 const EMPTY_METRICS: Pick<
   AdvancedSectionDraft,
@@ -130,17 +190,7 @@ function toDraft(step: AdvancedTemplateStep, parentClientId: string | null): Adv
 }
 
 export function materializeTemplateSections(steps: AdvancedTemplateStep[]): AdvancedSectionDraft[] {
-  const topLevel = steps.filter(step => step.parent_step_id == null);
-  const result: AdvancedSectionDraft[] = [];
-
-  for (const step of topLevel) {
-    result.push(toDraft(step, null));
-    for (const child of steps.filter(candidate => candidate.parent_step_id === step.id)) {
-      result.push(toDraft(child, step.id));
-    }
-  }
-
-  return result;
+  return sortAdvancedTemplateSteps(steps).map(step => toDraft(step, step.parent_step_id));
 }
 
 export function addAdvancedSection(
@@ -167,6 +217,33 @@ export function addAdvancedGroup(
   return [...sections, group, child];
 }
 
+export function insertAdvancedSectionsAfterSubtree(
+  sections: AdvancedSectionDraft[],
+  parentClientId: string,
+  additions: AdvancedSectionDraft[],
+): AdvancedSectionDraft[] {
+  const descendantIds = new Set<string>([parentClientId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const section of sections) {
+      if (section.parentClientId && descendantIds.has(section.parentClientId) && !descendantIds.has(section.clientId)) {
+        descendantIds.add(section.clientId);
+        changed = true;
+      }
+    }
+  }
+
+  const parentIndex = sections.findIndex(section => section.clientId === parentClientId);
+  if (parentIndex < 0) return sections;
+  const lastDescendantIndex = sections.reduce(
+    (lastIndex, section, index) => (descendantIds.has(section.clientId) ? Math.max(lastIndex, index) : lastIndex),
+    parentIndex,
+  );
+
+  return [...sections.slice(0, lastDescendantIndex + 1), ...additions, ...sections.slice(lastDescendantIndex + 1)];
+}
+
 export function removeAdvancedSection(sections: AdvancedSectionDraft[], clientId: string): AdvancedSectionDraft[] {
   const removed = new Set<string>([clientId]);
   let changed = true;
@@ -189,9 +266,6 @@ export function expandGroupRepetitions(sections: AdvancedSectionDraft[], groupId
   const children = sections.filter(section => section.parentClientId === groupId && section.repetitionIndex == null);
   if (children.length === 0) return sections;
 
-  const withoutCommonChildren = sections.filter(
-    section => !(section.parentClientId === groupId && section.repetitionIndex == null),
-  );
   const expandedChildren = Array.from({ length: group.repetitions }, (_, repetitionIndex) =>
     children.map(child => ({
       ...child,
@@ -199,8 +273,17 @@ export function expandGroupRepetitions(sections: AdvancedSectionDraft[], groupId
       repetitionIndex: repetitionIndex + 1,
     })),
   ).flat();
+  const firstChildIndex = sections.findIndex(
+    section => section.parentClientId === groupId && section.repetitionIndex == null,
+  );
+  if (firstChildIndex < 0) return sections;
 
-  return [...withoutCommonChildren, ...expandedChildren];
+  const commonChildIds = new Set(children.map(child => child.clientId));
+  return sections.flatMap((section, index) => {
+    if (index === firstChildIndex) return expandedChildren;
+    if (commonChildIds.has(section.clientId)) return [];
+    return [section];
+  });
 }
 
 export function collapseGroupRepetitions(sections: AdvancedSectionDraft[], groupId: string): AdvancedSectionDraft[] {
@@ -213,14 +296,22 @@ export function collapseGroupRepetitions(sections: AdvancedSectionDraft[], group
   if (repeatedChildren.length === 0) return sections;
 
   const firstRepetition = repeatedChildren.filter(section => section.repetitionIndex === 1);
-  const withoutRepeatedChildren = sections.filter(section => section.parentClientId !== groupId);
   const commonChildren = firstRepetition.map(child => ({
     ...child,
     clientId: child.clientId.replace(/-rep-1$/, ''),
     repetitionIndex: null,
   }));
 
-  return [...withoutRepeatedChildren, ...commonChildren];
+  const firstRepeatedChildIndex = sections.findIndex(
+    section => section.parentClientId === groupId && section.repetitionIndex != null,
+  );
+  if (firstRepeatedChildIndex < 0) return sections;
+
+  return sections.flatMap((section, index) => {
+    if (index === firstRepeatedChildIndex) return commonChildren;
+    if (section.parentClientId === groupId && section.repetitionIndex != null) return [];
+    return [section];
+  });
 }
 
 function positiveValue(value: number | null): number | null {
@@ -232,16 +323,15 @@ function getIntensityKey(sport: AdvancedSport): 'paceSPerKm' | 'paceSPer100m' | 
 }
 
 /**
- * Fills the missing value among duration, distance and pace/speed.
- * Distance is the authoritative value whenever it exists. Editing duration
- * recalculates intensity, and editing intensity recalculates duration. The
- * only situation in which distance is derived is when it was left empty and
- * the other two metrics are available.
+ * Keeps the configured highest-priority metrics and recalculates the
+ * lowest-priority metric whenever one of the other metrics changes. The
+ * default priority is pace/speed, time, distance.
  */
 export function deriveAdvancedSectionMetrics(
   section: AdvancedSectionDraft,
   sport: AdvancedSport,
   changedField?: AdvancedMetricField,
+  priority: EnduranceMetricPriority = DEFAULT_ENDURANCE_METRIC_PRIORITY,
 ): AdvancedSectionDraft {
   if (section.isGroup) return section;
 
@@ -263,12 +353,35 @@ export function deriveAdvancedSectionMetrics(
       : sport === 'running'
         ? (distance / 1000) * value
         : distance / value;
+  const calculateRoundedDuration = (distance: number, value: number) =>
+    Math.max(1, Math.round(calculateDuration(distance, value)));
   const calculateIntensity = (duration: number, distance: number) =>
     sport === 'swimming'
       ? duration / (distance / 100)
       : sport === 'running'
         ? duration / (distance / 1000)
         : distance / duration;
+
+  const deriveField = (field: AdvancedMetricField): boolean => {
+    if (field === 'distance' && durationS != null && intensity != null) {
+      next.distanceM = calculateDistance(durationS, intensity);
+      return true;
+    }
+    if (field === 'duration' && distanceM != null && intensity != null) {
+      next.durationS = calculateRoundedDuration(distanceM, intensity);
+      return true;
+    }
+    if (field === 'intensity' && distanceM != null && durationS != null) {
+      next[intensityKey] = calculateIntensity(durationS, distanceM);
+      return true;
+    }
+    return false;
+  };
+
+  if (changedField != null) {
+    const targetField = changedField === priority[2] ? priority[1] : priority[2];
+    if (deriveField(targetField)) return next;
+  }
 
   if (changedField === 'duration' && durationS != null) {
     if (distanceM != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
@@ -279,7 +392,7 @@ export function deriveAdvancedSectionMetrics(
   if (changedField === 'distance') {
     if (distanceM != null) {
       if (durationS != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
-      else if (intensity != null) next.durationS = calculateDuration(distanceM, intensity);
+      else if (intensity != null) next.durationS = calculateRoundedDuration(distanceM, intensity);
     } else if (durationS != null && intensity != null) {
       next.distanceM = calculateDistance(durationS, intensity);
     }
@@ -287,7 +400,7 @@ export function deriveAdvancedSectionMetrics(
   }
 
   if (changedField === 'intensity' && intensity != null) {
-    if (distanceM != null) next.durationS = calculateDuration(distanceM, intensity);
+    if (distanceM != null) next.durationS = calculateRoundedDuration(distanceM, intensity);
     else if (durationS != null) next.distanceM = calculateDistance(durationS, intensity);
     return next;
   }
@@ -297,7 +410,7 @@ export function deriveAdvancedSectionMetrics(
   } else if (durationS != null && intensity != null && distanceM == null) {
     next.distanceM = calculateDistance(durationS, intensity);
   } else if (distanceM != null && intensity != null && durationS == null) {
-    next.durationS = calculateDuration(distanceM, intensity);
+    next.durationS = calculateRoundedDuration(distanceM, intensity);
   }
 
   return next;

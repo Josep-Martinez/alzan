@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ import {
   Dumbbell,
   Zap,
   ChevronRight,
+  Clock,
 } from 'lucide-react-native';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
 import { OneOffDateSelector } from '../../components/training/OneOffDateSelector';
@@ -53,20 +54,35 @@ import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { ExerciseWithDetails } from '../../types/training';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/gymRoutineEditorTotals.helper';
 import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
 import {
+  cloneEditableState,
+  hasUnsavedChanges as compareUnsavedChanges,
+  serializeEditableState,
+} from '../../modules/training/helpers/unsavedChanges.helper';
+import {
   getCurrentWeekDateForWeekday,
   getCurrentWeekdayForDate,
   hasValidRecurringDay,
   isScheduledWeekday,
+  isValidOptionalOneOffDate,
   isValidIsoDate,
   resolveOneOffDate,
   shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
+import {
+  calculateWeeklyEndDate,
+  getFirstWeeklyOccurrenceOnOrAfter,
+  getNextWeeklyOccurrence,
+  isValidDateOnly,
+  parsePositiveWholeWeeks,
+} from '../../modules/training/helpers/weeklyRecurrence.helper';
 import { INTEGER_INPUT_PROPS } from '../../utils/numericInput';
+import { calculateProgressionWeeks } from '../../modules/training/helpers/enduranceProgression.helper';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -79,7 +95,8 @@ export const GymRoutineEditorScreen = () => {
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
 
-  const { routineData, oneOffPlanDate, saveRoutine } = useGymRoutineEditor(routineId);
+  const { routineData, oneOffPlanDate, isLoading, isOneOffPlanDateLoading, saveRoutine } =
+    useGymRoutineEditor(routineId);
   const { getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
   const isImportedDateDrivenTemplate =
     routineData?.source === 'imported' &&
@@ -100,7 +117,15 @@ export const GymRoutineEditorScreen = () => {
   const [oneOffDate, setOneOffDate] = useState<string | null>(null);
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [recurrenceWeeks, setRecurrenceWeeks] = useState('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
+  const [isFormHydrated, setIsFormHydrated] = useState(!routineId);
+  const initialEditableStateSnapshotRef = useRef<string | null>(null);
+  const builderInitialStateRef = useRef<{
+    exercises: RoutineDataExercise[];
+    supersetLinks: number[];
+    snapshot: string;
+  } | null>(null);
   const oneOffWeekday = !isRecurring ? getCurrentWeekdayForDate(oneOffDate) : null;
 
   const handleScheduleDaysChange = (days: number[]) => {
@@ -111,6 +136,17 @@ export const GymRoutineEditorScreen = () => {
       return;
     }
     setSelectedDays(days);
+    const selectedDay = days[0];
+    if (selectedDay === undefined) {
+      setRecurrenceStartDate(null);
+      setRecurrenceEndDate('');
+      return;
+    }
+
+    const baseDate = isValidDateOnly(recurrenceStartDate)
+      ? recurrenceStartDate
+      : getNextWeeklyOccurrence(new Date(), selectedDay);
+    setRecurrenceStartDate(getFirstWeeklyOccurrenceOnOrAfter(baseDate, selectedDay));
   };
 
   const [exercises, setExercises] = useState<RoutineDataExercise[]>([]);
@@ -130,6 +166,22 @@ export const GymRoutineEditorScreen = () => {
   const LINE_FLOW_DURATION_MS = 1000;
   const EXERCISE_FILL_DURATION_MS = 900;
   const totalSets = calculateRoutineTotalSets(exercises);
+
+  const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
+    if (!isRecurring) {
+      return isImportedDateDrivenTemplate ? recurrenceStartDate || null : null;
+    }
+    return getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, scheduledDay);
+  };
+
+  const getRecurrenceEndDateForSave = (scheduledDay: number | null): string | null => {
+    if (isRecurring) {
+      const startDate = getRecurrenceStartDateForSave(scheduledDay);
+      const weeks = parsePositiveWholeWeeks(recurrenceWeeks);
+      return weeks ? calculateWeeklyEndDate(startDate, scheduledDay, weeks) : null;
+    }
+    return recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null;
+  };
 
   const getExerciseDisplayName = (exercise: unknown) => {
     if (!exercise || typeof exercise !== 'object') return t('training.exercise');
@@ -207,6 +259,11 @@ export const GymRoutineEditorScreen = () => {
 
   // Populate state when data loads
   useEffect(() => {
+    initialEditableStateSnapshotRef.current = null;
+    setIsFormHydrated(!routineId);
+  }, [routineId]);
+
+  useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
@@ -233,21 +290,115 @@ export const GymRoutineEditorScreen = () => {
         setSelectedDays([]);
         setOriginalSuggestedDay(null);
       }
-      setIsRecurring(isScheduledWeekday(routineData.suggested_day_of_week));
+      const existingScheduledDay = isScheduledWeekday(routineData.suggested_day_of_week)
+        ? routineData.suggested_day_of_week
+        : null;
+      const existingWeeks = calculateProgressionWeeks(
+        lifecycleData.recurrence_start_date,
+        lifecycleData.recurrence_end_date,
+      );
+      const normalizedExistingStart =
+        existingScheduledDay !== null
+          ? getFirstWeeklyOccurrenceOnOrAfter(lifecycleData.recurrence_start_date, existingScheduledDay)
+          : lifecycleData.recurrence_start_date || null;
+      setIsRecurring(existingScheduledDay !== null);
       setOneOffDate(null);
-      setRecurrenceStartDate(lifecycleData.recurrence_start_date || null);
+      setRecurrenceStartDate(normalizedExistingStart);
       setExercises(routineData.exercises || []);
       setSupersetLinks(buildSupersetLinksFromExercises(routineData.exercises || []));
       setWorkoutGoal(routineData.workout_goal || null);
       setModality(routineData.modality || 'gym');
-      setRecurrenceEndDate(lifecycleData.recurrence_end_date || '');
+      setRecurrenceEndDate(
+        existingScheduledDay !== null && existingWeeks > 0
+          ? calculateWeeklyEndDate(normalizedExistingStart, existingScheduledDay, existingWeeks) || ''
+          : lifecycleData.recurrence_end_date || '',
+      );
+      setRecurrenceWeeks(existingWeeks > 0 ? String(existingWeeks) : '');
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
+      setIsFormHydrated(true);
     }
   }, [routineData, trainingSettings.autoDeleteExpiredTemplates]);
 
   useEffect(() => {
     if (routineId) setOneOffDate(oneOffPlanDate);
   }, [oneOffPlanDate, routineId]);
+
+  const editableStateSnapshot = useMemo(
+    () =>
+      serializeEditableState({
+        name,
+        description,
+        workoutGoal,
+        modality,
+        selectedDays,
+        isRecurring,
+        oneOffDate,
+        recurrenceStartDate,
+        recurrenceEndDate,
+        recurrenceWeeks,
+        autoDeleteAfterEnd,
+        exercises,
+        supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b),
+      }),
+    [
+      name,
+      description,
+      workoutGoal,
+      modality,
+      selectedDays,
+      isRecurring,
+      oneOffDate,
+      recurrenceStartDate,
+      recurrenceEndDate,
+      recurrenceWeeks,
+      autoDeleteAfterEnd,
+      exercises,
+      supersetLinks,
+    ],
+  );
+
+  useEffect(() => {
+    const editDataReady =
+      !routineId ||
+      (!!routineData && !isLoading && (!isOneOffPlanDateLoading || routineData.suggested_day_of_week !== null));
+
+    if (!isFormHydrated || !editDataReady || initialEditableStateSnapshotRef.current !== null) return;
+
+    // Wait one tick for automatic hydration/reconciliation effects before
+    // defining the untouched baseline used by the exit guard.
+    const settleTimer = setTimeout(() => {
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+    }, 0);
+
+    return () => clearTimeout(settleTimer);
+  }, [editableStateSnapshot, isFormHydrated, isLoading, isOneOffPlanDateLoading, routineData, routineId]);
+
+  const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);
+
+  const builderEditableStateSnapshot = useMemo(
+    () => serializeEditableState({ exercises, supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b) }),
+    [exercises, supersetLinks],
+  );
+  const hasBuilderChanges =
+    currentView === 'builder' &&
+    builderInitialStateRef.current !== null &&
+    compareUnsavedChanges(builderInitialStateRef.current.snapshot, builderEditableStateSnapshot);
+
+  useEffect(() => {
+    if (!isRecurring) return;
+
+    const selectedDay = selectedDays[0] ?? null;
+    const effectiveStart = getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, selectedDay);
+    const weeks = parsePositiveWholeWeeks(recurrenceWeeks);
+    if (!effectiveStart) {
+      setRecurrenceEndDate('');
+      return;
+    }
+
+    if (recurrenceStartDate !== effectiveStart) setRecurrenceStartDate(effectiveStart);
+    const calculatedEnd = weeks ? calculateWeeklyEndDate(effectiveStart, selectedDay, weeks) : null;
+    setRecurrenceEndDate(calculatedEnd || '');
+  }, [isRecurring, recurrenceStartDate, recurrenceWeeks, selectedDays]);
 
   useEffect(() => {
     exercisesRef.current = exercises;
@@ -608,19 +759,13 @@ export const GymRoutineEditorScreen = () => {
     }
   }, [exercises.length, supersetLinks]);
 
-  const executeSave = async (detachFromImport = false) => {
+  const executeSave = async (detachFromImport = false, onSaved?: () => void) => {
     try {
       const supersetIndexes = Array.from(supersetLinks).sort((a, b) => a - b);
       const suggestedDayForSave = isRecurring && selectedDays.length > 0 ? selectedDays[0] : null;
       const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
-      const recurrenceStartDateForSave = isRecurring
-        ? selectedDays.length > 0
-          ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd')
-          : null
-        : isImportedDateDrivenTemplate
-          ? recurrenceStartDate || null
-          : null;
-      const recurrenceEndDateForSave = recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null;
+      const recurrenceStartDateForSave = getRecurrenceStartDateForSave(suggestedDayForSave);
+      const recurrenceEndDateForSave = getRecurrenceEndDateForSave(suggestedDayForSave);
       const importedLifecycleChanged =
         routineData?.source === 'imported' &&
         (suggestedDayForSave !== routineData.suggested_day_of_week ||
@@ -663,30 +808,41 @@ export const GymRoutineEditorScreen = () => {
         supersetLinks: supersetIndexes,
       });
       // Navigate to TrainingHome to exit the editor flow completely
-      navigation.navigate('TrainingHome');
+      onSaved?.();
+      if (!onSaved) navigation.navigate('TrainingHome');
     } catch (e) {
       console.error(e);
       Alert.alert(t('common.error'), t('training.saveRoutineError'));
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (onSaved?: () => void) => {
     if (!name.trim()) {
       Alert.alert(t('common.error'), t('training.routineNameRequired'));
       return;
     }
 
-    if (!hasValidRecurringDay(isRecurring, selectedDays)) {
+    if (isRecurring && !hasValidRecurringDay(isRecurring, selectedDays)) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
 
-    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+    if (isRecurring && !isValidIsoDate(getRecurrenceStartDateForSave(selectedDays[0] ?? null))) {
+      Alert.alert(t('common.error'), t('training.recurrenceStartDateRequired'));
+      return;
+    }
+
+    if (isRecurring && recurrenceWeeks.trim() && !parsePositiveWholeWeeks(recurrenceWeeks)) {
+      Alert.alert(t('common.error'), t('training.recurrenceWeeksInvalid'));
+      return;
+    }
+
+    if (!isValidOptionalOneOffDate(isRecurring, isImportedDateDrivenTemplate, oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }
 
-    if (recurrenceEndDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEndDate.trim())) {
+    if (recurrenceEndDate.trim() && !isValidIsoDate(recurrenceEndDate.trim())) {
       Alert.alert(t('common.error'), t('training.invalidTemplateEndDate'));
       return;
     }
@@ -748,15 +904,67 @@ export const GymRoutineEditorScreen = () => {
                   }
                 }
               }
-              await executeSave(true);
+              await executeSave(true, onSaved);
             },
           },
         ],
       );
     } else {
-      await executeSave();
+      await executeSave(false, onSaved);
     }
   };
+
+  const requestExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasEditableChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onSaveAndExit: onSaved => handleSave(onSaved),
+  });
+
+  const openWorkoutBuilder = () => {
+    const builderState = {
+      exercises: cloneEditableState(exercises),
+      supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b),
+    };
+    builderInitialStateRef.current = {
+      ...builderState,
+      snapshot: serializeEditableState(builderState),
+    };
+    setCurrentView('builder');
+  };
+
+  const leaveWorkoutBuilder = () => {
+    builderInitialStateRef.current = null;
+    setCurrentView('main');
+  };
+
+  const discardWorkoutBuilderChanges = () => {
+    const initialBuilderState = builderInitialStateRef.current;
+    if (initialBuilderState) {
+      setExercises(cloneEditableState(initialBuilderState.exercises));
+      setSupersetLinks(new Set(initialBuilderState.supersetLinks));
+    }
+    leaveWorkoutBuilder();
+  };
+
+  const requestBuilderExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasBuilderChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onDiscard: discardWorkoutBuilderChanges,
+    onSaveAndExit: onSaved =>
+      handleSave(() => {
+        initialEditableStateSnapshotRef.current = editableStateSnapshot;
+        builderInitialStateRef.current = null;
+        onSaved();
+      }),
+  });
 
   const updateExerciseTarget = (index: number, field: string, value: string) => {
     setExercises(prev => {
@@ -803,9 +1011,9 @@ export const GymRoutineEditorScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else {
-                navigation.navigate('GymRoutinesList');
+                requestExit(() => navigation.navigate('GymRoutinesList'));
               }
             }}
           >
@@ -823,7 +1031,7 @@ export const GymRoutineEditorScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else {
                 handleSave();
               }
@@ -984,7 +1192,7 @@ export const GymRoutineEditorScreen = () => {
                     accessibilityLabel={exercises.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
                     activeOpacity={0.86}
                     style={[styles.designButton, { backgroundColor: themeColors.primary }]}
-                    onPress={() => setCurrentView('builder')}
+                    onPress={openWorkoutBuilder}
                   >
                     <Zap size={17} color="#FFFFFF" />
                     <Text style={styles.designButtonText}>
@@ -1022,29 +1230,88 @@ export const GymRoutineEditorScreen = () => {
                       placeholder={t('training.oneOffDatePlaceholder')}
                     />
                   )}
-                  <View style={styles.templateLifecycleCard}>
-                    <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
-                    <TextInput
-                      style={[styles.lifecycleInput, dynamicStyles.input]}
-                      value={recurrenceEndDate}
-                      onChangeText={setRecurrenceEndDate}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={themeColors.textSecondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <View style={styles.lifecycleToggleRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.lifecycleToggleLabel, dynamicStyles.label]}>
-                          {t('training.autoDeleteExpiredTemplates')}
-                        </Text>
-                        <Text style={[styles.lifecycleToggleDescription, dynamicStyles.sublabel]}>
-                          {t('training.autoDeleteExpiredTemplatesDesc')}
-                        </Text>
+                  {isRecurring ? (
+                    <View style={styles.templateLifecycleCard}>
+                      <OneOffDateSelector
+                        value={recurrenceStartDate}
+                        onChange={date => {
+                          const normalizedDate = getFirstWeeklyOccurrenceOnOrAfter(date, selectedDays[0] ?? null);
+                          setRecurrenceStartDate(normalizedDate || date);
+                        }}
+                        label={t('training.startDate')}
+                        placeholder={t('common.select')}
+                      />
+                      <View style={styles.formRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <Clock size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.recurrenceWeeks')}
+                          </Text>
+                        </View>
+                        <TextInput
+                          style={[styles.rowInput, { color: themeColors.textPrimary, textAlign: 'right' }]}
+                          value={recurrenceWeeks}
+                          onChangeText={value => setRecurrenceWeeks(value.replace(/[^0-9]/g, ''))}
+                          placeholder={t('training.indefinite')}
+                          placeholderTextColor={themeColors.textSecondary}
+                          {...INTEGER_INPUT_PROPS}
+                        />
                       </View>
-                      <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                      {isValidDateOnly(recurrenceEndDate) && (
+                        <Text style={{ color: themeColors.textSecondary, fontSize: 13, fontStyle: 'italic' }}>
+                          {t('training.recurrenceEndDateCalculated', {
+                            date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                              locale: getDateFnsLocale(),
+                            }),
+                          })}
+                        </Text>
+                      )}
+                      <View style={styles.lifecycleToggleRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.lifecycleToggleLabel, dynamicStyles.label]}>
+                            {t('training.autoDeleteExpiredTemplates')}
+                          </Text>
+                          <Text style={[styles.lifecycleToggleDescription, dynamicStyles.sublabel]}>
+                            {t('training.autoDeleteExpiredTemplatesDesc')}
+                          </Text>
+                        </View>
+                        <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                      </View>
                     </View>
-                  </View>
+                  ) : (
+                    <View style={styles.templateLifecycleCard}>
+                      <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
+                      <TextInput
+                        style={[styles.lifecycleInput, dynamicStyles.input]}
+                        value={recurrenceEndDate}
+                        onChangeText={setRecurrenceEndDate}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={themeColors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {isValidDateOnly(recurrenceEndDate) && (
+                        <Text style={{ color: themeColors.textSecondary, fontSize: 13, fontStyle: 'italic' }}>
+                          {t('training.recurrenceEndDateCalculated', {
+                            date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                              locale: getDateFnsLocale(),
+                            }),
+                          })}
+                        </Text>
+                      )}
+                      <View style={styles.lifecycleToggleRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.lifecycleToggleLabel, dynamicStyles.label]}>
+                            {t('training.autoDeleteExpiredTemplates')}
+                          </Text>
+                          <Text style={[styles.lifecycleToggleDescription, dynamicStyles.sublabel]}>
+                            {t('training.autoDeleteExpiredTemplatesDesc')}
+                          </Text>
+                        </View>
+                        <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                      </View>
+                    </View>
+                  )}
                 </View>
               </>
             ) : (

@@ -9,14 +9,18 @@ import {
   createEmptyAdvancedSection,
   expandGroupRepetitions,
   hasValidAdvancedSection,
+  insertAdvancedSectionsAfterSubtree,
   materializeTemplateSections,
   removeAdvancedSection,
+  serializeAdvancedSections,
+  sortByOrderIndex,
 } from './advancedEnduranceSession.helper';
 
 const templateSections = materializeTemplateSections([
   {
     id: 'warmup',
     parent_step_id: null,
+    order_index: 0,
     is_group: false,
     phase_type: 'warmup',
     duration_type: 'time',
@@ -30,6 +34,7 @@ const templateSections = materializeTemplateSections([
   {
     id: 'repeats',
     parent_step_id: null,
+    order_index: 1,
     is_group: true,
     phase_type: 'interval',
     duration_type: 'lap_button',
@@ -43,6 +48,7 @@ const templateSections = materializeTemplateSections([
   {
     id: 'work',
     parent_step_id: 'repeats',
+    order_index: 0,
     is_group: false,
     phase_type: 'interval',
     duration_type: 'distance',
@@ -56,6 +62,7 @@ const templateSections = materializeTemplateSections([
   {
     id: 'recovery',
     parent_step_id: 'repeats',
+    order_index: 1,
     is_group: false,
     phase_type: 'recovery',
     duration_type: 'time',
@@ -72,6 +79,165 @@ assert.equal(templateSections.length, 4);
 assert.equal(templateSections.find(section => section.clientId === 'repeats')?.repetitions, 4);
 assert.equal(templateSections.find(section => section.clientId === 'work')?.paceSPerKm, 270);
 
+const unorderedTemplateSections = materializeTemplateSections([
+  {
+    id: 'cooldown',
+    parent_step_id: null,
+    order_index: 4,
+    is_group: false,
+    phase_type: 'cooldown',
+    duration_type: 'distance',
+    duration_s: null,
+    distance_m: 1000,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'group',
+    parent_step_id: null,
+    order_index: 1,
+    is_group: true,
+    phase_type: 'interval',
+    duration_type: 'lap_button',
+    duration_s: null,
+    distance_m: null,
+    repetitions: 2,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'recovery-child',
+    parent_step_id: 'group',
+    order_index: 1,
+    is_group: false,
+    phase_type: 'recovery',
+    duration_type: 'time',
+    duration_s: 60,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'warmup',
+    parent_step_id: null,
+    order_index: 0,
+    is_group: false,
+    phase_type: 'warmup',
+    duration_type: 'time',
+    duration_s: 300,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'work-child',
+    parent_step_id: 'group',
+    order_index: 0,
+    is_group: false,
+    phase_type: 'interval',
+    duration_type: 'distance',
+    duration_s: null,
+    distance_m: 400,
+    repetitions: 1,
+    target_type: 'pace',
+    target_min: 270,
+    target_max: 285,
+  },
+]);
+assert.deepEqual(
+  unorderedTemplateSections.map(section => section.clientId),
+  ['warmup', 'group', 'work-child', 'recovery-child', 'cooldown'],
+);
+
+assert.deepEqual(
+  sortByOrderIndex([
+    { id: 'second', order_index: 1 },
+    { id: 'first-tied', order_index: 0 },
+    { id: 'second-tied', order_index: 0 },
+  ]).map(item => item.id),
+  ['first-tied', 'second-tied', 'second'],
+);
+
+const nestedTemplateSections = materializeTemplateSections([
+  {
+    id: 'grandchild',
+    parent_step_id: 'child',
+    order_index: 0,
+    is_group: false,
+    phase_type: 'interval',
+    duration_type: 'time',
+    duration_s: 30,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'sibling',
+    parent_step_id: null,
+    order_index: 1,
+    is_group: false,
+    phase_type: 'cooldown',
+    duration_type: 'time',
+    duration_s: 60,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'parent',
+    parent_step_id: null,
+    order_index: 0,
+    is_group: true,
+    phase_type: 'interval',
+    duration_type: 'lap_button',
+    duration_s: null,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'child',
+    parent_step_id: 'parent',
+    order_index: 0,
+    is_group: true,
+    phase_type: 'interval',
+    duration_type: 'lap_button',
+    duration_s: null,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+]);
+assert.deepEqual(
+  nestedTemplateSections.map(section => section.clientId),
+  ['parent', 'child', 'grandchild', 'sibling'],
+);
+
+const orderedSerializedSections = serializeAdvancedSections([
+  unorderedTemplateSections[1],
+  unorderedTemplateSections[2],
+  unorderedTemplateSections[4],
+]);
+assert.deepEqual(
+  orderedSerializedSections.map(section => section.orderIndex),
+  [0, 1, 2],
+);
+
 const expanded = expandGroupRepetitions(
   templateSections.map(section => ({ ...section, distanceM: section.clientId === 'work' ? 400 : section.distanceM })),
   'repeats',
@@ -84,6 +250,73 @@ assert.equal(collapsed.filter(section => section.parentClientId === 'repeats').l
 assert.equal(
   collapsed.some(section => section.repetitionIndex != null),
   false,
+);
+
+const positionedGroupSections = materializeTemplateSections([
+  {
+    id: 'late',
+    parent_step_id: null,
+    order_index: 2,
+    is_group: false,
+    phase_type: 'cooldown',
+    duration_type: 'time',
+    duration_s: 60,
+    distance_m: null,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'positioned-group',
+    parent_step_id: null,
+    order_index: 0,
+    is_group: true,
+    phase_type: 'interval',
+    duration_type: 'lap_button',
+    duration_s: null,
+    distance_m: null,
+    repetitions: 2,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+  {
+    id: 'positioned-child',
+    parent_step_id: 'positioned-group',
+    order_index: 0,
+    is_group: false,
+    phase_type: 'interval',
+    duration_type: 'distance',
+    duration_s: null,
+    distance_m: 400,
+    repetitions: 1,
+    target_type: 'none',
+    target_min: null,
+    target_max: null,
+  },
+]);
+const positionedExpanded = expandGroupRepetitions(positionedGroupSections, 'positioned-group');
+assert.deepEqual(
+  positionedExpanded.map(section => section.clientId),
+  ['positioned-group', 'positioned-child-rep-1', 'positioned-child-rep-2', 'late'],
+);
+assert.deepEqual(
+  collapseGroupRepetitions(positionedExpanded, 'positioned-group').map(section => section.clientId),
+  ['positioned-group', 'positioned-child', 'late'],
+);
+
+const fractionalRunningDuration = deriveAdvancedSectionMetrics(
+  { ...createEmptyAdvancedSection('fractional'), distanceM: 1500, paceSPerKm: 285 },
+  'running',
+);
+assert.equal(fractionalRunningDuration.durationS, 428);
+
+assert.deepEqual(
+  insertAdvancedSectionsAfterSubtree(positionedGroupSections, 'positioned-group', [
+    createEmptyAdvancedSection('new-child', 'positioned-group'),
+  ]).map(section => section.clientId),
+  ['positioned-group', 'positioned-child', 'new-child', 'late'],
 );
 
 const withEmpty = addAdvancedSection([], 'step-1');
@@ -211,8 +444,8 @@ const editedRunning = deriveAdvancedSectionMetrics(
   'running',
   'duration',
 );
-assert.equal(editedRunning.distanceM, 2000);
-assert.equal(editedRunning.paceSPerKm, 150);
+assert.equal(editedRunning.distanceM, 1000);
+assert.equal(editedRunning.paceSPerKm, 300);
 
 const editedDistance = deriveAdvancedSectionMetrics(
   {
@@ -222,7 +455,9 @@ const editedDistance = deriveAdvancedSectionMetrics(
   'running',
   'distance',
 );
-assert.equal(editedDistance.paceSPerKm, 600);
+assert.equal(editedDistance.distanceM, 1000);
+assert.equal(editedDistance.paceSPerKm, 300);
+assert.equal(editedDistance.durationS, 300);
 
 const editedIntensity = deriveAdvancedSectionMetrics(
   {
@@ -232,8 +467,9 @@ const editedIntensity = deriveAdvancedSectionMetrics(
   'running',
   'intensity',
 );
-assert.equal(editedIntensity.distanceM, 2000);
-assert.equal(editedIntensity.durationS, 1200);
+assert.equal(editedIntensity.distanceM, 1000);
+assert.equal(editedIntensity.durationS, 600);
+assert.equal(editedIntensity.paceSPerKm, 600);
 
 const distanceMayBeDerivedOnlyWhenEmpty = deriveAdvancedSectionMetrics(
   {
@@ -255,7 +491,47 @@ const editedDistanceKeepsUserDistance = deriveAdvancedSectionMetrics(
   'distance',
 );
 assert.equal(editedDistanceKeepsUserDistance.distanceM, 1000);
-assert.equal(editedDistanceKeepsUserDistance.paceSPerKm, 600);
+assert.equal(editedDistanceKeepsUserDistance.paceSPerKm, 300);
+assert.equal(editedDistanceKeepsUserDistance.durationS, 300);
+
+const customPriorityAdvanced = deriveAdvancedSectionMetrics(
+  {
+    ...runningByTimeAndDistance,
+    durationS: 900,
+    paceSPerKm: 300,
+  },
+  'running',
+  'duration',
+  ['intensity', 'distance', 'duration'],
+);
+assert.equal(customPriorityAdvanced.distanceM, 3000);
+assert.equal(customPriorityAdvanced.paceSPerKm, 300);
+
+const cyclingEditedDuration = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('cycling-edited-duration'),
+    distanceM: 36_000,
+    durationS: 7_200,
+    speedMPerS: 10,
+  },
+  'cycling',
+  'duration',
+);
+assert.equal(cyclingEditedDuration.distanceM, 72_000);
+assert.equal(cyclingEditedDuration.speedMPerS, 10);
+
+const swimmingEditedIntensity = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('swimming-edited-intensity'),
+    distanceM: 500,
+    durationS: 600,
+    paceSPer100m: 100,
+  },
+  'swimming',
+  'intensity',
+);
+assert.equal(swimmingEditedIntensity.distanceM, 600);
+assert.equal(swimmingEditedIntensity.durationS, 600);
 
 const cyclingDerived = deriveAdvancedSectionMetrics(
   {

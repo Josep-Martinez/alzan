@@ -80,7 +80,7 @@ async function request(url, options = {}) {
 }
 
 function validateConfiguration(values, baseUrl, reporter, requireConfig) {
-  const required = [
+  const legacyRequired = [
     "COROS_API_BASE_URL",
     "COROS_CLIENT_ID",
     "COROS_CLIENT_SECRET",
@@ -92,14 +92,15 @@ function validateConfiguration(values, baseUrl, reporter, requireConfig) {
     "COROS_WEBHOOK_CLIENT",
     "COROS_WEBHOOK_SECRET",
   ];
-  const missing = required.filter((key) => !values[key]?.trim());
-
-  if (missing.length > 0) {
+  const legacyMissing = legacyRequired.filter((key) => !values[key]?.trim());
+  if (legacyMissing.length > 0) {
+    const missing = [...legacyMissing];
     const detail = `faltan ${missing.join(", ")}`;
     if (requireConfig) reporter.fail("Configuración COROS", detail);
     else reporter.pending("Configuración COROS", detail);
-    return;
   }
+
+  if (legacyMissing.length > 0) return;
 
   const expectedRedirect = `${baseUrl}/oauth/coros/callback`;
   if (values.COROS_REDIRECT_URI !== expectedRedirect) {
@@ -155,10 +156,11 @@ async function main() {
   baseUrl.hash = "";
   const normalizedBaseUrl = baseUrl.toString().replace(/\/$/, "");
 
-  if (baseUrl.protocol !== "https:") {
-    reporter.fail("URL pública", "debe usar HTTPS");
+  const isLocalBaseUrl = ["localhost", "127.0.0.1", "::1"].includes(baseUrl.hostname);
+  if (baseUrl.protocol !== "https:" && !(isLocalBaseUrl && baseUrl.protocol === "http:")) {
+    reporter.fail("URL pública", "debe usar HTTPS fuera de localhost");
   } else {
-    reporter.pass("URL pública", normalizedBaseUrl);
+    reporter.pass("URL pública", isLocalBaseUrl ? `${normalizedBaseUrl} (local)` : normalizedBaseUrl);
   }
 
   try {

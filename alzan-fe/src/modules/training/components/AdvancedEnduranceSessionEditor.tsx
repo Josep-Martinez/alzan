@@ -18,6 +18,7 @@ import {
   createEmptyAdvancedSection,
   deriveAdvancedSectionMetrics,
   expandGroupRepetitions,
+  insertAdvancedSectionsAfterSubtree,
   removeAdvancedSection,
   type AdvancedDurationType,
   type AdvancedMetricField,
@@ -26,6 +27,9 @@ import {
   type AdvancedSport,
 } from '../helpers/advancedEnduranceSession.helper';
 import { parsePaceInput } from '../helpers/paceInput.helper';
+import { parseDurationInput } from '../helpers/durationInput.helper';
+import type { EnduranceMetricPriority } from '../helpers/enduranceMetricPriority.helper';
+import { formatDurationTime } from '../../../utils/unitConversionUtils';
 
 type Props = {
   sport: AdvancedSport;
@@ -34,6 +38,7 @@ type Props = {
   distanceUnit: string;
   toDisplayDistance: (meters: number) => number;
   toDbDistance: (distance: number) => number;
+  metricPriority: EnduranceMetricPriority;
 };
 
 type AddMode = { kind: 'step' | 'group'; parentClientId: string | null } | null;
@@ -93,21 +98,9 @@ function parseNumber(value: string): number | null {
   return parsed !== null && parsed >= 0 ? parsed : null;
 }
 
-function parseDuration(value: string): number | null {
-  if (!value.trim()) return null;
-  if (value.includes(':')) {
-    const [minutes, seconds] = value.split(':').map(Number);
-    if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
-    return Math.max(0, minutes * 60 + seconds);
-  }
-  return parseNumber(value);
-}
-
 function formatDuration(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '';
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.round(seconds % 60);
-  return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+  return formatDurationTime(seconds);
 }
 
 function formatDistance(
@@ -142,6 +135,7 @@ function SectionEditor({
   distanceUnit,
   toDisplayDistance,
   toDbDistance,
+  metricPriority,
   onChange,
   onDelete,
   expanded,
@@ -153,6 +147,7 @@ function SectionEditor({
   distanceUnit: string;
   toDisplayDistance: (meters: number) => number;
   toDbDistance: (distance: number) => number;
+  metricPriority: EnduranceMetricPriority;
   onChange: (section: AdvancedSectionDraft) => void;
   onDelete?: () => void;
   expanded: boolean;
@@ -174,7 +169,7 @@ function SectionEditor({
     section.durationS ? formatDuration(section.durationS) : '',
     intensityValue != null
       ? sport === 'cycling'
-        ? `${intensityValue}`
+        ? `${Math.round(intensityValue)}`
         : `${formatDuration(intensityValue)}/${sport === 'swimming' ? '100 m' : 'km'}`
       : '',
   ]
@@ -193,19 +188,19 @@ function SectionEditor({
         : field === 'distance'
           ? { distanceM: value }
           : { [intensityKey]: value };
-    onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field));
+    onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field, metricPriority));
   };
   return (
     <View
       style={[styles.sectionCard, dynamicStyles.glassCard, compact && styles.compactCard, { borderLeftColor: accent }]}
     >
-      <Pressable style={styles.cardHeader} onPress={onToggle} accessibilityRole="button">
-        <View style={styles.cardHeaderCopy}>
+      <View style={styles.cardHeader}>
+        <Pressable style={styles.cardHeaderCopy} onPress={onToggle} accessibilityRole="button">
           <Text style={[styles.phaseLabel, { color: accent }]}>{t(PHASE_LABEL_KEYS[section.phaseType])}</Text>
           <Text style={[styles.cardSummary, { color: themeColors.textPrimary }]} numberOfLines={1}>
             {summary || t('training.toComplete')}
           </Text>
-        </View>
+        </Pressable>
         <View style={styles.headerActions}>
           {onDelete && (
             <Pressable
@@ -217,13 +212,15 @@ function SectionEditor({
               <Trash2 size={18} color={themeColors.danger} />
             </Pressable>
           )}
-          {expanded ? (
-            <ChevronUp size={21} color={themeColors.primary} />
-          ) : (
-            <ChevronDown size={21} color={themeColors.primary} />
-          )}
+          <Pressable onPress={onToggle} accessibilityRole="button" accessibilityLabel={t('training.toggleDetails')}>
+            {expanded ? (
+              <ChevronUp size={21} color={themeColors.primary} />
+            ) : (
+              <ChevronDown size={21} color={themeColors.primary} />
+            )}
+          </Pressable>
         </View>
-      </Pressable>
+      </View>
 
       {expanded && (
         <View style={styles.cardBody}>
@@ -290,7 +287,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onCommit={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             </View>
           ) : (
@@ -365,7 +362,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onCommit={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             )}
           </View>
@@ -379,7 +376,7 @@ function SectionEditor({
                 intensityValue == null
                   ? ''
                   : sport === 'cycling'
-                    ? String(intensityValue)
+                    ? String(Math.round(intensityValue))
                     : formatDuration(intensityValue)
               }
               placeholder={sport === 'cycling' ? '0' : '0:00'}
@@ -430,6 +427,7 @@ export const AdvancedEnduranceSessionEditor = ({
   distanceUnit,
   toDisplayDistance,
   toDbDistance,
+  metricPriority,
 }: Props) => {
   const { t } = useTranslation();
   const { colors: themeColors, styles: dynamicStyles } = useTrainingStyles();
@@ -442,8 +440,8 @@ export const AdvancedEnduranceSessionEditor = ({
   const [newRepetitions, setNewRepetitions] = useState('4');
 
   const renderedSections = useMemo(
-    () => sections.map(section => deriveAdvancedSectionMetrics(section, sport)),
-    [sections, sport],
+    () => sections.map(section => deriveAdvancedSectionMetrics(section, sport, undefined, metricPriority)),
+    [metricPriority, sections, sport],
   );
   const topLevelSections = useMemo(
     () => renderedSections.filter(section => section.parentClientId == null),
@@ -501,12 +499,16 @@ export const AdvancedEnduranceSessionEditor = ({
           clientId: `${clientId}-rep-${index + 1}`,
           repetitionIndex: index + 1,
         }));
-        onChange([...sections, ...expanded]);
+        onChange(insertAdvancedSectionsAfterSubtree(sections, addMode.parentClientId, expanded));
         closeAddModal();
         return;
       }
     }
-    onChange([...sections, configured]);
+    onChange(
+      addMode.parentClientId
+        ? insertAdvancedSectionsAfterSubtree(sections, addMode.parentClientId, [configured])
+        : [...sections, configured],
+    );
     closeAddModal();
   };
 
@@ -538,6 +540,7 @@ export const AdvancedEnduranceSessionEditor = ({
               distanceUnit={distanceUnit}
               toDisplayDistance={toDisplayDistance}
               toDbDistance={toDbDistance}
+              metricPriority={metricPriority}
               onChange={updateSection}
               onDelete={sections.length > 1 ? () => deleteSection(section.clientId) : undefined}
               expanded={!collapsedSections.has(section.clientId)}
@@ -563,24 +566,24 @@ export const AdvancedEnduranceSessionEditor = ({
 
         return (
           <View key={section.clientId} style={[styles.groupCard, dynamicStyles.glassCard, { borderLeftColor: accent }]}>
-            <Pressable
-              style={styles.cardHeader}
-              onPress={() =>
-                setCollapsedGroups(previous => {
-                  const next = new Set(previous);
-                  if (next.has(section.clientId)) next.delete(section.clientId);
-                  else next.add(section.clientId);
-                  return next;
-                })
-              }
-              accessibilityRole="button"
-            >
-              <View style={styles.cardHeaderCopy}>
+            <View style={styles.cardHeader}>
+              <Pressable
+                style={styles.cardHeaderCopy}
+                onPress={() =>
+                  setCollapsedGroups(previous => {
+                    const next = new Set(previous);
+                    if (next.has(section.clientId)) next.delete(section.clientId);
+                    else next.add(section.clientId);
+                    return next;
+                  })
+                }
+                accessibilityRole="button"
+              >
                 <Text style={[styles.phaseLabel, { color: accent }]}>{t(PHASE_LABEL_KEYS[section.phaseType])}</Text>
                 <Text style={[styles.cardSummary, { color: themeColors.textPrimary }]}>
                   {groupSummary(section, commonChildren.length > 0 ? commonChildren : repeatedChildren)}
                 </Text>
-              </View>
+              </Pressable>
               <View style={styles.headerActions}>
                 <Pressable
                   onPress={() => deleteSection(section.clientId)}
@@ -596,7 +599,7 @@ export const AdvancedEnduranceSessionEditor = ({
                   <ChevronUp size={21} color={themeColors.primary} />
                 )}
               </View>
-            </Pressable>
+            </View>
 
             {!groupCollapsed && (
               <View style={styles.groupBody}>
@@ -632,6 +635,7 @@ export const AdvancedEnduranceSessionEditor = ({
                       distanceUnit={distanceUnit}
                       toDisplayDistance={toDisplayDistance}
                       toDbDistance={toDbDistance}
+                      metricPriority={metricPriority}
                       onChange={updateSection}
                       onDelete={() => deleteSection(child.clientId)}
                       expanded={!collapsedSections.has(child.clientId)}
@@ -659,6 +663,7 @@ export const AdvancedEnduranceSessionEditor = ({
                             distanceUnit={distanceUnit}
                             toDisplayDistance={toDisplayDistance}
                             toDbDistance={toDbDistance}
+                            metricPriority={metricPriority}
                             onChange={updateSection}
                             onDelete={() => deleteSection(child.clientId)}
                             expanded={!collapsedSections.has(child.clientId)}

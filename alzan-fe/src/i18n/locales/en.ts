@@ -1410,10 +1410,39 @@ const en = {
     permissionSheetOAuthDescription:
       'You are about to open {{service}} sign-in. You can cancel here and stay in Alzan, or continue to authorize the connection.',
     permissionSheetCorosDescription:
-      'COROS will share your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV with Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
+      'COROS will send your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV to Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
+    corosNotAvailable: 'Not available in this environment',
+    corosInfoButton: 'Learn how to connect COROS',
+    corosInfoButtonHint: 'Open information about COROS connection and synchronization',
+    corosInfoTitle: 'How to connect COROS',
+    corosInfoWhereTitle: 'Where to connect it',
+    corosInfoLocation: 'Open {{location}} and press Connect. COROS will open its own sign-in and consent screen.',
+    corosInfoSyncTitle: 'What happens after authorization',
+    corosInfoSync:
+      'After authorization, COROS sends its workouts to Alzan. The API synchronizes the latest three months automatically, and later synchronizations bring in new workouts and retry FIT files that were temporarily pending. Alzan does not send workouts back to COROS.',
+    corosInfoHistoryTitle: 'Older history',
+    corosInfoHistory:
+      'For activities older than three months, export FIT files from COROS Training Hub and use Import history on this card. Alzan imports each file once, keeps the original sport and metrics, and reports any file that needs attention.',
+    corosInfoDataTitle: 'What COROS sends to Alzan',
+    corosInfoData:
+      '{{dataFlow}}: workouts, summaries, details, laps, and FIT data when COROS provides them. Health data is imported only after you grant the corresponding consent.',
+    corosInfoPrivacyTitle: 'Your privacy',
+    corosInfoPrivacy:
+      'You sign in directly with COROS. Alzan does not receive or store your COROS password, and you can disconnect and remove the imported data from Alzan.',
+    corosInfoTechnicalTitle: 'Technical setup',
+    corosInfoTechnical:
+      'The technical configuration is done on the server. Local callback: {{localCallback}}. Production callback: {{productionCallback}}. You do not need to enter either address as an end user.',
+    corosInfoClose: 'Got it',
     permissionSheetContinue: 'Continue',
     corosSyncSummary:
       'Workouts imported: {{imported}} · Skipped: {{skipped}} · Failed: {{failed}} · Health days: {{healthDays}}',
+    corosBackfillInProgress: 'History import in progress · next date: {{date}}',
+    corosBackfillComplete: 'COROS history import complete',
+    corosFitPending: 'FIT files pending: {{count}}',
+    corosImportHistory: 'Import history',
+    corosHistoryImportTitle: 'COROS history import',
+    corosHistoryImportSummary: 'Imported: {{imported}} · Already present: {{skipped}} · Failed: {{failed}}',
+    corosHistoryImportErrors: 'Files needing attention:\n{{errors}}',
     corosDisconnectPendingTitle: 'COROS disconnected locally',
     corosDisconnectPendingMessage:
       'Your COROS data has been removed from Alzan. COROS did not respond to revocation, so Alzan will retry for the next 24 hours.',
@@ -1795,6 +1824,8 @@ const en = {
     recurrenceEndDateLabel: 'End date',
     recurrenceEndDate: 'End repeat date',
     recurrenceEndDateInvalid: 'Choose an end date on or after the first planned workout.',
+    recurrenceStartDateRequired: 'Choose a valid start date for the weekly repeat.',
+    recurrenceWeeksInvalid: 'Duration must be a positive whole number of weeks.',
     weeklyProgression: 'Weekly interval progression',
     weeklyProgressionSubtitle:
       'Adjust duration or distance and target for each week. Warm-up, recovery and cooldown stay unchanged.',
@@ -1918,6 +1949,7 @@ const en = {
     load: 'Load',
     addStep: 'Add Step',
     removeStep: 'Remove step',
+    toggleDetails: 'Show or hide step details',
     addRepeatedBlock: 'Add repeated block',
     repeatedBlock: 'Repeated block',
     sameValueForAll: 'Same value for all',
@@ -1942,6 +1974,12 @@ const en = {
     advancedActivityEmpty: 'Add a distance or duration to at least one section.',
     advancedActivitySaved: 'Advanced activity saved successfully.',
     advancedActivitySaveError: 'Could not save the advanced activity.',
+    advancedActivitySaveSchemaError:
+      'The local database is missing the advanced activity function. Apply the latest Supabase migration.',
+    advancedActivitySaveAuthError: 'Your session has expired. Sign in again and retry.',
+    advancedActivitySaveTemplateError: 'The selected template or one of its steps no longer exists.',
+    advancedActivitySavePayloadError: 'Some advanced activity steps are invalid. Review them and retry.',
+    advancedActivitySaveSportError: 'This sport is not supported for advanced activity registration.',
     advancedBreakdown: 'Activity breakdown',
     noAdvancedBreakdown: 'No section breakdown was saved for this activity.',
     addIntervalsHint: 'Add intervals, warm-up, or recovery periods for',
@@ -2170,6 +2208,11 @@ const en = {
     swimming: 'swimming',
     saveTemplate: 'Save Template',
     designSession: 'Design Session',
+    unsavedChangesTitle: 'Unsaved changes',
+    unsavedChangesMessage: 'You have unsaved changes. What do you want to do?',
+    keepEditing: 'Keep editing',
+    discardChanges: 'Exit without saving',
+    saveAndExit: 'Save and exit',
     goalResistenciaTitle: 'Endurance',
     goalResistenciaDesc: 'Improve aerobic base and build running stamina.',
     goalVelocidadTitle: 'Speed',
@@ -2531,6 +2574,14 @@ const en = {
     generalInfoModalTitle: 'General',
     generalInfoModalBody:
       'Configure how sessions behave while you train: auto timer, auto-play, sound, and vibration.\n\nThese settings affect the active workout flow and feedback during rest and set transitions.',
+    metricPriorityTitle: 'Metric priority',
+    metricPriorityDescription:
+      'The last metric is recalculated automatically when either of the other two changes. The order applies to simple and advanced registration for every distance sport.',
+    metricPriorityIntensity: 'Pace / speed',
+    metricPriorityDuration: 'Time',
+    metricPriorityDistance: 'Distance',
+    movePriorityUp: 'Move metric up',
+    movePriorityDown: 'Move metric down',
     dataInfoModalTitle: 'Data',
     dataInfoModalBody:
       'From this section you can export your workout history to PDF for review or sharing.\n\nThe file includes sessions within the date range you choose.',

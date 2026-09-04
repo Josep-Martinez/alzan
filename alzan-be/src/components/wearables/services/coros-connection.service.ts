@@ -57,7 +57,8 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
       if (tokenError) throw new InternalServerErrorException('COROS_TOKEN_READ_FAILED');
       if (token?.access_token) {
         try {
-          await this.corosOAuthService.deregisterUser(this.decryptToken(token.access_token));
+          const decryptedToken = this.decryptToken(token.access_token);
+          await this.corosOAuthService.deregisterUser(decryptedToken);
         } catch (error) {
           remoteDeauthorizationPending = true;
           try {
@@ -104,7 +105,8 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
 
       for (const job of jobs ?? []) {
         try {
-          await this.corosOAuthService.deregisterUser(this.decryptToken(job.encrypted_access_token));
+          const decryptedToken = this.decryptToken(job.encrypted_access_token);
+          await this.corosOAuthService.deregisterUser(decryptedToken);
           await this.supabaseAdminService.client.from('provider_deauthorization_jobs').delete().eq('id', job.id);
         } catch (retryError) {
           const attempts = job.attempts + 1;

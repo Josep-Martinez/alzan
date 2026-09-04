@@ -1427,10 +1427,40 @@ export default {
     permissionSheetOAuthDescription:
       'Vas a abrir el inicio de sesión de {{service}}. Puedes cancelar aquí y seguir en Alzan, o continuar para autorizar la conexión.',
     permissionSheetCorosDescription:
-      'COROS compartirá con Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
+      'COROS enviará a Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
+    corosNotAvailable: 'No disponible en este entorno',
+    corosInfoButton: 'Saber cómo conectar COROS',
+    corosInfoButtonHint: 'Abrir información sobre la conexión y sincronización de COROS',
+    corosInfoTitle: 'Cómo conectar COROS',
+    corosInfoWhereTitle: 'Dónde conectarlo',
+    corosInfoLocation:
+      'Entra en {{location}} y pulsa Conectar. COROS abrirá su propia pantalla de inicio de sesión y consentimiento.',
+    corosInfoSyncTitle: 'Qué ocurre después de autorizar',
+    corosInfoSync:
+      'Después de autorizar, COROS envía sus entrenamientos a Alzan. La API sincroniza automáticamente los últimos tres meses; después, las sincronizaciones traen entrenamientos nuevos y reintentan los archivos FIT pendientes. Alzan no envía entrenamientos a COROS.',
+    corosInfoHistoryTitle: 'Histórico anterior',
+    corosInfoHistory:
+      'Para actividades de hace más de tres meses, exporta archivos FIT desde COROS Training Hub y usa Importar histórico en esta tarjeta. Alzan importa cada archivo una vez, conserva el deporte y las métricas originales e indica qué archivos requieren atención.',
+    corosInfoDataTitle: 'Qué envía COROS a Alzan',
+    corosInfoData:
+      '{{dataFlow}}: entrenamientos, resúmenes, detalles, vueltas y datos FIT cuando COROS los ofrece. Los datos de salud solo se importan después de que des el consentimiento correspondiente.',
+    corosInfoPrivacyTitle: 'Tu privacidad',
+    corosInfoPrivacy:
+      'Iniciarás sesión directamente en COROS. Alzan no recibe ni guarda tu contraseña de COROS, y puedes desconectar y borrar los datos importados desde Alzan.',
+    corosInfoTechnicalTitle: 'Configuración técnica',
+    corosInfoTechnical:
+      'La configuración técnica se realiza en el servidor. Callback local: {{localCallback}}. Callback de producción: {{productionCallback}}. Como usuario no tienes que introducir ninguna de estas direcciones.',
+    corosInfoClose: 'Entendido',
     permissionSheetContinue: 'Continuar',
     corosSyncSummary:
       'Entrenamientos importados: {{imported}} · Omitidos: {{skipped}} · Fallidos: {{failed}} · Días de salud: {{healthDays}}',
+    corosBackfillInProgress: 'Histórico en curso · siguiente fecha: {{date}}',
+    corosBackfillComplete: 'Histórico de COROS completado',
+    corosFitPending: 'FIT pendientes: {{count}}',
+    corosImportHistory: 'Importar histórico',
+    corosHistoryImportTitle: 'Importación de histórico COROS',
+    corosHistoryImportSummary: 'Importados: {{imported}} · Ya estaban: {{skipped}} · Fallidos: {{failed}}',
+    corosHistoryImportErrors: 'Archivos que requieren atención:\n{{errors}}',
     corosDisconnectPendingTitle: 'COROS desconectado localmente',
     corosDisconnectPendingMessage:
       'Los datos COROS se han eliminado de Alzan. COROS no respondió a la revocación y Alzan volverá a intentarlo durante las próximas 24 horas.',
@@ -1814,6 +1844,8 @@ export default {
     recurrenceEndDateLabel: 'Fecha de fin',
     recurrenceEndDate: 'Fecha fin de repetición',
     recurrenceEndDateInvalid: 'Elige una fecha fin igual o posterior al primer entreno planificado.',
+    recurrenceStartDateRequired: 'Elige una fecha de inicio válida para la repetición semanal.',
+    recurrenceWeeksInvalid: 'La duración debe ser un número entero positivo de semanas.',
     weeklyProgression: 'Progresión semanal de intervalos',
     weeklyProgressionSubtitle:
       'Ajusta duración o distancia y objetivo para cada semana. Calentamiento, recuperación y vuelta a la calma no cambian.',
@@ -1938,6 +1970,7 @@ export default {
     load: 'Carga',
     addStep: 'Añadir Paso',
     removeStep: 'Eliminar paso',
+    toggleDetails: 'Mostrar u ocultar los detalles del paso',
     addRepeatedBlock: 'Añadir bloque repetido',
     repeatedBlock: 'Bloque repetido',
     sameValueForAll: 'Mismo valor para todas',
@@ -1962,6 +1995,12 @@ export default {
     advancedActivityEmpty: 'Añade distancia o duración en al menos una sección.',
     advancedActivitySaved: 'Actividad avanzada guardada correctamente.',
     advancedActivitySaveError: 'No se ha podido guardar la actividad avanzada.',
+    advancedActivitySaveSchemaError:
+      'A la base de datos local le falta la función de actividad avanzada. Aplica la migración más reciente de Supabase.',
+    advancedActivitySaveAuthError: 'La sesión ha caducado. Vuelve a iniciar sesión e inténtalo de nuevo.',
+    advancedActivitySaveTemplateError: 'La plantilla seleccionada o uno de sus pasos ya no existe.',
+    advancedActivitySavePayloadError: 'Hay pasos de actividad avanzada no válidos. Revísalos e inténtalo de nuevo.',
+    advancedActivitySaveSportError: 'Este deporte no admite el registro avanzado de actividades.',
     advancedBreakdown: 'Desglose de actividad',
     noAdvancedBreakdown: 'No se guardó ningún desglose para esta actividad.',
     addIntervalsHint: 'Añade intervalos, calentamiento o periodos de recuperación para',
@@ -2364,6 +2403,11 @@ export default {
     swimming: 'natación',
     saveTemplate: 'Guardar Plantilla',
     designSession: 'Diseñar Sesión',
+    unsavedChangesTitle: 'Cambios sin guardar',
+    unsavedChangesMessage: 'Tienes cambios sin guardar. ¿Qué quieres hacer?',
+    keepEditing: 'Seguir editando',
+    discardChanges: 'Salir sin guardar',
+    saveAndExit: 'Guardar y salir',
     goalResistenciaTitle: 'Resistencia',
     goalResistenciaDesc: 'Mejorar la base aeróbica y aguantar más tiempo corriendo.',
     goalVelocidadTitle: 'Velocidad',
@@ -2725,6 +2769,14 @@ export default {
     generalInfoModalTitle: 'General',
     generalInfoModalBody:
       'Aquí configuras cómo se comporta la sesión mientras entrenas: temporizador automático, reproducción automática, sonido y vibración.\n\nEstos ajustes afectan al flujo en la pantalla de entrenamiento activo y a los avisos durante descansos y cambios de serie.',
+    metricPriorityTitle: 'Prioridad de métricas',
+    metricPriorityDescription:
+      'La última métrica se recalcula automáticamente cuando cambia una de las otras dos. El orden se aplica al registro simple y avanzado de cualquier deporte con distancia.',
+    metricPriorityIntensity: 'Ritmo / velocidad',
+    metricPriorityDuration: 'Tiempo',
+    metricPriorityDistance: 'Distancia',
+    movePriorityUp: 'Subir métrica',
+    movePriorityDown: 'Bajar métrica',
     dataInfoModalTitle: 'Datos',
     dataInfoModalBody:
       'Desde este bloque puedes exportar tu historial de entrenamientos en PDF para revisarlo o compartirlo.\n\nEl archivo incluye las sesiones del rango de fechas que elijas.',

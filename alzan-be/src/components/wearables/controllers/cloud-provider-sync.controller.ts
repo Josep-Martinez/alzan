@@ -62,6 +62,16 @@ export class CloudProviderSyncController {
       errors_by_code: result.errorsByCode,
       health_days_imported: result.healthDaysImported,
       health_consent_required: result.healthConsentRequired,
+      backfill_complete:
+        'backfillComplete' in result && typeof result.backfillComplete === 'boolean'
+          ? result.backfillComplete
+          : undefined,
+      backfill_next_date:
+        'backfillNextDate' in result &&
+        (typeof result.backfillNextDate === 'string' || result.backfillNextDate === null)
+          ? result.backfillNextDate
+          : undefined,
+      fit_pending: 'fitPending' in result && typeof result.fitPending === 'number' ? result.fitPending : undefined,
       last_success_at: result.lastSuccessAt,
     };
   }

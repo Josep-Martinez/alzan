@@ -65,6 +65,19 @@ assert.equal(
 );
 
 assert.equal(
+  formatEnduranceStepDuration(
+    {
+      duration_type: 'time',
+      duration_s: 299.6,
+      target_type: 'none',
+      repetitions: null,
+    },
+    labels,
+  ),
+  'Duration: 5:00',
+);
+
+assert.equal(
   formatEnduranceStepTarget(
     {
       duration_type: 'distance',
@@ -125,7 +138,7 @@ assert.equal(
     'cycling',
     labels,
   ),
-  'Speed: 32.0 km/h',
+  'Speed: 32 km/h',
 );
 
 assert.equal(
@@ -143,6 +156,24 @@ assert.equal(
     labels,
   ),
   '100 reps · Load: 9.0 kg',
+);
+
+assert.equal(
+  formatEnduranceStepTarget(
+    {
+      duration_type: 'time',
+      duration_s: 900,
+      target_type: 'pace',
+      target_min: 285,
+      target_max: 300,
+      repetitions: null,
+    },
+    'running',
+    labels,
+    'km',
+    { includeLabel: false },
+  ),
+  '4:45 min/km - 5:00 min/km',
 );
 
 console.log('scheduledWorkoutPreviewFormat.helper tests passed');
