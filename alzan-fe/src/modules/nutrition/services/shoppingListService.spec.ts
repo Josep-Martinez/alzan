@@ -12,11 +12,14 @@ import {
   planShoppingMealLogs,
   getShoppingCycleRange,
   groupShoppingIngredientsByCategory,
-  adjustShoppingPurchaseQuantity,
   filterShoppingIngredients,
-  getShoppingPurchaseQuantity,
-  roundShoppingPurchaseQuantity,
+  getShoppingAvailableQuantity,
+  getShoppingQuantityToBuy,
+  filterShoppingIngredientsByExcludedKeys,
+  getShoppingIngredientKey,
+  normalizeShoppingListExcludedIngredientKeys,
   parseShoppingQuantityInput,
+  setShoppingAvailableQuantity,
   type ShoppingMealLogInput,
   type ShoppingIngredientInput,
   type ShoppingListRequest,
@@ -29,6 +32,7 @@ import {
 } from './shoppingListCompletion';
 import {
   createShoppingListItemState,
+  getShoppingListStateStorageKey,
   mergeShoppingListStateWithLegacy,
   mergeShoppingListStates,
   parseShoppingListState,
@@ -36,6 +40,7 @@ import {
   serializeShoppingListState,
   type ShoppingListState,
 } from './shoppingListState';
+import { buildShoppingListStateUpsertRows, parseShoppingListStateRows } from './shoppingListStateSyncSerializer';
 import {
   createShoppingListStateSyncQueue,
   syncShoppingListStateWithAdapter,
@@ -55,9 +60,12 @@ async function run() {
   testExcludesSkippedMealsAndScalesToLargeMenus();
   testPlansUpcomingMealsByLocalSchedule();
   testSupportsAllShoppingRangesAndLimits();
-  testSupportsPurchaseQuantitiesAndFilters();
-  testParsesCustomPurchaseQuantities();
+  testCalculatesAvailableQuantitiesAndFilters();
+  testExcludesFixedShoppingIngredients();
+  testNormalizesFixedShoppingIngredientKeys();
+  testParsesAvailableQuantities();
   testMigratesLegacyStateIncrementally();
+  testPersistsAvailableQuantitiesPerRange();
   await testSyncAdapterScopesClearAndSerializesOperations();
   await testSyncQueueRecoversAfterFailure();
   testRejectsPartialShoppingListCache();
@@ -69,7 +77,6 @@ async function run() {
         key: 'id:ingredient-1',
         name: 'Arroz',
         quantity_g: 250,
-        purchase_quantity_g: 500,
         category: 'cereal' as const,
       },
     ],
@@ -91,18 +98,26 @@ async function run() {
       showPast: false,
     }).includes('alzan.shopping-list.result.'),
   );
+  testShoppingListCacheScopesExcludedIngredients();
   testPersistsIndependentShoppingListState();
   console.log('shoppingListService: all assertions passed');
 }
 
-function testSupportsPurchaseQuantitiesAndFilters() {
+function testCalculatesAvailableQuantitiesAndFilters() {
   const ingredients = [
     { key: 'a', name: 'Arroz', quantity_g: 620, category: 'cereal' as IngredientsCategory },
     { key: 'b', name: 'Pan', quantity_g: 220, category: 'cereal' as IngredientsCategory },
   ];
-  assert.equal(roundShoppingPurchaseQuantity(620, 500), 1000);
-  assert.equal(adjustShoppingPurchaseQuantity(ingredients[0], 'round_1kg'), 1000);
-  assert.equal(getShoppingPurchaseQuantity({ ...ingredients[0], purchase_quantity_g: 750 }), 750);
+  assert.equal(getShoppingAvailableQuantity(ingredients[0]), 0);
+  assert.equal(getShoppingAvailableQuantity({ ...ingredients[0], available_quantity_g: 250 }), 250);
+  assert.equal(getShoppingQuantityToBuy(ingredients[0]), 620);
+  assert.equal(getShoppingQuantityToBuy({ ...ingredients[0], available_quantity_g: 250 }), 370);
+  assert.equal(getShoppingQuantityToBuy({ ...ingredients[0], available_quantity_g: 620 }), 0);
+  assert.equal(getShoppingQuantityToBuy({ ...ingredients[0], available_quantity_g: 750 }), 0);
+  assert.deepEqual(setShoppingAvailableQuantity(ingredients, 'a', 250), [
+    { ...ingredients[0], available_quantity_g: 250 },
+    ingredients[1],
+  ]);
   assert.deepEqual(
     filterShoppingIngredients(ingredients, new Set(['a']), 'pending').map(item => item.key),
     ['b'],
@@ -113,10 +128,68 @@ function testSupportsPurchaseQuantitiesAndFilters() {
   );
 }
 
-function testParsesCustomPurchaseQuantities() {
+function testExcludesFixedShoppingIngredients() {
+  const items: ShoppingIngredientInput[] = [
+    { name: 'Proteína', quantity_g: 30, source: 'database', source_ref: 'protein-id' },
+    { name: 'Proteína', quantity_g: 20, source: 'database', source_ref: 'protein-id' },
+    { name: 'Creatina', quantity_g: 5, source: 'database', source_ref: 'creatine-id' },
+    { name: 'Ingrediente manual', quantity_g: 10, source: 'manual', source_ref: null },
+  ];
+  const aggregated = aggregateShoppingIngredients(items);
+
+  assert.equal(getShoppingIngredientKey(items[0]), 'id:protein-id');
+  assert.equal(getShoppingIngredientKey(items[3]), 'name:ingrediente manual');
+  assert.deepEqual(
+    filterShoppingIngredientsByExcludedKeys(aggregated, ['id:protein-id']).map(item => [item.key, item.quantity_g]),
+    [
+      ['id:creatine-id', 5],
+      ['name:ingrediente manual', 10],
+    ],
+  );
+  assert.deepEqual(
+    filterShoppingIngredientsByExcludedKeys(aggregated, []).map(item => item.key),
+    ['id:creatine-id', 'name:ingrediente manual', 'id:protein-id'],
+  );
+}
+
+function testNormalizesFixedShoppingIngredientKeys() {
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys([' id:b ', 'id:a', 'id:b', '', 12, null]), [
+    'id:a',
+    'id:b',
+  ]);
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys(undefined), []);
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys('id:a'), []);
+}
+
+function testShoppingListCacheScopesExcludedIngredients() {
+  const descriptor = {
+    userId: 'user-1',
+    mode: 'upcoming',
+    rangeStart: '2026-08-24',
+    rangeEnd: '2026-08-30',
+    startDay: 1,
+    timezone: 'Europe/Madrid',
+    mealTimes: {},
+    showPast: false,
+  };
+  const withoutExclusions = getShoppingListCacheKey(descriptor);
+  const withExclusions = getShoppingListCacheKey({
+    ...descriptor,
+    excludedIngredientKeys: ['id:zinc', 'id:protein'],
+  });
+  const withSortedExclusions = getShoppingListCacheKey({
+    ...descriptor,
+    excludedIngredientKeys: ['id:protein', 'id:zinc'],
+  });
+
+  assert.notEqual(withoutExclusions, withExclusions);
+  assert.equal(withExclusions, withSortedExclusions);
+}
+
+function testParsesAvailableQuantities() {
   assert.equal(parseShoppingQuantityInput('1,25'), 1.25);
   assert.equal(parseShoppingQuantityInput(' 500.5 '), 500.5);
-  assert.equal(parseShoppingQuantityInput('0'), null);
+  assert.equal(parseShoppingQuantityInput('0'), 0);
   assert.equal(parseShoppingQuantityInput('-2'), null);
   assert.equal(parseShoppingQuantityInput('not-a-number'), null);
 }
@@ -126,12 +199,20 @@ function testPersistsIndependentShoppingListState() {
     'name:arroz': {
       completed: true,
       hidden: false,
-      purchaseQuantityGrams: 1000,
+      availableQuantityGrams: 250,
       updatedAt: '2026-08-28T10:00:00.000Z',
     },
   };
   const parsed = parseShoppingListState(serializeShoppingListState(state));
   assert.deepEqual(parsed, state);
+  assert.equal(
+    parseShoppingListState(
+      JSON.stringify({
+        'name:arroz': { ...state['name:arroz'], purchaseQuantityGrams: 1000 },
+      }),
+    )['name:arroz'].availableQuantityGrams,
+    250,
+  );
   assert.equal(
     mergeShoppingListStates(state, {
       'name:arroz': { ...state['name:arroz'], completed: false, updatedAt: '2026-08-28T09:00:00.000Z' },
@@ -152,6 +233,64 @@ function testPersistsIndependentShoppingListState() {
     false,
   );
   assert.deepEqual(resetShoppingListState(), {});
+}
+
+function testPersistsAvailableQuantitiesPerRange() {
+  const range = { startDate: '2026-08-24', endDate: '2026-08-30' };
+  const nextWeek = { startDate: '2026-08-31', endDate: '2026-09-06' };
+  const state: ShoppingListState = {
+    'name:arroz': createShoppingListItemState({ availableQuantityGrams: 250, updatedAt: '2026-08-28T10:00:00.000Z' }),
+  };
+  assert.deepEqual(
+    parseShoppingListStateRows([
+      {
+        ingredient_key: 'name:arroz',
+        completed: false,
+        hidden: false,
+        available_quantity_g: 250,
+        updated_at: '2026-08-28T10:00:00.000Z',
+      },
+    ]),
+    state,
+  );
+  assert.equal(
+    parseShoppingListStateRows([
+      {
+        ingredient_key: 'name:arroz',
+        completed: false,
+        hidden: false,
+        available_quantity_g: 0,
+        updated_at: '2026-08-28T10:00:00.000Z',
+      },
+    ])?.['name:arroz'].availableQuantityGrams,
+    0,
+  );
+  assert.equal(
+    parseShoppingListStateRows([
+      {
+        ingredient_key: 'name:arroz',
+        completed: false,
+        hidden: false,
+        available_quantity_g: -1,
+        updated_at: '2026-08-28T10:00:00.000Z',
+      },
+    ]),
+    null,
+  );
+  assert.deepEqual(buildShoppingListStateUpsertRows('user-1', range, state), [
+    {
+      ingredient_key: 'name:arroz',
+      completed: false,
+      hidden: false,
+      available_quantity_g: 250,
+      updated_at: '2026-08-28T10:00:00.000Z',
+      user_id: 'user-1',
+      range_start: range.startDate,
+      range_end: range.endDate,
+    },
+  ]);
+  assert.deepEqual(parseShoppingListState(serializeShoppingListState({})), {});
+  assert.notEqual(getShoppingListStateStorageKey('user-1', range), getShoppingListStateStorageKey('user-1', nextWeek));
 }
 
 function testMigratesLegacyStateIncrementally() {
@@ -329,6 +468,12 @@ function testFormatsShoppingListForExport() {
       categoryLabels: new Map([['cereal', 'Cereales']]),
     }),
     'Cereales\nArroz - 100 g',
+  );
+  assert.equal(
+    formatShoppingListForExport([
+      { key: 'id:rice', name: 'Arroz', quantity_g: 1000, available_quantity_g: 250, category: 'cereal' },
+    ]),
+    'cereal\nArroz - 750 g',
   );
 }
 
