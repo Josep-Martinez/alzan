@@ -52,21 +52,31 @@ import {
 import { fetchTemplateWithProgressedSteps } from '../../modules/training/services/enduranceProgressionService';
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
-import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, TIME_INPUT_PROPS } from '../../utils/numericInput';
+import {
+  DECIMAL_INPUT_PROPS,
+  INTEGER_INPUT_PROPS,
+  TIME_INPUT_PROPS,
+  parseLocalizedDecimal,
+} from '../../utils/numericInput';
 import { formatDurationTime, formatPaceTime } from '../../utils/unitConversionUtils';
 import { useTranslation } from 'react-i18next';
 import { AdvancedEnduranceSessionEditor } from '../../modules/training/components/AdvancedEnduranceSessionEditor';
+import { KilometerEnduranceSessionEditor } from '../../modules/training/components/KilometerEnduranceSessionEditor';
 import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
 import {
   calculateAdvancedTotals,
   buildAdvancedSessionTimestamps,
   createEmptyAdvancedSection,
   deriveAdvancedSectionMetrics,
+  deriveKilometerSectionMetrics,
   hasValidAdvancedSection,
+  hasValidKilometerSections,
   materializeTemplateSections,
   serializeAdvancedSections,
+  buildKilometerSections,
   type AdvancedSport,
   type AdvancedSectionDraft,
+  type KilometerSectionDraft,
 } from '../../modules/training/helpers/advancedEnduranceSession.helper';
 import {
   resolvePersistedSportSubtype,
@@ -75,7 +85,6 @@ import {
 } from './helpers/sessionModality.helper';
 import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
 import {
-  deriveEnduranceMetricValues,
   synchronizeEnduranceMetricValues,
   type EnduranceMetricField,
 } from '../../modules/training/helpers/enduranceMetricPriority.helper';
@@ -394,6 +403,10 @@ export const EnduranceSessionFormScreen = () => {
   const [sportType, setSportType] = useState<string>(initialSport);
   const [registrationMode, setRegistrationMode] = useState<'simple' | 'advanced'>('simple');
   const [advancedSections, setAdvancedSections] = useState<AdvancedSectionDraft[]>([]);
+  const [advancedEditorMode, setAdvancedEditorMode] = useState<'template' | 'free' | 'kilometers'>('free');
+  const [kilometerDistanceInput, setKilometerDistanceInput] = useState('');
+  const [kilometerSections, setKilometerSections] = useState<KilometerSectionDraft[]>([]);
+  const hasInitializedKilometersRef = React.useRef(false);
   const [name, setName] = useState(getInitialName());
   const [distance, setDistance] = useState('');
   const [durationHours, setDurationHours] = useState('');
@@ -491,9 +504,9 @@ export const EnduranceSessionFormScreen = () => {
         : advancedSections,
     [advancedSections, advancedSport, trainingSettings.metricPriority],
   );
-  const advancedTotals = React.useMemo(
-    () => calculateAdvancedTotals(advancedSectionsWithDerivedMetrics),
-    [advancedSectionsWithDerivedMetrics],
+  const activeAdvancedSectionsWithDerivedMetrics = React.useMemo(
+    () => (advancedEditorMode === 'kilometers' ? kilometerSections : advancedSectionsWithDerivedMetrics),
+    [advancedEditorMode, advancedSectionsWithDerivedMetrics, kilometerSections],
   );
   const modalityOptions = getOptions(sportType, 'modality');
   const hasModalityOptions = shouldRenderModalitySelector(modalityOptions);
@@ -653,6 +666,7 @@ export const EnduranceSessionFormScreen = () => {
         ? materializeTemplateSections(activeTemplate.steps)
         : [createEmptyAdvancedSection('advanced-step-1')],
     );
+    setAdvancedEditorMode(activeTemplate ? 'template' : 'free');
     hasInitializedAdvancedRef.current = true;
   }, [activeTemplate, templateId]);
 
@@ -1100,50 +1114,6 @@ export const EnduranceSessionFormScreen = () => {
     pace,
   ]);
 
-  // Keep a user-entered pace available while distance is empty so that the
-  // only allowed distance derivation (duration + pace) can be completed.
-  useEffect(() => {
-    if (isEditingPace || paceError || safeParseFloat(distance) > 0 || !pace || !simpleSpeedUnit) return;
-
-    const totalDurationSeconds =
-      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
-      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
-      (Number.parseInt(durationSeconds || '0', 10) || 0);
-    if (totalDurationSeconds <= 0) return;
-
-    let intensity: number | null = null;
-    if (simpleSpeedUnit.startsWith('min/')) {
-      const parsedPace = parsePaceInput(pace);
-      if (parsedPace.ok) intensity = parsedPace.totalSeconds;
-    } else {
-      const parsedSpeed = safeParseFloat(pace);
-      if (parsedSpeed > 0) intensity = Math.round(parsedSpeed);
-    }
-    if (intensity == null) return;
-
-    const derived = deriveEnduranceMetricValues(
-      { distanceM: null, durationS: totalDurationSeconds, intensity },
-      simpleSpeedUnit,
-      'intensity',
-      trainingSettings.metricPriority,
-    );
-    if (derived.distanceM != null && derived.distanceM > 0) {
-      setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
-    }
-  }, [
-    distance,
-    durationHours,
-    durationMinutes,
-    durationSeconds,
-    formatNumberForInput,
-    isEditingPace,
-    pace,
-    paceError,
-    simpleSpeedUnit,
-    trainingSettings.metricPriority,
-    toDisplayDistance,
-  ]);
-
   // Handle manual pace editing
   const handlePaceBlur = () => {
     lastEditedMetricRef.current = 'intensity';
@@ -1294,6 +1264,36 @@ export const EnduranceSessionFormScreen = () => {
     }
   };
 
+  const selectAdvancedEditorMode = (mode: 'template' | 'free' | 'kilometers') => {
+    if (mode === 'kilometers' && !hasInitializedKilometersRef.current) {
+      hasInitializedKilometersRef.current = true;
+      const currentDistanceKm =
+        safeParseFloat(distance) > 0
+          ? preferences.distance_unit === 'km'
+            ? safeParseFloat(distance)
+            : safeParseFloat(distance) * 1.60934
+          : 0;
+      const nextInput = currentDistanceKm > 0 ? formatNumberForInput(currentDistanceKm, 3) : kilometerDistanceInput;
+      setKilometerDistanceInput(nextInput);
+      setKilometerSections(
+        buildKilometerSections(currentDistanceKm > 0 ? currentDistanceKm * 1000 : null, kilometerSections),
+      );
+    }
+    setAdvancedEditorMode(mode);
+  };
+
+  const handleKilometerDistanceInputChange = (value: string) => {
+    setKilometerDistanceInput(value);
+  };
+
+  const commitKilometerDistance = () => {
+    const parsedDistanceKm = parseLocalizedDecimal(kilometerDistanceInput);
+    // Keep the last confirmed draft recoverable while the distance is empty or invalid.
+    // Saving validates the current input independently, so this cannot save stale totals.
+    if (parsedDistanceKm == null || parsedDistanceKm <= 0) return;
+    setKilometerSections(previous => buildKilometerSections(parsedDistanceKm * 1000, previous));
+  };
+
   const persistParsedRouteDetails = React.useCallback(
     async (sessionId: string) => {
       if (!sessionId || !routeUploadAsset) return;
@@ -1310,6 +1310,22 @@ export const EnduranceSessionFormScreen = () => {
   const handleSave = async () => {
     // --- VALIDATION ---
     const isAdvancedRegistration = registrationMode === 'advanced' && advancedAvailable;
+    // Save can run before the distance input's blur has committed a React update.
+    // Validate and serialize the same freshly reconciled snapshot, never stale totals.
+    const kilometerDistanceKm = parseLocalizedDecimal(kilometerDistanceInput);
+    const confirmedKilometerSections =
+      isAdvancedRegistration && advancedEditorMode === 'kilometers'
+        ? buildKilometerSections(
+            kilometerDistanceKm != null && kilometerDistanceKm > 0 ? kilometerDistanceKm * 1000 : null,
+            kilometerSections,
+          ).map(section => (advancedSport ? deriveKilometerSectionMetrics(section, advancedSport) : section))
+        : kilometerSections;
+    const sectionsForSave =
+      advancedEditorMode === 'kilometers' ? confirmedKilometerSections : activeAdvancedSectionsWithDerivedMetrics;
+    const totalsForSave = calculateAdvancedTotals(sectionsForSave);
+    if (isAdvancedRegistration && advancedEditorMode === 'kilometers' && confirmedKilometerSections.length > 0) {
+      setKilometerSections(confirmedKilometerSections);
+    }
     const rawDurationSeconds =
       (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
       (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
@@ -1367,8 +1383,17 @@ export const EnduranceSessionFormScreen = () => {
 
     // 1. Gym Mode specific
     if (isAdvancedRegistration) {
-      if (!hasValidAdvancedSection(advancedSectionsWithDerivedMetrics)) {
-        Alert.alert(t('training.missingDataTitle'), t('training.advancedActivityEmpty'));
+      const hasValidSections =
+        advancedEditorMode === 'kilometers'
+          ? hasValidKilometerSections(confirmedKilometerSections)
+          : hasValidAdvancedSection(sectionsForSave);
+      if (!hasValidSections) {
+        Alert.alert(
+          t('training.missingDataTitle'),
+          advancedEditorMode === 'kilometers'
+            ? t('training.kilometerIntervalsIncomplete')
+            : t('training.advancedActivityEmpty'),
+        );
         return;
       }
       if (sportType === 'swimming' && !sportSubtype) {
@@ -1425,8 +1450,8 @@ export const EnduranceSessionFormScreen = () => {
       const startDateTime = new Date(`${normalizedDate}T${normalizedTime}:00`).toISOString();
 
       if (isAdvancedRegistration) {
-        const durationInSeconds = advancedTotals.durationS ?? 0;
-        const advancedLeaves = advancedSectionsWithDerivedMetrics.filter(section => !section.isGroup);
+        const durationInSeconds = totalsForSave.durationS ?? 0;
+        const advancedLeaves = sectionsForSave.filter(section => !section.isGroup);
         const sumSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
           const values = advancedLeaves
             .map(selector)
@@ -1455,8 +1480,8 @@ export const EnduranceSessionFormScreen = () => {
             stroke: sportType === 'swimming' ? stroke : null,
             start_time: advancedTimestamps.startTime,
             end_time: advancedTimestamps.endTime,
-            duration_s: advancedTotals.durationS,
-            distance_m: advancedTotals.distanceM,
+            duration_s: totalsForSave.durationS,
+            distance_m: totalsForSave.distanceM,
             elev_gain_m: elevation ? safeParseFloat(elevation) : sumSectionMetric(section => section.elevationGainM),
             avg_heart_rate: hr ? Number.parseInt(hr, 10) : averageSectionMetric(section => section.heartRateAvg),
             max_heart_rate: maxSectionMetric(section => section.heartRateMax),
@@ -1472,7 +1497,7 @@ export const EnduranceSessionFormScreen = () => {
             started_at_local: advancedTimestamps.startedAtLocal,
             ended_at_local: advancedTimestamps.endedAtLocal,
           },
-          sections: serializeAdvancedSections(advancedSectionsWithDerivedMetrics),
+          sections: serializeAdvancedSections(sectionsForSave),
         });
 
         persistedSessionId = createdSessionId;
@@ -3385,15 +3410,85 @@ export const EnduranceSessionFormScreen = () => {
               )}
 
               {registrationMode === 'advanced' ? (
-                <AdvancedEnduranceSessionEditor
-                  sport={sportType as 'running' | 'cycling' | 'swimming'}
-                  sections={advancedSections}
-                  onChange={setAdvancedSections}
-                  distanceUnit={preferences.distance_unit}
-                  toDisplayDistance={toDisplayDistance}
-                  toDbDistance={toDbDistanceFromDisplay}
-                  metricPriority={trainingSettings.metricPriority}
-                />
+                <>
+                  <View style={[styles.modeToggle, dynamicStyles.glassCard]}>
+                    {activeTemplate && (
+                      <TouchableOpacity
+                        style={[
+                          styles.modeToggleButton,
+                          advancedEditorMode === 'template' && {
+                            borderWidth: 2,
+                            borderColor: themeColors.primary,
+                            backgroundColor: themeColors.primary + '10',
+                          },
+                        ]}
+                        onPress={() => selectAdvancedEditorMode('template')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: advancedEditorMode === 'template' }}
+                      >
+                        <Text style={[styles.modeToggleText, { color: themeColors.primary }]}>
+                          {t('training.templateMode')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {!activeTemplate && (
+                      <TouchableOpacity
+                        style={[
+                          styles.modeToggleButton,
+                          advancedEditorMode === 'free' && {
+                            borderWidth: 2,
+                            borderColor: themeColors.primary,
+                            backgroundColor: themeColors.primary + '10',
+                          },
+                        ]}
+                        onPress={() => selectAdvancedEditorMode('free')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: advancedEditorMode === 'free' }}
+                      >
+                        <Text style={[styles.modeToggleText, { color: themeColors.primary }]}>
+                          {t('training.freeIntervalsMode')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[
+                        styles.modeToggleButton,
+                        advancedEditorMode === 'kilometers' && {
+                          borderWidth: 2,
+                          borderColor: themeColors.primary,
+                          backgroundColor: themeColors.primary + '10',
+                        },
+                      ]}
+                      onPress={() => selectAdvancedEditorMode('kilometers')}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: advancedEditorMode === 'kilometers' }}
+                    >
+                      <Text style={[styles.modeToggleText, { color: themeColors.primary }]}>
+                        {t('training.kilometerMode')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {advancedEditorMode === 'kilometers' ? (
+                    <KilometerEnduranceSessionEditor
+                      sport={sportType as 'running' | 'cycling' | 'swimming'}
+                      distanceInput={kilometerDistanceInput}
+                      sections={kilometerSections}
+                      onDistanceInputChange={handleKilometerDistanceInputChange}
+                      onDistanceCommit={commitKilometerDistance}
+                      onChange={setKilometerSections}
+                    />
+                  ) : (
+                    <AdvancedEnduranceSessionEditor
+                      sport={sportType as 'running' | 'cycling' | 'swimming'}
+                      sections={advancedSections}
+                      onChange={setAdvancedSections}
+                      distanceUnit={preferences.distance_unit}
+                      toDisplayDistance={toDisplayDistance}
+                      toDbDistance={toDbDistanceFromDisplay}
+                      metricPriority={trainingSettings.metricPriority}
+                    />
+                  )}
+                </>
               ) : (
                 <>
                   <View style={styles.row}>

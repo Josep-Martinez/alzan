@@ -35,12 +35,16 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     [range.endDate, range.startDate, userId],
   );
   const [state, setState] = useState<ShoppingListState>({});
+  const activeStorageKeyRef = useRef(storageKey);
+  activeStorageKeyRef.current = storageKey;
   const stateRef = useRef<ShoppingListState>({});
   const [filter, setFilter] = useState<ShoppingListIngredientFilter>('all');
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
+  const isHydrated = storageKey !== null && hydratedKey === storageKey;
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<Error | null>(null);
-  const mutationVersionRef = useRef(0);
+  const resetVersionRef = useRef(0);
   const syncOperationRef = useRef(0);
   const resetPendingRef = useRef<string | null>(null);
   const resetStorageKey = useMemo(
@@ -48,20 +52,45 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     [range.endDate, range.startDate, userId],
   );
 
-  const runSync = useCallback(async (operation: () => Promise<boolean>): Promise<boolean> => {
-    const operationId = ++syncOperationRef.current;
-    setIsSyncing(true);
-    const ok = await operation().catch(() => false);
-    if (operationId === syncOperationRef.current) {
-      setIsSyncing(false);
-      setSyncError(ok ? null : new Error('Shopping list synchronization failed'));
-    }
-    return ok;
-  }, []);
+  const runSync = useCallback(
+    async (operation: () => Promise<boolean>): Promise<boolean> => {
+      if (activeStorageKeyRef.current !== storageKey) return false;
+      const operationId = ++syncOperationRef.current;
+      setIsSyncing(true);
+      const ok = await operation().catch(() => false);
+      if (activeStorageKeyRef.current === storageKey && operationId === syncOperationRef.current) {
+        setIsSyncing(false);
+        setSyncError(ok ? null : new Error('Shopping list synchronization failed'));
+      }
+      return ok;
+    },
+    [storageKey],
+  );
+
+  const persistState = useCallback(
+    async (next: ShoppingListState): Promise<boolean> => {
+      if (!userId || !storageKey) return false;
+      const resetVersion = resetVersionRef.current;
+      return persistShoppingListState(userId, range, next, async confirmed => {
+        if (
+          activeStorageKeyRef.current !== storageKey ||
+          resetPendingRef.current ||
+          resetVersionRef.current !== resetVersion
+        )
+          return;
+        // Reconcile with edits made while the request was in flight, not its old snapshot.
+        const merged = mergeShoppingListStates(stateRef.current, confirmed);
+        stateRef.current = merged;
+        setState(merged);
+        await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged));
+      });
+    },
+    [userId, range.startDate, range.endDate, storageKey],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setIsHydrated(false);
+    setHydratedKey(null);
     setIsSyncing(false);
     setSyncError(null);
 
@@ -69,83 +98,94 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       resetPendingRef.current = null;
       stateRef.current = {};
       setState({});
-      setIsHydrated(true);
       return () => {
         cancelled = true;
       };
     }
 
-    const hydrationMutationVersion = mutationVersionRef.current;
+    const hydrationResetVersion = resetVersionRef.current;
     void (async () => {
-      const localValue = await AsyncStorage.getItem(storageKey).catch(() => null);
+      const localValue = await AsyncStorage.getItem(storageKey);
       const localState = parseShoppingListState(localValue);
-      const legacyValue = await AsyncStorage.getItem(
-        getShoppingListCompletionStorageKey(userId, range.startDate),
-      ).catch(() => null);
+      const legacyValue = await AsyncStorage.getItem(getShoppingListCompletionStorageKey(userId, range.startDate));
       const legacyKeys = parseShoppingListCompletionKeys(legacyValue);
       const migratedState = mergeShoppingListStateWithLegacy(localState, legacyKeys);
       const resetPending =
-        resetStorageKey !== null &&
-        (await AsyncStorage.getItem(resetStorageKey).catch(() => null)) === SHOPPING_LIST_RESET_PENDING_VALUE;
+        resetStorageKey !== null && (await AsyncStorage.getItem(resetStorageKey)) === SHOPPING_LIST_RESET_PENDING_VALUE;
 
       if (cancelled) return;
-      if (resetPending) resetPendingRef.current = resetStorageKey;
+      resetPendingRef.current = resetPending ? resetStorageKey : null;
       stateRef.current = resetPending ? resetShoppingListState() : migratedState;
       setState(stateRef.current);
-      setIsHydrated(true);
 
       if (resetPending) {
         const cleared = await runSync(() => resetShoppingListStatePersisted(userId, range));
         if (cancelled || !cleared) return;
-        await AsyncStorage.removeItem(resetStorageKey!).catch(() => undefined);
+        await AsyncStorage.removeItem(resetStorageKey!);
+        if (cancelled) return;
         resetPendingRef.current = null;
         await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
           () => undefined,
         );
+        if (!cancelled) setHydratedKey(storageKey);
         return;
       }
 
       const migratedStorageSaved = await AsyncStorage.setItem(storageKey, serializeShoppingListState(migratedState))
         .then(() => true)
         .catch(() => false);
+      if (!migratedStorageSaved && !cancelled) setSyncError(new Error('Could not save shopping list locally'));
       if (migratedStorageSaved && legacyKeys.size > 0) {
         await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
           () => undefined,
         );
       }
+      if (cancelled) return;
+      setHydratedKey(storageKey);
 
       const remoteState = await loadShoppingListStateFromServer(userId, range);
-      if (cancelled || mutationVersionRef.current !== hydrationMutationVersion || !remoteState) return;
-      const merged = mergeShoppingListStates(migratedState, remoteState);
+      if (cancelled || resetPendingRef.current || resetVersionRef.current !== hydrationResetVersion) return;
+      if (!remoteState) {
+        setSyncError(new Error('Shopping list synchronization failed'));
+        return;
+      }
+      const merged = mergeShoppingListStates(stateRef.current, remoteState);
       stateRef.current = merged;
       setState(merged);
       if (!areShoppingListStatesEqual(merged, remoteState)) {
-        await runSync(() => persistShoppingListState(userId, range, merged));
+        await runSync(() => persistState(merged));
       } else {
         await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged)).catch(() => undefined);
       }
     })().catch(() => {
       if (cancelled) return;
-      stateRef.current = {};
-      setState({});
-      setIsHydrated(true);
+      setSyncError(new Error('Could not restore shopping list'));
     });
 
     return () => {
       cancelled = true;
+      syncOperationRef.current += 1;
+      resetVersionRef.current += 1;
     };
-  }, [range.endDate, range.startDate, resetStorageKey, runSync, storageKey, userId]);
+  }, [hydrationAttempt, range.endDate, range.startDate, resetStorageKey, runSync, storageKey, userId, persistState]);
 
   const updateState = useCallback(
     (updater: (previous: ShoppingListState) => ShoppingListState) => {
-      if (!userId || !isHydrated) return;
-      mutationVersionRef.current += 1;
-      const next = updater(stateRef.current);
+      if (!userId || !isHydrated || resetPendingRef.current) return;
+      const previous = stateRef.current;
+      const next = updater(previous);
+      for (const [key, item] of Object.entries(next)) {
+        const previousTime = Date.parse(previous[key]?.updatedAt ?? '');
+        if (item !== previous[key] && Date.parse(item.updatedAt) <= previousTime) {
+          // An intentional edit must advance the version, even with equal ticks or clock skew.
+          next[key] = { ...item, updatedAt: new Date(previousTime + 1).toISOString() };
+        }
+      }
       stateRef.current = next;
       setState(next);
-      void runSync(() => persistShoppingListState(userId, range, next));
+      void runSync(() => persistState(next));
     },
-    [isHydrated, range, runSync, userId],
+    [isHydrated, persistState, runSync, userId],
   );
 
   const toggleIngredient = useCallback(
@@ -203,21 +243,33 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
 
   const resetRange = useCallback(async (): Promise<boolean> => {
     if (!userId || !isHydrated || !storageKey || !resetStorageKey) return false;
-    mutationVersionRef.current += 1;
-    const emptyState = resetShoppingListState();
-    stateRef.current = emptyState;
-    setState(emptyState);
+    resetVersionRef.current += 1;
     resetPendingRef.current = resetStorageKey;
+    setHydratedKey(null);
     const markerSaved = await AsyncStorage.setItem(resetStorageKey, SHOPPING_LIST_RESET_PENDING_VALUE)
       .then(() => true)
       .catch(() => false);
+    if (!markerSaved) {
+      if (activeStorageKeyRef.current === storageKey) {
+        resetPendingRef.current = null;
+        setHydratedKey(storageKey);
+        setSyncError(new Error('Could not persist shopping list reset'));
+      }
+      return false;
+    }
+    if (activeStorageKeyRef.current !== storageKey) return false;
+    const emptyState = resetShoppingListState();
+    stateRef.current = emptyState;
+    setState(emptyState);
     const cleared = await runSync(() => resetShoppingListStatePersisted(userId, range));
     if (!cleared || !markerSaved) return false;
     const markerRemoved = await AsyncStorage.removeItem(resetStorageKey)
       .then(() => true)
       .catch(() => false);
     if (markerRemoved) {
+      if (activeStorageKeyRef.current !== storageKey) return true;
       resetPendingRef.current = null;
+      setHydratedKey(storageKey);
       await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
         () => undefined,
       );
@@ -237,15 +289,30 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
         .then(() => true)
         .catch(() => false);
       if (markerRemoved) {
+        if (activeStorageKeyRef.current !== storageKey) return true;
         resetPendingRef.current = null;
+        setHydratedKey(storageKey);
         await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
           () => undefined,
         );
       }
       return markerRemoved;
     }
-    return runSync(() => persistShoppingListState(userId, range, stateRef.current));
-  }, [range, resetStorageKey, runSync, storageKey, userId]);
+    if (!isHydrated) {
+      setHydrationAttempt(attempt => attempt + 1);
+      return false;
+    }
+    return runSync(() => persistState(stateRef.current));
+  }, [isHydrated, range, resetStorageKey, runSync, storageKey, userId, persistState]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const reconnect = () => {
+      void retrySync();
+    };
+    window.addEventListener('online', reconnect);
+    return () => window.removeEventListener('online', reconnect);
+  }, [retrySync]);
 
   const completedKeys = useMemo(
     () =>

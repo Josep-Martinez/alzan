@@ -1,5 +1,5 @@
 import type { ShoppingListDateRange } from './shoppingListPlanner';
-import type { ShoppingListState } from './shoppingListState';
+import { mergeShoppingListStates, type ShoppingListState } from './shoppingListState';
 
 export type ShoppingListStateSyncAdapter = {
   load: (userId: string, range: ShoppingListDateRange) => Promise<ShoppingListState>;
@@ -12,9 +12,15 @@ export const syncShoppingListStateWithAdapter = async (
   userId: string,
   range: ShoppingListDateRange,
   state: ShoppingListState,
+  onSynced?: (state: ShoppingListState) => Promise<void>,
 ): Promise<boolean> => {
   try {
-    await adapter.upsert(userId, range, state);
+    const remote = await adapter.load(userId, range);
+    await adapter.upsert(userId, range, mergeShoppingListStates(state, remote));
+    // The database may reject stale rows, or another writer may win during the
+    // read/write interval. Reconcile the actual result, never the sent snapshot.
+    const confirmed = await adapter.load(userId, range);
+    await onSynced?.(mergeShoppingListStates(state, confirmed));
     return true;
   } catch {
     return false;
@@ -48,4 +54,16 @@ export const createShoppingListStateSyncQueue = () => {
       return next;
     },
   };
+};
+
+// Local durability must never wait behind a network request.
+export const persistShoppingListLocallyFirst = async (
+  saveLocal: () => Promise<void>,
+  saveRemote: () => Promise<boolean>,
+): Promise<boolean> => {
+  const localSaved = await saveLocal()
+    .then(() => true)
+    .catch(() => false);
+  const remoteSaved = await saveRemote().catch(() => false);
+  return localSaved && remoteSaved;
 };
