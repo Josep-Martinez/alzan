@@ -22,9 +22,17 @@ ENTRADAS POSIBLES
 
 INGREDIENTES Y CANTIDADES
 - Para cada ingrediente usa el nombre más claro y común en español. No inventes alimentos ni IDs.
-- Conserva toda cantidad explícita. Si no hay cantidad, estima una cantidad razonable en gramos.
+- Si el usuario aporta un CSV de ingredientes, lee su cabecera real y busca el nombre canónico en name_es o ingrediente, según exista. Usa una fila solo cuando identifique con seguridad el mismo alimento, variedad y estado; copia el nombre exacto de esa fila. Si no hay coincidencia inequívoca, conserva el nombre fuente para que Alzan pida resolverlo. No supongas que el catálogo está adjunto automáticamente.
+- No cambies «Pimiento» por «Pimiento morrón» sin que la entrada precise esa variedad.
+- Omite «Especias secas sin sal» y otras especias genéricas complementarias sin producto ni cantidad concretos. Conserva curry, tikka masala y salsas o mezclas específicas cuando sean parte identificable del plato; no los sustituyas por especias genéricas ni confundas curry en polvo con salsa o plato al curry.
+- Conserva toda cantidad explícita. Solo estima una cantidad cuando se trate de una foto o porción visible y la estimación sea razonablemente clara; en documentos y menús escritos no inventes cantidades ausentes.
+- El contrato solo admite gramos. Si aparece ml, l, unidades, piezas, cucharadas, cucharaditas, tazas, vasos u otra medida, busca una equivalencia fiable en internet o en una base de datos nutricional reconocida y conviértela a gramos.
+- Para líquidos o productos con densidad específica, usa la densidad del alimento o de la marca cuando esté disponible; no supongas que 1 ml equivale siempre a 1 g. Si la equivalencia no es suficientemente fiable, devuelve un informe de bloqueo en vez de inventarla.
+- No uses una equivalencia de otra marca cuando la entrada identifica una marca concreta. El JSON final debe contener solo el número en gramos, sin unidades, fuentes ni propiedades adicionales.
 - No añadas alimentos que no estén visibles, escritos o incluidos en la receta.
 - Si no puedes identificar con seguridad un alimento, devuelve un informe de bloqueo que identifique el ingrediente; no inventes una coincidencia.
+- Distingue peso en crudo, cocido, escurrido y consumido. No cambies de estado ni apliques factores de cocción salvo que el documento o una fuente fiable lo indique claramente.
+- No confundas cantidad de envase con cantidad consumida. Si el documento dice "1 yogur", busca el peso neto solo si la marca o el tamaño están identificados; si no, bloquea esa equivalencia.
 
 CRITERIO CULINARIO
 - Desglosa solo un nivel los platos compuestos reconocibles en sus componentes principales: por ejemplo, paella en arroz, proteínas, verduras y aceite; croqueta en relleno, bechamel, rebozado y aceite absorbido; o tarta en su base y relleno.
@@ -45,6 +53,7 @@ FECHAS Y TIPO DE COMIDA
 FIDELIDAD
 - Conserva fechas, orden, nombres de comidas, ingredientes, alternativas y cantidades explícitas.
 - No optimices el menú ni añadas comidas.
+- No dupliques comidas, no las traslades de fecha y no conviertas recomendaciones, objetivos, macros o listas de compra en ingredientes.
 - Un menú puede contener como máximo ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales.
 
 SALIDA

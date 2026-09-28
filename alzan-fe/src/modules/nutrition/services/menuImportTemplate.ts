@@ -35,7 +35,7 @@ export const MENU_IMPORT_PROMPT = `Convierte el DOCX de nutrición adjunto en un
 ARCHIVOS
 - Usa como fuente principal el DOCX que contiene el plan de nutrición y léelo completo, aunque tenga otro nombre.
 - Si también hay un DOCX de entrenamiento o un CSV de ejercicios, ignóralos por completo. No bloquees por la ausencia de un DOCX de entrenamiento, exercises_rows o cualquier otro archivo que no sea necesario para nutrición.
-- Si se adjunta un CSV de ingredientes (distinto de un CSV de ejercicios), úsalo únicamente como catálogo de nombres: cuando exista una coincidencia segura, copia exactamente el valor name_es de la fila correspondiente. No inventes nombres ni uses el CSV de ejercicios para resolver ingredientes.
+- Si se adjunta un CSV de ingredientes (distinto de un CSV de ejercicios), lee su cabecera real: el nombre canónico puede estar en name_es o en ingrediente. Usa solo la columna que exista; no afirmes que falta name_es si existe ingrediente. El CSV es un catálogo de nombres, no una fuente para añadir comidas, ingredientes o cantidades.
 
 SALIDA
 - Devuelve únicamente JSON válido, sin markdown, comentarios ni texto adicional.
@@ -58,13 +58,18 @@ FIDELIDAD
 - No diseñes, optimices, corrijas raciones, mezcles recetas ni añadas comidas o ingredientes.
 - Expande las recetas del documento; no conviertas una lista de la compra en una comida.
 - Conserva el texto de alternativas y condiciones en el nombre de la comida solo cuando forme parte de la asignación del día; no combines alternativas ni elijas una por tu cuenta.
-- Convierte unidades a gramos solo con una equivalencia explícita del DOCX. Para intervalos, usa un único número únicamente si el DOCX fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones.
-- Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, no fabriques datos: devuelve un informe de bloqueo que indique la fecha y la comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
+- El contrato solo admite gramos. Si el documento usa ml, l, unidades, piezas, cucharadas, cucharaditas, tazas, vasos u otra medida, busca una equivalencia fiable en internet o en una base de datos nutricional reconocida y conviértela a gramos.
+- Para líquidos y alimentos cuya densidad depende del producto, usa la densidad específica del alimento o de la marca cuando esté disponible; no trates todos los mililitros como gramos. Si solo existe una equivalencia genérica con incertidumbre relevante, devuelve un informe de bloqueo indicando el alimento y la medida.
+- No conviertas usando una búsqueda de una marca distinta si el documento identifica la marca o el producto. Conserva la cantidad equivalente consumida, redondeada de forma razonable, y no añadas la fuente ni la unidad al JSON final.
+- Para intervalos de cantidades, usa un único número únicamente si el documento fija cuál corresponde a ese día; una equivalencia de internet convierte unidades, pero no decide la ración. No uses medias, extremos ni estimaciones arbitrarias.
+- Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, bloquea indicando la fecha y comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
 
 INGREDIENTES
 - Conserva el nombre del ingrediente tal como aparece en el documento y no inventes alimentos distintos. Acepta diferencias de ortografía, acentos, singular/plural y sinónimos sin cambiar la identidad del alimento.
-- Si el CSV de ingredientes contiene una coincidencia segura, prioriza su nombre canónico exacto en name_es sin cambiar la identidad ni la cantidad del ingrediente.
-- Conserva siempre la cantidad original.
+- Para cada ingrediente del documento, busca primero coincidencia normalizada en el CSV (mayúsculas, acentos, singular/plural); admite sinónimos solo si designan el mismo alimento y la misma variedad/estado. Si la coincidencia es inequívoca, copia exactamente el valor de name_es o ingrediente, según la cabecera real. Si no existe o cambia la identidad, conserva el nombre del documento: Alzan pedirá resolverlo antes de guardar. No conviertas automáticamente «Pimiento» en «Pimiento morrón» sin que el documento especifique esa variedad.
+- Omite «Especias secas sin sal» y otras mezclas genéricas de especias complementarias sin producto ni cantidad concretos. No sustituyas con ellas ingredientes principales del plato: conserva curry, tikka masala y las salsas o mezclas concretas cuando la fuente las identifique; si el catálogo no tiene una entrada equivalente, deja su nombre original pendiente de resolución. No confundas curry en polvo con una salsa o un plato al curry.
+- Conserva siempre la cantidad consumida original, expresada en gramos tras la conversión verificada cuando sea necesaria; no copies un número en ml como si fueran gramos.
+- Distingue peso en crudo, cocido, escurrido y consumido; no cambies de estado sin una equivalencia fiable. No confundas peso del envase con cantidad consumida.
 - Mantén meal_type entre breakfast, almuerzo, lunch, merienda, dinner y snack.
 - No inventes nombres, IDs, calorías ni macronutrientes. No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales ni ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres distintos.
 
