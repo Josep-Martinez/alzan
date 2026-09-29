@@ -175,7 +175,7 @@ const testWebLaunchFlow = async (): Promise<void> => {
     });
 
     assert.equal(result, 'clipboard-error');
-    assert.deepEqual(events, ['copy-sync', 'copy-async', 'close']);
+    assert.deepEqual(events, ['copy-sync', 'copy-async', 'open']);
   }
 };
 

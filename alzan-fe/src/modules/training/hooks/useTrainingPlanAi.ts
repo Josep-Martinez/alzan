@@ -74,20 +74,13 @@ export const useTrainingPlanAi = () => {
       setIsLaunching(true);
       try {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          // Reserve the tab synchronously from the original tap. It stays
-          // blank until the catalog has been copied, so popup blockers cannot
-          // prevent the actual provider navigation after an async fallback.
-          const reservedWindow = window.open('about:blank', '_blank');
+          let reservedWindow: Window | null = null;
           const webResult = await launchTrainingAiOnWeb({
             copySync: () => copyTextToClipboardSync(clipboardText),
             copyAsync: () => copyTextToClipboardAsync(clipboardText),
             openInNewTab: () => {
-              if (reservedWindow && !reservedWindow.closed) {
-                reservedWindow.location.assign(target.url);
-                return true;
-              }
-
-              return Boolean(window.open(target.url, '_blank'));
+              reservedWindow = window.open(target.url, '_blank');
+              return Boolean(reservedWindow);
             },
             redirectCurrentTab: () => window.location.assign(target.url),
             closeOpenedWindow: () => {

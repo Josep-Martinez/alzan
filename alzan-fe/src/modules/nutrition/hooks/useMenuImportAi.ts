@@ -3,26 +3,14 @@ import { Platform } from 'react-native';
 import { format } from 'date-fns';
 import * as Linking from 'expo-linking';
 
-import { copyTextToClipboard } from '../../../utils/clipboard';
+import { copyTextToClipboard, copyTextToClipboardAsync, copyTextToClipboardSync } from '../../../utils/clipboard';
 import { buildMenuImportAiPrompt } from '../services/menuImportAiPrompt';
 import {
   buildMenuImportAiLaunchTarget,
   type MenuImportAiLaunchResult,
   type MenuImportAiProvider,
 } from '../services/menuImportAiProvider';
-
-const openMenuImportAiTarget = async (url: string, reservedWindow: Window | null): Promise<void> => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    // Open the complete URL in the click handler. Navigating an about:blank
-    // popup after awaiting the clipboard is unreliable on Safari/iOS.
-    if (!reservedWindow || reservedWindow.closed) throw new Error('Unable to open AI provider in a new window');
-    return;
-  }
-
-  const canOpen = await Linking.canOpenURL(url);
-  if (!canOpen) throw new Error('Unable to open AI provider');
-  await Linking.openURL(url);
-};
+import { launchTrainingAiOnWeb } from '../../training/services/trainingPlanAiProvider';
 
 export const useMenuImportAi = () => {
   const [isLaunching, setIsLaunching] = useState(false);
@@ -35,24 +23,42 @@ export const useMenuImportAi = () => {
         currentDate: format(new Date(), 'yyyy-MM-dd'),
       });
       const target = buildMenuImportAiLaunchTarget(provider, prompt);
-      const reservedWindow =
-        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open(target.url, '_blank') : null;
 
       setIsLaunching(true);
       try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          let reservedWindow: Window | null = null;
+          const webResult = await launchTrainingAiOnWeb({
+            copySync: () => target.mode === 'prefilled' || copyTextToClipboardSync(prompt),
+            copyAsync: () => (target.mode === 'prefilled' ? Promise.resolve() : copyTextToClipboardAsync(prompt)),
+            openInNewTab: () => {
+              reservedWindow = window.open(target.url, '_blank');
+              return Boolean(reservedWindow);
+            },
+            redirectCurrentTab: () => window.location.assign(target.url),
+            closeOpenedWindow: () => {
+              if (reservedWindow && !reservedWindow.closed) reservedWindow.close();
+            },
+          });
+
+          if (webResult === 'clipboard-error') return { ok: false, kind: 'clipboard-error' };
+          if (webResult === 'open-error') return { ok: false, kind: 'open-error' };
+          return { ok: true, provider, mode: target.mode };
+        }
+
         if (target.mode === 'clipboard') {
           try {
             await copyTextToClipboard(prompt);
           } catch {
-            reservedWindow?.close();
             return { ok: false, kind: 'clipboard-error' };
           }
         }
 
         try {
-          await openMenuImportAiTarget(target.url, reservedWindow);
+          const canOpen = await Linking.canOpenURL(target.url);
+          if (!canOpen) throw new Error('Unable to open AI provider');
+          await Linking.openURL(target.url);
         } catch {
-          reservedWindow?.close();
           return { ok: false, kind: 'open-error' };
         }
 

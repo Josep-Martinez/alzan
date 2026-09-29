@@ -67,26 +67,34 @@ export const launchTrainingAiOnWeb = async (
     copied = false;
   }
 
+  let asyncCopy: Promise<void> | null = null;
   if (!copied) {
     try {
-      await actions.copyAsync();
+      // Start the browser clipboard request while the click gesture is still active.
+      asyncCopy = actions.copyAsync();
+    } catch {
+      asyncCopy = null;
+    }
+  }
+
+  let opened = false;
+  try {
+    opened = actions.openInNewTab();
+    if (!opened) actions.redirectCurrentTab();
+  } catch {
+    actions.closeOpenedWindow?.();
+    return 'open-error';
+  }
+
+  if (asyncCopy) {
+    try {
+      await asyncCopy;
       copied = true;
     } catch {
       copied = false;
     }
   }
 
-  if (!copied) {
-    actions.closeOpenedWindow?.();
-    return 'clipboard-error';
-  }
-
-  try {
-    if (actions.openInNewTab()) return 'opened';
-    actions.redirectCurrentTab();
-    return 'redirected';
-  } catch {
-    actions.closeOpenedWindow?.();
-    return 'open-error';
-  }
+  if (!copied) return 'clipboard-error';
+  return opened ? 'opened' : 'redirected';
 };
