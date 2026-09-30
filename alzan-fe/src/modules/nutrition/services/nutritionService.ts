@@ -20,6 +20,7 @@ import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
 import { Locale } from '../../../i18n';
 import { MIN_INGREDIENT_QUANTITY_G } from '../constants';
+import type { NutritionDayStatusValue } from './nutritionDayStatus';
 import type { DeletedMealSnapshot } from './mealUndoPlanner';
 
 // Final gate before inserting into meal_items: any positive quantity is clamped to
@@ -166,6 +167,28 @@ export const nutritionService = {
       .delete()
       .eq('user_id', userId)
       .in('date', uniqueDates);
+
+    if (error) throw error;
+  },
+
+  async setNutritionDayStatus(userId: string, date: string, status: NutritionDayStatusValue): Promise<void> {
+    if (!userId || !date) throw new Error('Invalid nutrition day');
+
+    if (status === 'normal') {
+      const { error } = await supabase.from('nutrition_day_statuses').delete().eq('user_id', userId).eq('date', date);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await supabase.from('nutrition_day_statuses').upsert(
+      {
+        user_id: userId,
+        date,
+        status,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,date' },
+    );
 
     if (error) throw error;
   },

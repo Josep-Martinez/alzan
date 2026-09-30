@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
@@ -21,20 +30,40 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
-import { getTemplateIdsForBulkDelete, sortTemplateList, TemplateListSort } from './helpers/templateList.helper';
+import { TemplateSelectionCheckbox } from './components/TemplateSelectionCheckbox';
+import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
+import {
+  getTemplateListContentBottomPadding,
+  getTemplateListHeaderAction,
+  getTemplateMetadataLabel,
+  getSelectedTemplateIdsForBulkDelete,
+  getTemplateIdsForBulkDelete,
+  sortTemplateList,
+  TemplateListSort,
+  toggleTemplateSelection,
+} from './helpers/templateList.helper';
 
 export const SportTemplatesListScreen = () => {
   const { t, i18n } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
+  const { topFromScreenBottom } = useTabBarLayout();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'SportTemplatesList'>>();
   const { assignToDate } = route.params || {}; // YYYY-MM-DD string
+  const isTemplateSelectionMode = Boolean(assignToDate);
+  const selectionDateLabel = assignToDate
+    ? format(new Date(assignToDate), 'dd MMM', { locale: getDateFnsLocale() })
+    : '';
 
   const { user } = useAuth();
   const { templates, isLoading, deleteTemplate } = useEnduranceTemplates();
   const { getOptionLabel } = useSportCatalog();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [sortOrder, setSortOrder] = React.useState<TemplateListSort>('created');
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = React.useState<Set<string>>(() => new Set());
+  const headerAction = getTemplateListHeaderAction(isTemplateSelectionMode, isSelectionMode);
 
   const sortedTemplates = React.useMemo(
     () =>
@@ -104,6 +133,43 @@ export const SportTemplatesListScreen = () => {
     }
   };
 
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedTemplateIds(new Set());
+  };
+  const deleteSelected = () => {
+    const ids = getSelectedTemplateIdsForBulkDelete(sortedTemplates, selectedTemplateIds);
+    if (!ids.length || isDeleting) return;
+    Alert.alert(
+      t('training.deleteSelectedTemplatesTitle'),
+      t('training.deleteSelectedTemplatesMessage', { count: ids.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('training.deleteSelectedTemplatesAction', { count: ids.length }),
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            let completed = 0;
+            try {
+              for (const id of ids) {
+                await deleteTemplate.mutateAsync(id);
+                completed += 1;
+              }
+              cancelSelection();
+            } catch (error) {
+              console.error('Error deleting selected templates:', error);
+              setSelectedTemplateIds(new Set(ids.slice(completed)));
+              Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleEdit = (id: string) => {
     navigation.navigate('EnduranceWorkoutBuilder', { templateId: id });
   };
@@ -142,15 +208,22 @@ export const SportTemplatesListScreen = () => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isSelectionMode) cancelSelection();
+              else if (headerAction === 'back') navigation.goBack();
+              else navigation.navigate('TrainingHome');
+            }}
+            style={styles.backButton}
+          >
             <Text style={[styles.backText, { color: themeColors.primary }]}>
-              {assignToDate ? t('common.cancel') : t('common.back')}
+              {headerAction === 'back' ? t('common.back') : t('common.close')}
             </Text>
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.headerTitle]}>
-            {assignToDate ? t('training.selectTemplate') : t('training.myTemplates')}
+            {isTemplateSelectionMode ? t('training.selectTemplate') : t('training.myTemplates')}
           </Text>
-          {!assignToDate && (
+          {!isTemplateSelectionMode && !isSelectionMode && (
             <View style={styles.headerActions}>
               <TemplateListManagementMenu
                 itemCount={templates.length}
@@ -158,6 +231,10 @@ export const SportTemplatesListScreen = () => {
                 isDeleting={isDeleting}
                 onSortChange={setSortOrder}
                 onDeleteAll={handleDeleteAll}
+                onStartSelection={() => {
+                  setSelectedTemplateIds(new Set());
+                  setIsSelectionMode(true);
+                }}
               />
               <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
                 <Plus size={24} color={themeColors.primary} />
@@ -167,7 +244,10 @@ export const SportTemplatesListScreen = () => {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: getTemplateListContentBottomPadding(topFromScreenBottom, isSelectionMode) },
+          ]}
           refreshControl={<RefreshControl refreshing={isLoading} tintColor={themeColors.primary} />}
         >
           {templates?.length === 0 && !isLoading && (
@@ -188,92 +268,126 @@ export const SportTemplatesListScreen = () => {
 
             return (
               <View key={template.id} style={styles.cardWrapper}>
-                <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
-                  <View style={styles.cardContent}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        {
-                          backgroundColor: SPORT_COLORS[template.sport_type] || themeColors.primary,
-                        },
-                      ]}
-                    >
-                      <SportIcon sport={template.sport_type} size={20} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.cardInfo}>
-                      <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
-                      <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                        {getSportLabel(template.sport_type)} • {goalLabel}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {assignToDate ? (
-                    <View
-                      style={[
-                        styles.cardFooter,
-                        { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                      ]}
-                    >
-                      <TouchableOpacity
+                <Pressable
+                  disabled={!isSelectionMode || isDeleting}
+                  onPress={() => setSelectedTemplateIds(current => toggleTemplateSelection(current, template.id))}
+                  accessibilityRole={isSelectionMode ? 'checkbox' : undefined}
+                  accessibilityLabel={t('training.selectTemplateNamed', { name: template.base_name })}
+                  accessibilityState={
+                    isSelectionMode
+                      ? { checked: selectedTemplateIds.has(template.id), disabled: isDeleting }
+                      : undefined
+                  }
+                >
+                  <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
+                    <View style={[styles.cardContent, isSelectionMode && styles.selectionCardContent]}>
+                      {isSelectionMode && (
+                        <TemplateSelectionCheckbox
+                          checked={selectedTemplateIds.has(template.id)}
+                          primaryColor={themeColors.primary}
+                          borderColor={themeColors.border}
+                        />
+                      )}
+                      <View
                         style={[
-                          styles.actionButton,
+                          styles.iconContainer,
                           {
-                            backgroundColor: themeColors.primary,
-                            width: '100%',
-                            justifyContent: 'center',
+                            backgroundColor: SPORT_COLORS[template.sport_type] || themeColors.primary,
                           },
                         ]}
-                        onPress={() => handleAssign(template)}
                       >
-                        <Plus size={16} color="#FFFFFF" />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                          {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
-                            locale: getDateFnsLocale(),
-                          })}`}
+                        <SportIcon sport={template.sport_type} size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.cardInfo}>
+                        <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
+                        <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={2}>
+                          {getTemplateMetadataLabel(
+                            getSportLabel(template.sport_type),
+                            goalLabel,
+                            template.created_at
+                              ? format(new Date(template.created_at), 'dd MMM yyyy', { locale: getDateFnsLocale() })
+                              : undefined,
+                          )}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
                     </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.cardFooter,
-                        { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: themeColors.primary, marginRight: 'auto' }]}
-                        onPress={() => navigation.navigate('EnduranceSessionForm', { templateId: template.id })}
-                      >
-                        <Play size={16} color="#FFFFFF" />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>{t('training.register')}</Text>
-                      </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={[styles.actionButton, dynamicStyles.secondaryButton]}
-                        onPress={() => handleEdit(template.id)}
+                    {isTemplateSelectionMode ? (
+                      <View
+                        style={[
+                          styles.cardFooter,
+                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                        ]}
                       >
-                        <Edit2 size={18} color={themeColors.primary} />
-                        <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
-                          {t('common.edit')}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
-                        onPress={() => handleDelete(template.id, template.base_name)}
+                        <TouchableOpacity
+                          style={[
+                            styles.actionButton,
+                            {
+                              backgroundColor: themeColors.primary,
+                              width: '100%',
+                              justifyContent: 'center',
+                            },
+                          ]}
+                          onPress={() => handleAssign(template)}
+                        >
+                          <Plus size={16} color="#FFFFFF" />
+                          <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                            {`${t('training.addTo')} ${selectionDateLabel}`}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : isSelectionMode ? null : (
+                      <View
+                        style={[
+                          styles.cardFooter,
+                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                        ]}
                       >
-                        <Trash2 size={18} color={themeColors.danger} />
-                        <Text style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}>
-                          {t('common.delete')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </GlassCard>
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: themeColors.primary, marginRight: 'auto' }]}
+                          onPress={() => navigation.navigate('EnduranceSessionForm', { templateId: template.id })}
+                        >
+                          <Play size={16} color="#FFFFFF" />
+                          <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>{t('training.register')}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionButton, dynamicStyles.secondaryButton]}
+                          onPress={() => handleEdit(template.id)}
+                        >
+                          <Edit2 size={18} color={themeColors.primary} />
+                          <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
+                            {t('common.edit')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
+                          onPress={() => handleDelete(template.id, template.base_name)}
+                        >
+                          <Trash2 size={18} color={themeColors.danger} />
+                          <Text
+                            style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}
+                          >
+                            {t('common.delete')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </GlassCard>
+                </Pressable>
               </View>
             );
           })}
         </ScrollView>
+
+        {isSelectionMode && !isTemplateSelectionMode && (
+          <TemplateSelectionToolbar
+            selectedCount={getSelectedTemplateIdsForBulkDelete(sortedTemplates, selectedTemplateIds).length}
+            isDeleting={isDeleting}
+            onCancel={cancelSelection}
+            onDelete={deleteSelected}
+          />
+        )}
 
         {/* Loading overlay */}
         {isDeleting && (
@@ -323,7 +437,6 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   content: {
     padding: spacing.l,
-    paddingBottom: 100,
   },
   emptyState: {
     alignItems: 'center',
@@ -362,6 +475,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.m,
   },
+  selectionCardContent: { marginBottom: 0 },
   iconContainer: {
     width: 40,
     height: 40,

@@ -12,6 +12,7 @@ import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { createVacationDateSet, getNutritionExportAverageDayCount } from './nutritionVacation';
+import { generateDailyProgressHtml } from './dailyProgressPdf';
 
 import iconSource from '../../../../assets/icon.png';
 
@@ -56,6 +57,7 @@ const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
 interface DaySummary {
   date: string;
   isVacation: boolean;
+  isOverTarget: boolean;
   logs: MealLogWithItems[];
   plannedMeals: PlannedMealWithLog[];
   totals: {
@@ -75,6 +77,7 @@ interface PDFExportOptions {
   };
   webPrintWindow?: WebExportWindow | null;
   returnHtml?: boolean;
+  includeDailyProgress?: boolean;
 }
 
 interface WebExportWindow {
@@ -149,22 +152,14 @@ const getMappedDayOfWeek = (date: string): number => {
   return day === 0 ? 7 : day;
 };
 
-const getAdherenceLabel = (status: string | null | undefined): string => {
-  switch (status) {
-    case 'done_as_planned':
-      return t('nutrition.pdfDoneAsPlanned');
-    case 'done_with_changes':
-      return t('nutrition.pdfDoneWithChanges');
-    case 'skipped':
-      return t('nutrition.pdfSkippedMeal');
-    case 'extra_meal':
-      return t('nutrition.pdfExtraMeal');
-    default:
-      return t('nutrition.pdfLoggedMeal');
-  }
-};
-
-export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow, returnHtml }: PDFExportOptions) => {
+export const generateDietPDF = async ({
+  startDate,
+  endDate,
+  user,
+  webPrintWindow,
+  returnHtml,
+  includeDailyProgress = true,
+}: PDFExportOptions) => {
   try {
     const userId = user.id;
     if (!userId) throw new Error('User ID not provided');
@@ -209,6 +204,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     if (dayStatusesError) throw new Error(getErrorMessage(dayStatusesError));
     const vacationDates = createVacationDateSet(dayStatuses);
+    const overTargetDates = new Set(
+      (dayStatuses ?? []).filter(status => status.status === 'over_target').map(status => status.date),
+    );
 
     const logIds = safeLogs.map(l => l.id);
     const { data: items, error: itemsError } =
@@ -245,6 +243,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       daysMap.set(date, {
         date,
         isVacation: vacationDates.has(date),
+        isOverTarget: overTargetDates.has(date),
         logs: [],
         plannedMeals: [],
         totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -257,6 +256,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
         daysMap.set(date, {
           date,
           isVacation: vacationDates.has(date),
+          isOverTarget: overTargetDates.has(date),
           logs: [],
           plannedMeals: [],
           totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -367,10 +367,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       `;
     };
 
-    const renderLoggedMeal = (meal: MealLogWithItems, plannedMeal?: DietTemplateMeal): string => {
+    const renderLoggedMeal = (meal: MealLogWithItems): string => {
       const isSkipped = meal.adherence_status === 'skipped';
-      const plannedName = normalizeText(plannedMeal?.base_name);
-      const displayName = normalizeText(meal.name) ?? plannedName;
+      const displayName = normalizeText(meal.name);
       const actualValues = {
         kcal: isSkipped ? 0 : meal.kcal || 0,
         protein: isSkipped ? 0 : meal.protein_g || 0,
@@ -384,44 +383,14 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             <div class="meal-name">
               ${escapeHtml(translateMealType(meal.meal_type))}
               ${displayName ? `— <span style="font-weight:400">${escapeHtml(displayName)}</span>` : ''}
-              <span class="meal-status">${escapeHtml(getAdherenceLabel(meal.adherence_status))}</span>
             </div>
             <div class="meal-total">${escapeHtml(convertEnergyToUi(actualValues.kcal, energyUnit).label)}</div>
           </div>
-          ${
-            plannedMeal
-              ? renderMacroLine(t('nutrition.pdfPlannedTarget'), {
-                  kcal: plannedMeal.target_kcal || 0,
-                  protein: plannedMeal.target_protein_g || 0,
-                  carbs: plannedMeal.target_carbs_g || 0,
-                  fats: plannedMeal.target_fats_g || 0,
-                })
-              : ''
-          }
           ${renderMacroLine(t('nutrition.pdfActualIntake'), actualValues)}
           ${isSkipped ? '' : renderMealItemsTable(meal)}
         </div>
       `;
     };
-
-    const renderPendingPlannedMeal = (plan: DietTemplateMeal): string => `
-      <div class="meal-block meal-block-pending avoid-break">
-        <div class="meal-header">
-          <div class="meal-name">
-            ${escapeHtml(translateMealType(plan.meal_type))}
-            — <span style="font-weight:400">${escapeHtml(plan.base_name)}</span>
-            <span class="meal-status">${escapeHtml(t('nutrition.pdfPendingMeal'))}</span>
-          </div>
-          <div class="meal-total">${escapeHtml(convertEnergyToUi(plan.target_kcal || 0, energyUnit).label)}</div>
-        </div>
-        ${renderMacroLine(t('nutrition.pdfPlannedTarget'), {
-          kcal: plan.target_kcal || 0,
-          protein: plan.target_protein_g || 0,
-          carbs: plan.target_carbs_g || 0,
-          fats: plan.target_fats_g || 0,
-        })}
-      </div>
-    `;
 
     const renderDayMeals = (day: DaySummary): string => {
       const vacationHtml = day.isVacation
@@ -430,7 +399,6 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             <div class="meal-header">
               <div class="meal-name">
                 ${escapeHtml(t('nutrition.pdfVacationDay'))}
-                <span class="meal-status">${escapeHtml(t('nutrition.pdfVacationDay'))}</span>
               </div>
               <div class="meal-total">-</div>
             </div>
@@ -438,14 +406,12 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
           </div>
         `
         : '';
-      const plannedHtml = day.plannedMeals
-        .map(({ plan, log }) => (log ? renderLoggedMeal(log, plan) : renderPendingPlannedMeal(plan)))
+      const loggedMealsHtml = day.logs
+        .filter(log => log.adherence_status !== 'skipped')
+        .map(log => renderLoggedMeal(log))
         .join('');
-      const plannedLogIds = new Set(day.plannedMeals.map(({ log }) => log?.id).filter((id): id is string => !!id));
-      const extraLogs = day.logs.filter(log => !plannedLogIds.has(log.id));
-      const extraHtml = extraLogs.map(log => renderLoggedMeal(log)).join('');
 
-      if (vacationHtml || plannedHtml || extraHtml) return `${vacationHtml}${plannedHtml}${extraHtml}`;
+      if (vacationHtml || loggedMealsHtml) return `${vacationHtml}${loggedMealsHtml}`;
 
       return `
         <div class="meal-block avoid-break">
@@ -456,7 +422,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       `;
     };
 
-    const html = `
+    const baseHtml = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -577,6 +543,15 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                     align-items: center;
                     margin-top: 30px;
                     margin-bottom: 15px;
+                }
+                .day-block-over-target .day-header {
+                    background: #d97706;
+                }
+                .day-warning {
+                    color: #92400e;
+                    font-weight: 700;
+                    font-size: 11px;
+                    margin: -6px 0 10px;
                 }
                 .day-date {
                     font-weight: 600;
@@ -743,6 +718,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             </div>
             </div> <!-- end summary-page -->
 
+            <div class="legacy-daily-meal-diary" style="display:none">
             <div class="page-break"></div>
 
             <!-- Page 3+: Daily Logs -->
@@ -751,11 +727,12 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             ${Array.from(daysMap.values())
               .map(
                 day => `
-                <div class="day-block avoid-break">
+                <div class="day-block avoid-break ${day.isOverTarget ? 'day-block-over-target' : ''}">
                     <div class="day-header">
                         <span class="day-date">${escapeHtml(format(parseISO(day.date), dayDatePattern, { locale: dateLocale }))}</span>
                         <span class="day-total">${escapeHtml(convertEnergyToUi(day.totals.kcal, energyUnit).label)}</span>
                     </div>
+                    ${day.isOverTarget ? `<div class="day-warning">${escapeHtml(t('nutrition.pdfOverTargetDay'))}</div>` : ''}
                     <div class="macro-line">
                         ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(day.totals.protein)}g · ${t('nutrition.carbs')}: ${Math.round(day.totals.carbs)}g · ${t('nutrition.fats')}: ${Math.round(day.totals.fats)}g`)}
                     </div>
@@ -765,6 +742,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             `,
               )
               .join('')}
+            </div>
 
 
             <!-- Footer -->
@@ -774,6 +752,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
         </body>
         </html>
         `;
+
+    const dailyProgressHtml = includeDailyProgress ? await generateDailyProgressHtml(userId, startDate, endDate) : '';
+    const html = dailyProgressHtml ? baseHtml.replace('</body>', `${dailyProgressHtml}</body>`) : baseHtml;
 
     if (returnHtml) return html;
 

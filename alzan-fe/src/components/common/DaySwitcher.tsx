@@ -12,6 +12,8 @@ interface DaySwitcherProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   markedDates?: Set<string>;
+  overTargetDates?: Set<string>;
+  onPressDate?: (date: Date) => void;
 }
 
 export interface DaySwitcherRef {
@@ -20,7 +22,7 @@ export interface DaySwitcherRef {
 }
 
 export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
-  ({ selectedDate, onSelectDate, markedDates }, ref) => {
+  ({ selectedDate, onSelectDate, markedDates, overTargetDates, onPressDate }, ref) => {
     const { t } = useTranslation();
     const [calendarVisible, setCalendarVisible] = useState(false);
     const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
@@ -80,13 +82,23 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
 
     const renderDayItem = (date: Date) => {
       const isSelected = isSameDay(date, selectedDate);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const isOverTarget = overTargetDates?.has(dateKey);
+      const isVacation = markedDates?.has(dateKey);
       return (
         <TouchableOpacity
           key={date.toISOString()}
-          style={[styles.dayItem, dynamicStyles.dayItem, isSelected && dynamicStyles.selectedDayItem]}
-          onPress={() => onSelectDate(date)}
+          style={[
+            styles.dayItem,
+            dynamicStyles.dayItem,
+            isSelected && dynamicStyles.selectedDayItem,
+            isOverTarget && styles.overTargetDayItem,
+            isVacation && styles.vacationDayItem,
+          ]}
+          onPress={() => (onPressDate ? onPressDate(date) : onSelectDate(date))}
           accessibilityRole="button"
           accessibilityLabel={format(date, 'PPPP', { locale: getDateFnsLocale() })}
+          accessibilityHint={onPressDate ? t('progressPdf.dayStatusCycleHint') : undefined}
           accessibilityState={{ selected: isSelected }}
         >
           <Text style={[styles.dayName, dynamicStyles.dayName, isSelected && { color: '#FFFFFF', fontWeight: '700' }]}>
@@ -97,8 +109,10 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
               {format(date, 'd')}
             </Text>
           </View>
-          {markedDates?.has(format(date, 'yyyy-MM-dd')) && (
-            <View style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : themeColors.primary }]} />
+          {(isVacation || isOverTarget) && (
+            <View
+              style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : isVacation ? '#7C3AED' : '#D97706' }]}
+            />
           )}
         </TouchableOpacity>
       );
@@ -247,6 +261,14 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  overTargetDayItem: {
+    borderWidth: 2,
+    borderColor: '#D97706',
+  },
+  vacationDayItem: {
+    borderWidth: 2,
+    borderColor: '#7C3AED',
   },
   dot: {
     width: 4,

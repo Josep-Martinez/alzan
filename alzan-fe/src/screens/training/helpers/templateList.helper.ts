@@ -1,5 +1,17 @@
 export type TemplateListSort = 'name' | 'created' | 'usage';
 
+export const getTemplateMetadataLabel = (...parts: (string | undefined)[]): string =>
+  parts
+    .map(part => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(' • ');
+
+export const getTemplateListContentBottomPadding = (topFromScreenBottom: number, isSelectionMode: boolean): number =>
+  Math.max(0, topFromScreenBottom) + 24 + (isSelectionMode ? 100 : 0);
+
+export const getTemplateListHeaderAction = (isSelectionFlow: boolean, isBulkSelectionMode = false): 'back' | 'close' =>
+  isSelectionFlow || isBulkSelectionMode ? 'back' : 'close';
+
 export type TemplateListItem = {
   id: string;
   name: string;
@@ -34,3 +46,15 @@ export const sortTemplateList = <T extends TemplateListItem>(
 
 export const getTemplateIdsForBulkDelete = (items: readonly TemplateListItem[]): string[] =>
   items.map(item => item.id).filter((id, index, ids) => id.length > 0 && ids.indexOf(id) === index);
+
+export const toggleTemplateSelection = (selectedIds: ReadonlySet<string>, templateId: string): Set<string> => {
+  const nextSelectedIds = new Set(selectedIds);
+  if (nextSelectedIds.has(templateId)) nextSelectedIds.delete(templateId);
+  else nextSelectedIds.add(templateId);
+  return nextSelectedIds;
+};
+
+export const getSelectedTemplateIdsForBulkDelete = <T extends TemplateListItem>(
+  items: readonly T[],
+  selectedIds: ReadonlySet<string>,
+): string[] => getTemplateIdsForBulkDelete(items.filter(item => selectedIds.has(item.id)));
