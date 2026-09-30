@@ -1,6 +1,6 @@
 {
   "name": "alzan-health",
-  "version": "0.0.1",
+  "version": "0.0.9",
   "main": "index.ts",
   "scripts": {
     "verify:active-workout": "tsx src/screens/training/helpers/workoutOrganization.spec.ts && tsx src/screens/training/helpers/workoutSetProgress.spec.ts && tsx src/screens/training/helpers/activeWorkoutDraft.spec.ts && tsx src/screens/training/helpers/workoutFinalization.spec.ts",
