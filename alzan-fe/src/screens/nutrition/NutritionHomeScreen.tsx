@@ -613,6 +613,7 @@ export const NutritionHomeScreen = () => {
         {/* Day Switcher - Removed external wrapper styles to let component handle margin */}
         <DaySwitcher
           ref={daySwitcherRef}
+          variant="nutrition"
           selectedDate={selectedDate}
           markedDates={vacationDates}
           overTargetDates={overTargetDates}

@@ -4,6 +4,7 @@ import { format, addDays, isSameDay, startOfDay, startOfWeek } from 'date-fns';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
+import { getDaySwitcherMarkerPresentation, type DaySwitcherVariant } from './daySwitcherPresentation.helper';
 import { CalendarDatePickerModal } from './CalendarDatePickerModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 interface DaySwitcherProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  variant: DaySwitcherVariant;
   markedDates?: Set<string>;
   overTargetDates?: Set<string>;
   onPressDate?: (date: Date) => void;
@@ -22,7 +24,7 @@ export interface DaySwitcherRef {
 }
 
 export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
-  ({ selectedDate, onSelectDate, markedDates, overTargetDates, onPressDate }, ref) => {
+  ({ selectedDate, onSelectDate, variant, markedDates, overTargetDates, onPressDate }, ref) => {
     const { t } = useTranslation();
     const [calendarVisible, setCalendarVisible] = useState(false);
     const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
@@ -83,8 +85,15 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     const renderDayItem = (date: Date) => {
       const isSelected = isSameDay(date, selectedDate);
       const dateKey = format(date, 'yyyy-MM-dd');
-      const isOverTarget = overTargetDates?.has(dateKey);
-      const isVacation = markedDates?.has(dateKey);
+      const isOverTarget = overTargetDates?.has(dateKey) ?? false;
+      const isVacation = markedDates?.has(dateKey) ?? false;
+      const marker = getDaySwitcherMarkerPresentation({
+        variant,
+        isMarked: isVacation,
+        isOverTarget,
+        isSelected,
+        primaryColor: themeColors.primary,
+      });
       return (
         <TouchableOpacity
           key={date.toISOString()}
@@ -92,8 +101,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
             styles.dayItem,
             dynamicStyles.dayItem,
             isSelected && dynamicStyles.selectedDayItem,
-            isOverTarget && styles.overTargetDayItem,
-            isVacation && styles.vacationDayItem,
+            marker.borderColor && { borderWidth: 2, borderColor: marker.borderColor },
           ]}
           onPress={() => (onPressDate ? onPressDate(date) : onSelectDate(date))}
           accessibilityRole="button"
@@ -109,11 +117,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
               {format(date, 'd')}
             </Text>
           </View>
-          {(isVacation || isOverTarget) && (
-            <View
-              style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : isVacation ? '#7C3AED' : '#D97706' }]}
-            />
-          )}
+          {marker.dotColor && <View style={[styles.dot, { backgroundColor: marker.dotColor }]} />}
         </TouchableOpacity>
       );
     };
@@ -261,14 +265,6 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  overTargetDayItem: {
-    borderWidth: 2,
-    borderColor: '#D97706',
-  },
-  vacationDayItem: {
-    borderWidth: 2,
-    borderColor: '#7C3AED',
   },
   dot: {
     width: 4,

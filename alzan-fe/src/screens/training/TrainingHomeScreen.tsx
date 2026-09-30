@@ -1118,6 +1118,7 @@ export const TrainingHomeScreen = () => {
 
         <DaySwitcher
           ref={daySwitcherRef}
+          variant="training"
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           markedDates={markedDates}
