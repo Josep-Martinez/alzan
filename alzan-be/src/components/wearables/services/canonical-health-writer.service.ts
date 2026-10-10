@@ -130,6 +130,83 @@ export class CanonicalHealthWriterService {
     return sampleId;
   }
 
+  /** Inserts unseen provider samples and refreshes corrected samples in a bounded window. */
+  public async replaceHealthMetricSamples(input: {
+    userId: string;
+    provider: HealthMetricSampleInsert['provider'];
+    sourceChannel: string;
+    from: string;
+    to: string;
+    rows: HealthMetricSampleInsert[];
+  }): Promise<number> {
+    const existingBySourceId = new Map<
+      string,
+      Pick<HealthMetricSampleInsert, 'value' | 'unit' | 'recorded_at' | 'local_date' | 'timezone'> & {
+        id: string;
+      }
+    >();
+    for (let offset = 0; ; offset += INSERT_CHUNK_SIZE) {
+      const { data: existingRows, error: lookupError } = await this.supabaseAdminService.client
+        .from('health_metric_samples')
+        .select('id, source_record_id, value, unit, recorded_at, local_date, timezone')
+        .eq('user_id', input.userId)
+        .eq('provider', input.provider)
+        .eq('source_channel', input.sourceChannel)
+        .is('source_package', null)
+        .gte('recorded_at', input.from)
+        .lt('recorded_at', input.to)
+        .order('id', { ascending: true })
+        .range(offset, offset + INSERT_CHUNK_SIZE - 1);
+      if (lookupError) throw new InternalServerErrorException('WEARABLE_HEALTH_SAMPLES_LOOKUP_FAILED');
+      for (const row of existingRows ?? []) {
+        if (row.source_record_id) existingBySourceId.set(row.source_record_id, row);
+      }
+      if (!existingRows || existingRows.length < INSERT_CHUNK_SIZE) break;
+    }
+    const seenIncomingIds = new Set<string>();
+    const unseenRows = input.rows.filter(row => {
+      if (!row.source_record_id) return true;
+      if (existingBySourceId.has(row.source_record_id) || seenIncomingIds.has(row.source_record_id)) return false;
+      seenIncomingIds.add(row.source_record_id);
+      return true;
+    });
+    for (const row of input.rows) {
+      if (!row.source_record_id) continue;
+      const existing = existingBySourceId.get(row.source_record_id);
+      if (!existing?.id) continue;
+      const changed =
+        existing.value !== row.value ||
+        existing.unit !== row.unit ||
+        existing.recorded_at !== row.recorded_at ||
+        existing.local_date !== row.local_date ||
+        existing.timezone !== row.timezone;
+      if (!changed) continue;
+      const { error } = await this.supabaseAdminService.client
+        .from('health_metric_samples')
+        .update({
+          value: row.value,
+          unit: row.unit,
+          recorded_at: row.recorded_at,
+          local_date: row.local_date,
+          timezone: row.timezone,
+          raw_payload: row.raw_payload,
+        })
+        .eq('id', existing.id)
+        .eq('user_id', input.userId)
+        .eq('provider', input.provider)
+        .eq('source_channel', input.sourceChannel)
+        .is('source_package', null);
+      if (error) throw new InternalServerErrorException('WEARABLE_HEALTH_SAMPLES_UPDATE_FAILED');
+    }
+    for (let index = 0; index < unseenRows.length; index += INSERT_CHUNK_SIZE) {
+      const { error } = await this.supabaseAdminService.client
+        .from('health_metric_samples')
+        .insert(unseenRows.slice(index, index + INSERT_CHUNK_SIZE));
+      if (error) throw new InternalServerErrorException('WEARABLE_HEALTH_SAMPLES_INSERT_FAILED');
+    }
+    return unseenRows.length;
+  }
+
   private async findDailyStepsId(
     userId: string,
     dailyActivity: ProviderDailyActivityCanonical,
@@ -306,6 +383,7 @@ export class CanonicalHealthWriterService {
       sleep_end: endTime,
       is_main_sleep: !sleep.isNap,
       is_nap: sleep.isNap,
+      duration_in_bed_min: sleep.durationInBedMin ?? null,
       total_sleep_min: sleep.totalSleepMin,
       awake_min: sleep.awakeMin,
       light_sleep_min: sleep.lightSleepMin,
@@ -324,6 +402,7 @@ export class CanonicalHealthWriterService {
       avg_respiratory_rpm: sleep.avgRespiratoryRpm,
       avg_spo2_pct: sleep.avgSpo2Pct,
       min_spo2_pct: sleep.minSpo2Pct,
+      max_spo2_pct: sleep.maxSpo2Pct ?? null,
       data_quality: 'partial',
       source_sleep_id: sleep.sourceSleepId,
       source_record_id: input.provenance.sourceRecordId ?? sleep.sourceRecordId ?? sleep.sourceSleepId,
