@@ -18,6 +18,7 @@ import { CanonicalActivityWriterService } from './canonical-activity-writer.serv
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import { WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
 import {
   SuuntoWorkoutPaginationStrategy,
   UnverifiedSinglePageWorkoutPaginationStrategy,
@@ -35,6 +36,8 @@ export interface SuuntoSyncResult {
   provider: 'suunto';
   jobId: string;
   status: 'running' | 'success' | 'partial';
+  cancelled?: boolean;
+  retryAfterAt?: string | null;
   activitiesImported: number;
   activitiesSkipped: number;
   activitiesRepaired: number;
@@ -46,7 +49,7 @@ export interface SuuntoSyncResult {
 }
 
 type WorkoutImportOutcome = {
-  kind: 'failed' | 'imported' | 'repaired' | 'skipped';
+  kind: 'cancelled' | 'failed' | 'imported' | 'repaired' | 'skipped';
   errorCode?: string;
 };
 
@@ -62,6 +65,8 @@ const WORKOUT_LIST_LIMIT = 100;
 const WORKOUT_IMPORT_CONCURRENCY = 3;
 const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
+const SUUNTO_REQUEST_TIMEOUT_MS = 30_000;
+const SUUNTO_RETRY_CANCELLATION_POLL_MS = 1_000;
 const CANONICAL_ACTIVITY_VERSION = 8;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
@@ -84,19 +89,25 @@ export class SuuntoCloudSyncService {
   ) {}
 
   public async syncActivities(userId: string): Promise<SuuntoSyncResult> {
-    const token = await this.getUsableToken(userId);
     const job = await this.importLifecycleService.claimSyncJob({
       userId,
       provider: 'suunto',
       syncDomain: 'activities',
       leaseSeconds: 1800,
     });
-    if (job.action === 'active') return this.buildActiveJobResult(job.jobId);
+    if (job.action === 'active') return this.buildActiveJobResult(job);
     const stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     const phaseDurationsMs: Record<string, number> = {};
     try {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return await this.finishCancelledSync(job.jobId, job.leaseToken, phaseDurationsMs);
+      }
+      const token = await this.getUsableToken(userId, job.jobId);
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return await this.finishCancelledSync(job.jobId, job.leaseToken, phaseDurationsMs);
+      }
       const fetchStartedAt = Date.now();
-      const workoutFetch = await this.fetchWorkoutSummaries(token.accessToken, userId);
+      const workoutFetch = await this.fetchWorkoutSummaries(token.accessToken, userId, job.jobId);
       const workouts = workoutFetch.workouts;
       phaseDurationsMs.fetchSummaries = Date.now() - fetchStartedAt;
       const keyedWorkouts = workouts
@@ -108,28 +119,32 @@ export class SuuntoCloudSyncService {
           return timeB - timeA;
         });
       const importStartedAt = Date.now();
-      const outcomes = await this.mapWithConcurrency(keyedWorkouts, WORKOUT_IMPORT_CONCURRENCY, async entry =>
-        this.processWorkout({
+      const outcomes = await this.mapWithConcurrency(keyedWorkouts, WORKOUT_IMPORT_CONCURRENCY, async entry => {
+        if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId))
+          return { kind: 'cancelled' as const };
+        return this.processWorkout({
           userId,
           accessToken: token.accessToken,
           workoutKey: entry.workoutKey,
           summary: entry.workout,
           jobId: job.jobId,
           phaseDurationsMs,
-        }),
-      );
+        });
+      });
       phaseDurationsMs.importWorkouts = Date.now() - importStartedAt;
+      const cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
       const activitiesImported = this.countOutcomes(outcomes, 'imported');
       const activitiesSkipped = this.countOutcomes(outcomes, 'skipped');
       const activitiesRepaired = this.countOutcomes(outcomes, 'repaired');
       const activitiesFailed = this.countOutcomes(outcomes, 'failed');
       const errorsByCode = this.countErrors(outcomes);
+      if (cancelled) errorsByCode[WEARABLE_SYNC_CANCEL_REQUESTED] = 1;
       if (!workoutFetch.isPaginationVerified) errorsByCode.SUUNTO_PAGINATION_UNVERIFIED = 1;
       const activitiesReconciled = activitiesImported + activitiesRepaired;
       phaseDurationsMs.reconcile = 0;
       const lastSuccessAt = new Date().toISOString();
-      const status = activitiesFailed > 0 || !workoutFetch.isPaginationVerified ? 'partial' : 'success';
-      await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
+      const status = cancelled || activitiesFailed > 0 || !workoutFetch.isPaginationVerified ? 'partial' : 'success';
+      if (!cancelled) await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
       await this.syncStateService.saveState({
         userId,
         provider: 'suunto',
@@ -138,7 +153,7 @@ export class SuuntoCloudSyncService {
         syncDomain: 'activities',
         cursorToken: null,
         anchorToken: null,
-        lastRecordAt: workoutFetch.isPaginationVerified ? lastSuccessAt : null,
+        lastRecordAt: !cancelled && workoutFetch.isPaginationVerified ? lastSuccessAt : null,
         status,
         metadata: {
           jobId: job.jobId,
@@ -153,7 +168,7 @@ export class SuuntoCloudSyncService {
           paginationVerified: workoutFetch.isPaginationVerified,
         },
       });
-      await this.importLifecycleService.finishSyncJob({
+      const cancelledAtFinish = await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status,
@@ -164,12 +179,13 @@ export class SuuntoCloudSyncService {
           activitiesFailed,
           activitiesReconciled,
         },
-        lastError: activitiesFailed > 0 ? 'SUUNTO_SYNC_PARTIAL' : null,
+        lastError: cancelled ? WEARABLE_SYNC_CANCEL_REQUESTED : activitiesFailed > 0 ? 'SUUNTO_SYNC_PARTIAL' : null,
       });
       return {
         provider: 'suunto',
         jobId: job.jobId,
-        status,
+        status: cancelledAtFinish ? 'partial' : status,
+        cancelled: cancelled || cancelledAtFinish,
         activitiesImported,
         activitiesSkipped,
         activitiesRepaired,
@@ -177,27 +193,32 @@ export class SuuntoCloudSyncService {
         activitiesReconciled,
         errorsByCode,
         phaseDurationsMs,
-        lastSuccessAt,
+        lastSuccessAt: cancelled || cancelledAtFinish ? null : lastSuccessAt,
       };
     } catch (error: unknown) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
+        return await this.finishCancelledSync(job.jobId, job.leaseToken, phaseDurationsMs);
+      }
       await this.finishFailedJob(job.jobId, job.leaseToken, error);
       await this.markConnectionError(userId, this.getErrorMessage(error));
       throw error;
     } finally {
       stopLeaseHeartbeat();
+      this.importLifecycleService.releaseSyncJob?.(job.jobId);
     }
   }
 
   /** Shares the existing Suunto OAuth refresh path with the independent 24/7 importer. */
-  public async getHealthAccessToken(userId: string): Promise<string> {
-    return (await this.getUsableToken(userId)).accessToken;
+  public async getHealthAccessToken(userId: string, jobId?: string): Promise<string> {
+    return (await this.getUsableToken(userId, jobId)).accessToken;
   }
 
-  private buildActiveJobResult(jobId: string): SuuntoSyncResult {
+  private buildActiveJobResult(job: { jobId: string; retryAfterAt: string | null }): SuuntoSyncResult {
     return {
       provider: 'suunto',
-      jobId,
+      jobId: job.jobId,
       status: 'running',
+      retryAfterAt: job.retryAfterAt,
       activitiesImported: 0,
       activitiesSkipped: 0,
       activitiesRepaired: 0,
@@ -205,6 +226,34 @@ export class SuuntoCloudSyncService {
       activitiesReconciled: 0,
       errorsByCode: {},
       phaseDurationsMs: {},
+      lastSuccessAt: null,
+    };
+  }
+
+  private async finishCancelledSync(
+    jobId: string,
+    leaseToken: string,
+    phaseDurationsMs: Record<string, number>,
+  ): Promise<SuuntoSyncResult> {
+    await this.importLifecycleService.finishSyncJob({
+      jobId,
+      leaseToken,
+      status: 'partial',
+      counters: { activitiesImported: 0, activitiesSkipped: 0, activitiesRepaired: 0, activitiesFailed: 0 },
+      lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+    });
+    return {
+      provider: 'suunto',
+      jobId,
+      status: 'partial',
+      cancelled: true,
+      activitiesImported: 0,
+      activitiesSkipped: 0,
+      activitiesRepaired: 0,
+      activitiesFailed: 0,
+      activitiesReconciled: 0,
+      errorsByCode: { [WEARABLE_SYNC_CANCEL_REQUESTED]: 1 },
+      phaseDurationsMs,
       lastSuccessAt: null,
     };
   }
@@ -323,7 +372,7 @@ export class SuuntoCloudSyncService {
       traceId: null,
     });
     const downloadStartedAt = Date.now();
-    const fitBytes = await this.fetchWorkoutFit(accessToken, workoutKey);
+    const fitBytes = await this.fetchWorkoutFit(accessToken, workoutKey, lifecycleJobId);
     this.addPhaseDuration(phaseDurationsMs, 'downloadFit', Date.now() - downloadStartedAt);
     const parseStartedAt = Date.now();
     const activity = applySuuntoWorkoutSummaryTimeMetadata(
@@ -389,12 +438,17 @@ export class SuuntoCloudSyncService {
     }, {});
   }
 
-  private async fetchWorkoutSummaries(accessToken: string, userId?: string): Promise<WorkoutSummaryFetchResult> {
+  private async fetchWorkoutSummaries(
+    accessToken: string,
+    userId?: string,
+    jobId?: string,
+  ): Promise<WorkoutSummaryFetchResult> {
     const since = await this.resolveWorkoutLookbackStartMs(userId);
     const response = await this.getSuunto<JsonRecord | JsonRecord[]>(
       '/v2/workouts',
       accessToken,
       this.workoutPaginationStrategy.buildRequest(String(since)),
+      jobId,
     );
     const page = this.extractWorkoutSummaries(response);
     const workoutsByKey = new Map<string, JsonRecord>();
@@ -519,13 +573,17 @@ export class SuuntoCloudSyncService {
     return value < EPOCH_MS_THRESHOLD ? value * 1000 : value;
   }
 
-  private async fetchWorkoutFit(accessToken: string, workoutKey: string): Promise<Uint8Array> {
+  private async fetchWorkoutFit(accessToken: string, workoutKey: string, jobId: string): Promise<Uint8Array> {
     try {
-      const response = await this.executeSuuntoRequest(() =>
-        axios.get<ArrayBuffer>(`${this.apiBaseUrl}/v2/workout/exportFit/${encodeURIComponent(workoutKey)}`, {
-          headers: this.buildApiHeaders(accessToken),
-          responseType: 'arraybuffer',
-        }),
+      const response = await this.executeSuuntoRequest(
+        signal =>
+          axios.get<ArrayBuffer>(`${this.apiBaseUrl}/v2/workout/exportFit/${encodeURIComponent(workoutKey)}`, {
+            headers: this.buildApiHeaders(accessToken),
+            responseType: 'arraybuffer',
+            timeout: SUUNTO_REQUEST_TIMEOUT_MS,
+            signal,
+          }),
+        jobId,
       );
       return new Uint8Array(response.data);
     } catch (error: unknown) {
@@ -533,11 +591,11 @@ export class SuuntoCloudSyncService {
     }
   }
 
-  private async getUsableToken(userId: string): Promise<ProviderTokenRow> {
+  private async getUsableToken(userId: string, jobId?: string): Promise<ProviderTokenRow> {
     const token = await this.readToken(userId);
     if (!this.isTokenExpired(token.expiresAt)) return token;
     if (!token.refreshToken) throw new UnauthorizedException('SUUNTO_REFRESH_TOKEN_MISSING');
-    return this.refreshToken(userId, token);
+    return this.refreshToken(userId, token, jobId);
   }
 
   private async readToken(userId: string): Promise<ProviderTokenRow> {
@@ -565,7 +623,7 @@ export class SuuntoCloudSyncService {
     };
   }
 
-  private async refreshToken(userId: string, token: ProviderTokenRow): Promise<ProviderTokenRow> {
+  private async refreshToken(userId: string, token: ProviderTokenRow, jobId?: string): Promise<ProviderTokenRow> {
     const clientId = this.configService.get<string>('SUUNTO_CLIENT_ID');
     const clientSecret = this.configService.get<string>('SUUNTO_CLIENT_SECRET');
     if (!clientId || !clientSecret) throw new InternalServerErrorException('SUUNTO_CLIENT_CREDENTIALS_MISSING');
@@ -581,6 +639,8 @@ export class SuuntoCloudSyncService {
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        timeout: SUUNTO_REQUEST_TIMEOUT_MS,
+        signal: jobId ? this.importLifecycleService.getSyncJobSignal?.(jobId) : undefined,
       },
     );
     const data = response.data as {
@@ -620,16 +680,25 @@ export class SuuntoCloudSyncService {
     };
   }
 
-  private async getSuunto<T>(path: string, accessToken: string, params?: Record<string, string>): Promise<T> {
+  private async getSuunto<T>(
+    path: string,
+    accessToken: string,
+    params?: Record<string, string>,
+    jobId?: string,
+  ): Promise<T> {
     try {
-      const response = await this.executeSuuntoRequest(() =>
-        axios.get<T>(`${this.apiBaseUrl}${path}`, {
-          headers: {
-            ...this.buildApiHeaders(accessToken),
-            Accept: 'application/json',
-          },
-          params,
-        }),
+      const response = await this.executeSuuntoRequest(
+        signal =>
+          axios.get<T>(`${this.apiBaseUrl}${path}`, {
+            headers: {
+              ...this.buildApiHeaders(accessToken),
+              Accept: 'application/json',
+            },
+            params,
+            timeout: SUUNTO_REQUEST_TIMEOUT_MS,
+            signal,
+          }),
+        jobId,
       );
       return response.data;
     } catch (error: unknown) {
@@ -637,15 +706,22 @@ export class SuuntoCloudSyncService {
     }
   }
 
-  private async executeSuuntoRequest<T>(request: () => Promise<T>): Promise<T> {
+  private async executeSuuntoRequest<T>(request: (signal?: AbortSignal) => Promise<T>, jobId?: string): Promise<T> {
     let lastError: unknown;
+    const signal = jobId ? this.importLifecycleService.getSyncJobSignal?.(jobId) : undefined;
     for (let attempt = 0; attempt <= SUUNTO_REQUEST_RETRIES; attempt += 1) {
+      if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+        throw new Error(WEARABLE_SYNC_CANCEL_REQUESTED);
+      }
       try {
-        return await request();
+        return await request(signal);
       } catch (error: unknown) {
         lastError = error;
+        if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+          throw error;
+        }
         if (attempt === SUUNTO_REQUEST_RETRIES || !this.shouldRetrySuuntoRequest(error)) throw error;
-        await this.sleep(this.retryDelayMs(error, attempt));
+        await this.sleep(this.retryDelayMs(error, attempt), jobId, signal);
       }
     }
     throw lastError;
@@ -675,8 +751,27 @@ export class SuuntoCloudSyncService {
     return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : null;
   }
 
-  private async sleep(milliseconds: number): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, milliseconds));
+  private async sleep(milliseconds: number, jobId?: string, signal?: AbortSignal): Promise<void> {
+    const deadline = Date.now() + milliseconds;
+    while (Date.now() < deadline) {
+      if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+        throw new Error(WEARABLE_SYNC_CANCEL_REQUESTED);
+      }
+      const waitMs = Math.min(deadline - Date.now(), SUUNTO_RETRY_CANCELLATION_POLL_MS);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', handleAbort);
+          resolve();
+        }, waitMs);
+        const handleAbort = (): void => {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', handleAbort);
+          reject(new Error(WEARABLE_SYNC_CANCEL_REQUESTED));
+        };
+        signal?.addEventListener('abort', handleAbort, { once: true });
+        if (signal?.aborted) handleAbort();
+      });
+    }
   }
 
   // Suunto Cloud API requires the APIZONE subscription key alongside the user token.

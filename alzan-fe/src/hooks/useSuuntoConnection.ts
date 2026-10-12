@@ -118,14 +118,28 @@ export function useSuuntoConnection() {
     mutationFn: async () => wearablesLocalHealthApi.syncSuuntoActivities(),
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
       if (result.status === 'running') {
-        Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
+        const retryAt = result.retry_after_at ? Date.parse(result.retry_after_at) : Number.NaN;
+        const remainingMinutes = Number.isFinite(retryAt)
+          ? Math.max(1, Math.ceil((retryAt - Date.now()) / 60_000))
+          : null;
+        Alert.alert(
+          t('settings.syncAlreadyRunningTitle'),
+          remainingMinutes == null
+            ? t('settings.syncAlreadyRunningMessage')
+            : t('settings.syncAlreadyRunningRetryMessage', { minutes: remainingMinutes }),
+        );
         return;
       }
       invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['health', user?.id], refetchType: 'active' });
+      if (result.cancelled) {
+        Alert.alert(t('settings.syncCancelledTitle'), t('settings.syncCancelledMessage'));
+        return;
+      }
       const healthSummary =
         result.health_sync_status === 'success'
           ? t('settings.suuntoHealthImported', { count: result.health_samples_imported ?? 0 })

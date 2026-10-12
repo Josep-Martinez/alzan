@@ -5,6 +5,7 @@ import { aggregateStepsByDate } from '../services/stepsAggregation';
 import { stepsApi } from '../services/stepsApi';
 import { healthQueryKeys } from './healthQueryKeys';
 import { isManualStepsRangeValid } from '../helpers/stepsRange.helper';
+import { invalidateStepsRelatedQueries } from './stepsQueryInvalidation';
 
 /**
  * Daily step rows for the last `days` days (oldest first). Used by the chart.
@@ -23,7 +24,7 @@ export const useStepsRange = (days = 366) => {
 };
 
 /**
- * Aggregated step total for today (manual value preferred), or null if none.
+ * Highest step total recorded across sources for today, or null if none.
  */
 export const useTodaySteps = () => {
   const { user } = useAuth();
@@ -76,8 +77,7 @@ export const useUpsertManualSteps = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateStepsRelatedQueries(queryClient, user?.id);
     },
   });
 };
@@ -92,7 +92,7 @@ export const useUpsertManualStepsRange = () => {
     mutationFn: async (params: { rows: ManualStepsRangeRow[] }) => {
       if (!user?.id) throw new Error('No authenticated user');
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      await Promise.all(
+      const results = await Promise.allSettled(
         params.rows.map(row =>
           stepsApi.upsertManual({
             date: format(row.date, 'yyyy-MM-dd'),
@@ -101,10 +101,11 @@ export const useUpsertManualStepsRange = () => {
           }),
         ),
       );
+      const failedSave = results.find(result => result.status === 'rejected');
+      if (failedSave?.status === 'rejected') throw failedSave.reason;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    onSettled: () => {
+      invalidateStepsRelatedQueries(queryClient, user?.id);
     },
   });
 };

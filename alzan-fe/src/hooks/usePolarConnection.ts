@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { wearablesLocalHealthApi } from '../modules/wearables';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 const POLAR_PROVIDER = 'polar';
 const QUERY_KEY = ['polarConnection'];
@@ -35,8 +37,21 @@ export function usePolarConnection() {
 
   const syncMutation = useMutation({
     mutationFn: async () => wearablesLocalHealthApi.syncPolarActivities(),
-    onSuccess: () => {
+    onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
+      if (result.status !== 'running') {
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
+        queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+        queryClient.invalidateQueries({ queryKey: ['enduranceSessions-count'] });
+        invalidateTrainingCalendar(queryClient);
+        queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      }
+      if (result.status === 'running') {
+        Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
+      } else if (result.cancelled) {
+        Alert.alert(t('settings.syncCancelledTitle'), t('settings.syncCancelledMessage'));
+      }
     },
     onError: (error: Error) => {
       Alert.alert(t('common.error'), error.message);

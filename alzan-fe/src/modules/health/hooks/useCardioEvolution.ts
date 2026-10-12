@@ -2,35 +2,39 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import type { ActivitySession } from '../../../types/requests.types';
+import type { CardioPeriod } from '../algorithms/cardioEvolution';
 import { healthQueryKeys } from './healthQueryKeys';
+import { normalizeCardioSportType } from '../algorithms/cardioSportNormalization';
 import {
   analyzeCardiacDrift,
   analyzeIntervalHeartRateRecovery,
+  selectCardioStreamCandidates,
   type CardiacIntervalRecoveryResult,
   type CardiacDriftResult,
   type CardioActivity,
   type CardioStreamSample,
   type CardioZoneTime,
+  summarizeCardioZoneTimes,
   summarizeCardioWeek,
 } from '../algorithms/cardioEvolution';
+import {
+  getCardioEvaluationSessionIds,
+  type CardioExerciseName,
+  type CardioLap,
+  type CardioWorkoutSet,
+} from '../algorithms/cardioSportEvaluation';
 
 const HISTORY_PAGE_SIZE = 1000;
 const STREAM_PAGE_SIZE = 1000;
-const INTERVAL_SPORT_TYPES = new Set([
-  'hyrox',
-  'football',
-  'basketball',
-  'tennis',
-  'padel',
-  'martial_arts',
-  'volleyball',
-]);
+const ZONE_PAGE_SIZE = 1000;
+const ZONE_SESSION_BATCH_SIZE = 100;
+const DETAIL_SESSION_BATCH_SIZE = 100;
+// WHOOP's canonical mapper stores its provider-supplied zone_durations directly.
+// Other importers can fall back to estimated zones, but provenance is not persisted per row.
+const PROVIDER_REPORTED_ZONE_PROVIDERS: ReadonlySet<string> = new Set(['whoop']);
 
 const getSportKey = (activity: Pick<CardioActivity, 'sport_type' | 'sport_subtype'>): string =>
-  `${activity.sport_type}::${activity.sport_subtype ?? ''}`;
-
-const isIntervalWorkout = (activity: CardioActivity): boolean =>
-  INTERVAL_SPORT_TYPES.has(activity.sport_type) || /hiit|interval|intermitent/i.test(activity.sport_subtype ?? '');
+  normalizeCardioSportType(activity.sport_type, activity.sport_subtype);
 
 type CardioSessionSelection = Pick<
   ActivitySession,
@@ -52,6 +56,12 @@ type CardioSessionSelection = Pick<
   | 'total_sets'
   | 'total_reps'
   | 'workout_template_id'
+  | 'pool_type'
+  | 'stroke'
+  | 'surface'
+  | 'football_session_type'
+  | 'ski_type'
+  | 'snowboard_type'
 >;
 
 const toCardioActivity = (session: CardioSessionSelection): CardioActivity => ({
@@ -73,6 +83,12 @@ const toCardioActivity = (session: CardioSessionSelection): CardioActivity => ({
   total_sets: session.total_sets,
   total_reps: session.total_reps,
   workout_template_id: session.workout_template_id,
+  pool_type: session.pool_type,
+  stroke: session.stroke,
+  surface: session.surface,
+  football_session_type: session.football_session_type,
+  ski_type: session.ski_type,
+  snowboard_type: session.snowboard_type,
 });
 
 const loadStreamSamples = async (userId: string, sessionIds: string[]): Promise<CardioStreamSample[]> => {
@@ -104,22 +120,87 @@ const loadStreamSamples = async (userId: string, sessionIds: string[]): Promise<
   return samples;
 };
 
-const getStreamCandidates = (activities: CardioActivity[], referenceDate: Date): CardioActivity[] => {
-  const cutoff = referenceDate.getTime() - 28 * 24 * 60 * 60 * 1000;
-  const selected = new Map<string, CardioActivity>();
-  for (const activity of activities) {
-    const canAnalyzeDrift =
-      ['running', 'trail', 'cycling'].includes(activity.sport_type) && (activity.duration_s ?? 0) >= 45 * 60;
-    const canAnalyzeIntervalRecovery = isIntervalWorkout(activity) && (activity.duration_s ?? 0) >= 12 * 60;
-    if (!canAnalyzeDrift && !canAnalyzeIntervalRecovery) continue;
-    if (Date.parse(activity.start_time) < cutoff) continue;
-    const key = getSportKey(activity);
-    const existing = selected.get(key);
-    if (!existing || Date.parse(activity.start_time) > Date.parse(existing.start_time)) {
-      selected.set(key, activity);
+const loadZoneTimes = async (sessionIds: string[]): Promise<CardioZoneTime[]> => {
+  const zoneTimes: CardioZoneTime[] = [];
+  for (let batchStart = 0; batchStart < sessionIds.length; batchStart += ZONE_SESSION_BATCH_SIZE) {
+    const batch = sessionIds.slice(batchStart, batchStart + ZONE_SESSION_BATCH_SIZE);
+    for (let page = 0; ; page += 1) {
+      const start = page * ZONE_PAGE_SIZE;
+      const { data, error } = await supabase
+        .from('activity_heart_rate_zones')
+        .select('session_id, zone, duration_s')
+        .in('session_id', batch)
+        .order('session_id', { ascending: true })
+        .order('zone', { ascending: true })
+        .range(start, start + ZONE_PAGE_SIZE - 1);
+      if (error) throw error;
+      const rows = data ?? [];
+      zoneTimes.push(...rows.map(row => ({ session_id: row.session_id, zone: row.zone, duration_s: row.duration_s })));
+      if (rows.length < ZONE_PAGE_SIZE) break;
     }
   }
-  return [...selected.values()];
+  return zoneTimes;
+};
+
+const loadLaps = async (sessionIds: string[]): Promise<CardioLap[]> => {
+  const laps: CardioLap[] = [];
+  for (let batchStart = 0; batchStart < sessionIds.length; batchStart += DETAIL_SESSION_BATCH_SIZE) {
+    const batch = sessionIds.slice(batchStart, batchStart + DETAIL_SESSION_BATCH_SIZE);
+    for (let page = 0; ; page += 1) {
+      const start = page * HISTORY_PAGE_SIZE;
+      const { data, error } = await supabase
+        .from('activity_laps')
+        .select(
+          'session_id, lap_type, split_group, split_distance_m, distance_m, duration_s, avg_heart_rate, avg_pace_s_per_km',
+        )
+        .in('session_id', batch)
+        .order('session_id', { ascending: true })
+        .order('split_group', { ascending: true })
+        .order('split_group_order', { ascending: true })
+        .order('lap_index', { ascending: true })
+        .range(start, start + HISTORY_PAGE_SIZE - 1);
+      if (error) throw error;
+      const rows = data ?? [];
+      laps.push(...rows);
+      if (rows.length < HISTORY_PAGE_SIZE) break;
+    }
+  }
+  return laps;
+};
+
+const loadStrengthData = async (
+  userId: string,
+  sessionIds: string[],
+): Promise<{ workoutSets: CardioWorkoutSet[]; exerciseNames: CardioExerciseName[] }> => {
+  const workoutSets: CardioWorkoutSet[] = [];
+  for (let batchStart = 0; batchStart < sessionIds.length; batchStart += DETAIL_SESSION_BATCH_SIZE) {
+    const batch = sessionIds.slice(batchStart, batchStart + DETAIL_SESSION_BATCH_SIZE);
+    for (let page = 0; ; page += 1) {
+      const start = page * HISTORY_PAGE_SIZE;
+      const { data, error } = await supabase
+        .from('workout_sets')
+        .select('session_id, exercise_id, weight_kg, reps, rpe, is_warmup, set_type')
+        .eq('user_id', userId)
+        .in('session_id', batch)
+        .order('session_id', { ascending: true })
+        .order('exercise_id', { ascending: true })
+        .order('set_number', { ascending: true })
+        .range(start, start + HISTORY_PAGE_SIZE - 1);
+      if (error) throw error;
+      const rows = data ?? [];
+      workoutSets.push(...rows);
+      if (rows.length < HISTORY_PAGE_SIZE) break;
+    }
+  }
+  const exerciseIds = [...new Set(workoutSets.map(set => set.exercise_id))];
+  const exerciseNames: CardioExerciseName[] = [];
+  for (let batchStart = 0; batchStart < exerciseIds.length; batchStart += DETAIL_SESSION_BATCH_SIZE) {
+    const batch = exerciseIds.slice(batchStart, batchStart + DETAIL_SESSION_BATCH_SIZE);
+    const { data, error } = await supabase.from('exercises').select('id, base_name_es, base_name_en').in('id', batch);
+    if (error) throw error;
+    exerciseNames.push(...(data ?? []));
+  }
+  return { workoutSets, exerciseNames };
 };
 
 export const useCardioEvolution = () => {
@@ -134,6 +215,8 @@ export const useCardioEvolution = () => {
           weeklySummary: summarizeCardioWeek([], []),
           driftBySport: {},
           intervalRecoveryBySport: {},
+          zoneDataError: false,
+          streamDataError: false,
         };
       }
       const referenceDate = new Date();
@@ -143,10 +226,14 @@ export const useCardioEvolution = () => {
         const { data: pageRows, error: sessionsError } = await supabase
           .from('activity_sessions')
           .select(
-            'id, sport_type, sport_subtype, provider, device_id, start_time, duration_s, distance_m, avg_heart_rate, max_heart_rate, avg_speed_m_per_s, avg_power_w, avg_temp_c, elev_gain_m, total_volume_kg, total_sets, total_reps, workout_template_id',
+            'id, sport_type, sport_subtype, provider, device_id, start_time, duration_s, distance_m, avg_heart_rate, max_heart_rate, avg_speed_m_per_s, avg_power_w, avg_temp_c, elev_gain_m, total_volume_kg, total_sets, total_reps, workout_template_id, pool_type, stroke, surface, football_session_type, ski_type, snowboard_type',
           )
           .eq('user_id', user.id)
           .eq('status', 'completed')
+          .eq('needs_strength_review', false)
+          .or(
+            'duplicate_resolution.is.null,duplicate_resolution.neq.pending,duplicate_score.lt.80,duplicate_score.is.null',
+          )
           .not('end_time', 'is', null)
           .lte('start_time', referenceDate.toISOString())
           .order('start_time', { ascending: false })
@@ -159,41 +246,43 @@ export const useCardioEvolution = () => {
       const activities = sessionRows
         .map(toCardioActivity)
         .sort((left, right) => Date.parse(left.start_time) - Date.parse(right.start_time));
-      const streamCandidates = getStreamCandidates(activities, referenceDate);
+      const streamCandidates = selectCardioStreamCandidates(activities, referenceDate);
       const weekStart = new Date(referenceDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const weeklyIds = activities
-        .filter(activity => Date.parse(activity.start_time) >= Date.parse(weekStart))
+      const weeklyZoneSessionIds = activities
+        .filter(
+          activity =>
+            Date.parse(activity.start_time) >= Date.parse(weekStart) &&
+            PROVIDER_REPORTED_ZONE_PROVIDERS.has(activity.provider.toLowerCase()),
+        )
         .map(activity => activity.id);
-      const [zoneResult, streamSamples] = await Promise.all([
-        weeklyIds.length > 0
-          ? supabase
-              .from('activity_heart_rate_zones')
-              .select('session_id, zone, duration_s')
-              .in('session_id', weeklyIds)
-          : Promise.resolve({ data: [], error: null }),
+      const [zoneResult, streamResult] = await Promise.all([
+        loadZoneTimes(weeklyZoneSessionIds)
+          .then(zoneTimes => ({ zoneTimes, failed: false }))
+          .catch(() => ({ zoneTimes: [], failed: true })),
         loadStreamSamples(
           user.id,
-          streamCandidates.map(activity => activity.id),
-        ),
+          streamCandidates.map(candidate => candidate.activity.id),
+        )
+          .then(samples => ({ samples, failed: false }))
+          .catch(() => ({ samples: [], failed: true })),
       ]);
-      if (zoneResult.error) throw zoneResult.error;
-      const zoneTimes: CardioZoneTime[] = (zoneResult.data ?? []).map(row => ({
-        session_id: row.session_id,
-        zone: row.zone,
-        duration_s: row.duration_s,
-      }));
+      const zoneTimes = zoneResult.zoneTimes;
+      const streamSamples = streamResult.samples;
       const driftBySport: Record<string, CardiacDriftResult | null> = {};
       const intervalRecoveryBySport: Record<string, CardiacIntervalRecoveryResult | null> = {};
-      for (const activity of streamCandidates) {
+      for (const candidate of streamCandidates) {
+        const { activity } = candidate;
         const sportKey = getSportKey(activity);
-        driftBySport[sportKey] = analyzeCardiacDrift(
-          streamSamples,
-          activity.id,
-          activity.sport_type,
-          activity.duration_s ?? 0,
-          activity.start_time,
-        );
-        if (isIntervalWorkout(activity)) {
+        if (candidate.analyzeDrift) {
+          driftBySport[sportKey] = analyzeCardiacDrift(
+            streamSamples,
+            activity.id,
+            getSportKey(activity),
+            activity.duration_s ?? 0,
+            activity.start_time,
+          );
+        }
+        if (candidate.analyzeIntervalRecovery) {
           intervalRecoveryBySport[sportKey] = analyzeIntervalHeartRateRecovery(
             streamSamples,
             activity.id,
@@ -207,6 +296,104 @@ export const useCardioEvolution = () => {
         weeklySummary: summarizeCardioWeek(activities, zoneTimes, referenceDate),
         driftBySport,
         intervalRecoveryBySport,
+        zoneDataError: zoneResult.failed,
+        streamDataError: streamResult.failed,
+      };
+    },
+    staleTime: 1000 * 60 * 3,
+  });
+};
+
+export const useCardioEvolutionDetails = (
+  activities: CardioActivity[],
+  sportType: string,
+  period: CardioPeriod,
+  activitiesUpdatedAt: number,
+) => {
+  const { user } = useAuth();
+  const referenceDate = new Date();
+  const sessionIdsByPeriod = getCardioEvaluationSessionIds(activities, sportType, referenceDate, period);
+  const allPeriodIds = [...new Set([...sessionIdsByPeriod.previous, ...sessionIdsByPeriod.recent])];
+  const sessionIdsHash = allPeriodIds.reduce((hash, id) => {
+    let nextHash = hash;
+    for (let index = 0; index < id.length; index += 1) nextHash = (nextHash * 31 + id.charCodeAt(index)) >>> 0;
+    return nextHash;
+  }, 0);
+  const sessionIdsKey = `${allPeriodIds.length}:${sessionIdsHash.toString(36)}`;
+  return useQuery({
+    queryKey: [
+      healthQueryKeys.all(user?.id),
+      'cardio-evolution-details',
+      sportType,
+      period,
+      activitiesUpdatedAt,
+      sessionIdsKey,
+    ],
+    enabled: !!user?.id && !!sportType && activitiesUpdatedAt > 0,
+    queryFn: async () => {
+      if (!user || !sportType || allPeriodIds.length === 0) {
+        return {
+          laps: [],
+          workoutSets: [],
+          exerciseNames: [],
+          periodZoneTimes: {
+            recent: summarizeCardioZoneTimes([], []),
+            previous: summarizeCardioZoneTimes([], []),
+          },
+          periodZoneDataError: false,
+          lapDataError: false,
+          strengthDataError: false,
+        };
+      }
+      const relevantLaps = ['running', 'cycling', 'swimming', 'trail', 'hiking'].includes(
+        normalizeCardioSportType(sportType),
+      );
+      const activityProviderById = new Map(activities.map(activity => [activity.id, activity.provider]));
+      const providerZoneSessionIdsByPeriod = {
+        recent: sessionIdsByPeriod.recent.filter(sessionId =>
+          PROVIDER_REPORTED_ZONE_PROVIDERS.has((activityProviderById.get(sessionId) ?? '').toLowerCase()),
+        ),
+        previous: sessionIdsByPeriod.previous.filter(sessionId =>
+          PROVIDER_REPORTED_ZONE_PROVIDERS.has((activityProviderById.get(sessionId) ?? '').toLowerCase()),
+        ),
+      };
+      const providerZoneSessionIds = [
+        ...new Set([...providerZoneSessionIdsByPeriod.previous, ...providerZoneSessionIdsByPeriod.recent]),
+      ];
+      const [lapResult, strengthResult, zoneResult] = await Promise.all([
+        relevantLaps
+          ? loadLaps(allPeriodIds)
+              .then(laps => ({ laps, failed: false }))
+              .catch(() => ({ laps: [] as CardioLap[], failed: true }))
+          : Promise.resolve({ laps: [] as CardioLap[], failed: false }),
+        normalizeCardioSportType(sportType) === 'gym'
+          ? loadStrengthData(user.id, allPeriodIds)
+              .then(data => ({ ...data, failed: false }))
+              .catch(() => ({
+                workoutSets: [] as CardioWorkoutSet[],
+                exerciseNames: [] as CardioExerciseName[],
+                failed: true,
+              }))
+          : Promise.resolve({
+              workoutSets: [] as CardioWorkoutSet[],
+              exerciseNames: [] as CardioExerciseName[],
+              failed: false,
+            }),
+        loadZoneTimes(providerZoneSessionIds)
+          .then(zoneTimes => ({ zoneTimes, failed: false }))
+          .catch(() => ({ zoneTimes: [] as CardioZoneTime[], failed: true })),
+      ]);
+      return {
+        laps: lapResult.laps,
+        workoutSets: strengthResult.workoutSets,
+        exerciseNames: strengthResult.exerciseNames,
+        periodZoneTimes: {
+          recent: summarizeCardioZoneTimes(zoneResult.zoneTimes, providerZoneSessionIdsByPeriod.recent),
+          previous: summarizeCardioZoneTimes(zoneResult.zoneTimes, providerZoneSessionIdsByPeriod.previous),
+        },
+        periodZoneDataError: zoneResult.failed,
+        lapDataError: lapResult.failed,
+        strengthDataError: strengthResult.failed,
       };
     },
     staleTime: 1000 * 60 * 3,

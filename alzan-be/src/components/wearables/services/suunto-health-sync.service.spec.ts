@@ -121,6 +121,7 @@ async function assertHealthSyncUsesIndependentDomainAndMapsPayloads(): Promise<v
           claims.push(input);
           return { action: 'claimed', jobId: 'job', leaseToken: 'lease' };
         },
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async () => undefined,
       } as never,
     );
@@ -172,6 +173,7 @@ async function assertHealthFailureIsPartial(): Promise<void> {
       } as never,
       {
         claimSyncJob: async () => ({ action: 'claimed', jobId: 'job', leaseToken: 'lease' }),
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async () => undefined,
       } as never,
     );
@@ -465,6 +467,7 @@ async function assertHealthWriteFailurePreservesCursor(): Promise<void> {
       } as never,
       {
         claimSyncJob: async () => ({ action: 'acquired', jobId: 'job', leaseToken: 'lease' }),
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async ({ status }: { status: string }) => {
           finishedStatus = status;
         },
@@ -489,4 +492,47 @@ void (async () => {
   await assertCorrectedSampleUpdatesWithoutChangingOtherOwners();
   await assertExistingSamplesUseStablePagination();
   await assertHealthWriteFailurePreservesCursor();
+  await assertCancellationAfterMetricWriteRetainsCount();
 })();
+
+async function assertCancellationAfterMetricWriteRetainsCount(): Promise<void> {
+  const originalGet = axios.get;
+  let cancelled = false;
+  let finishedCounters: Record<string, number> = {};
+  axios.get = (async (url: string) => ({
+    data: url.endsWith('/activity')
+      ? [{ timestamp: '2026-09-10T12:00:00Z', entryData: { HR: 80, StepCount: 10 } }]
+      : [],
+  })) as typeof axios.get;
+  try {
+    const service = new SuuntoHealthSyncService(
+      {
+        get: (key: string) =>
+          key === 'SUUNTO_247_ENABLED' ? 'true' : key === 'SUUNTO_247_SUBSCRIPTION_KEY' ? 'key' : undefined,
+      } as never,
+      { getHealthAccessToken: async () => 'token' } as never,
+      {
+        replaceHealthMetricSamples: async () => 1,
+        upsertDailyActivity: async () => {
+          cancelled = true;
+          throw new Error('write interrupted');
+        },
+      } as never,
+      { getCursor: async () => null, markFailed: async () => undefined } as never,
+      {
+        claimSyncJob: async () => ({ action: 'acquired', jobId: 'job', leaseToken: 'lease' }),
+        isSyncCancellationRequested: async () => cancelled,
+        finishSyncJob: async ({ counters }: { counters: Record<string, number> }) => {
+          finishedCounters = counters;
+          return true;
+        },
+      } as never,
+    );
+    const result = await service.sync('user-1');
+    assert.equal(result.cancelled, true);
+    assert.equal(result.healthSamplesImported, 1);
+    assert.equal(finishedCounters.healthSamplesImported, 1);
+  } finally {
+    axios.get = originalGet;
+  }
+}

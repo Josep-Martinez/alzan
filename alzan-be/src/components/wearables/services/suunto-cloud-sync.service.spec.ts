@@ -178,6 +178,7 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
         leaseToken: 'lease-1',
         leaseExpiresAt: '2026-06-15T10:05:00.000Z',
       }),
+      isSyncCancellationRequested: async () => false,
       claimActivity: async (input: { sourceRecordId: string }) =>
         input.sourceRecordId === 'existing-workout'
           ? { action: 'skip', importId: 'import-existing', sessionId: 'session-existing' }
@@ -264,6 +265,36 @@ async function run(): Promise<void> {
   assertIncrementalAndRepairLookbacks();
   await assertRateLimitRetriesRespectRetryAfter();
   await assertSyncSkipsAlreadyImportedWorkouts();
+  await assertCancelledSyncDoesNotReportSuccessTime();
+}
+
+async function assertCancelledSyncDoesNotReportSuccessTime(): Promise<void> {
+  let checks = 0;
+  const service = new SuuntoCloudSyncService(
+    {} as ConfigService,
+    {} as SupabaseAdminService,
+    {} as RawPayloadService,
+    { saveState: async () => undefined } as unknown as IntegrationSyncStateService,
+    {} as CanonicalActivityWriterService,
+    {
+      claimSyncJob: async () => ({ action: 'acquired', jobId: 'job', leaseToken: 'lease' }),
+      isSyncCancellationRequested: async () => ++checks >= 3,
+      renewSyncJob: async () => undefined,
+      finishSyncJob: async () => false,
+      releaseSyncJob: () => undefined,
+    } as unknown as WearableImportLifecycleService,
+  ) as unknown as {
+    getUsableToken: () => Promise<{ accessToken: string }>;
+    fetchWorkoutSummaries: () => Promise<{ workouts: JsonRecord[]; isPaginationVerified: boolean }>;
+    syncActivities: (userId: string) => Promise<{ cancelled?: boolean; lastSuccessAt: string | null }>;
+  };
+  service.getUsableToken = async () => ({ accessToken: 'token' });
+  service.fetchWorkoutSummaries = async () => ({ workouts: [], isPaginationVerified: true });
+
+  const result = await service.syncActivities('user');
+
+  assert.equal(result.cancelled, true);
+  assert.equal(result.lastSuccessAt, null);
 }
 
 void run();

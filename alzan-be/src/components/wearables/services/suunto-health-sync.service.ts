@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { Insert } from '../../../types/requests.types';
@@ -11,17 +11,20 @@ import { CanonicalProvenance } from '../domain/wearable.types';
 import { CanonicalHealthWriterService } from './canonical-health-writer.service';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { SuuntoCloudSyncService } from './suunto-cloud-sync.service';
-import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import { WearableImportLifecycleService, WearableSyncJobClaim } from './wearable-import-lifecycle.service';
+import { WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
 
 type JsonRecord = Record<string, unknown>;
 type SyncOutcome = {
   status: 'success' | 'partial' | 'unavailable' | 'running';
+  cancelled?: boolean;
   healthSamplesImported: number;
   healthDaysImported: number;
   sleepsImported: number;
   recoveriesImported: number;
   errorCode?: string;
   lastSyncedAt: string | null;
+  retryAfterAt?: string | null;
 };
 
 const MS_PER_DAY = 86_400_000;
@@ -30,6 +33,8 @@ const MAX_API_WINDOW_DAYS = 28;
 
 @Injectable()
 export class SuuntoHealthSyncService {
+  private readonly logger = new Logger(SuuntoHealthSyncService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly suunto: SuuntoCloudSyncService,
@@ -60,6 +65,11 @@ export class SuuntoHealthSyncService {
     }
 
     let job: Awaited<ReturnType<WearableImportLifecycleService['claimSyncJob']>> | null = null;
+    let stopLeaseHeartbeat: (() => void) | null = null;
+    let healthSamplesImported = 0;
+    let healthDaysImported = 0;
+    let sleepsImported = 0;
+    let recoveriesImported = 0;
     try {
       job = await this.lifecycle.claimSyncJob({
         userId,
@@ -67,8 +77,10 @@ export class SuuntoHealthSyncService {
         syncDomain: 'health_metrics',
         leaseSeconds: 1800,
       });
-      if (job.action === 'active') return this.outcome('running');
-      const accessToken = await this.suunto.getHealthAccessToken(userId);
+      if (job.action === 'active') return this.outcome('running', undefined, job.retryAfterAt);
+      stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
+      if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) return this.finishCancelled(job, 0, 0, 0, 0);
+      const accessToken = await this.suunto.getHealthAccessToken(userId, job.jobId);
       const now = Date.now();
       const previousCursor = await this.states.getCursor({
         userId,
@@ -81,7 +93,8 @@ export class SuuntoHealthSyncService {
       const from = Number.isFinite(cursorTime)
         ? Math.max(now - HEALTH_LOOKBACK_DAYS * MS_PER_DAY, cursorTime - 3 * MS_PER_DAY)
         : now - HEALTH_LOOKBACK_DAYS * MS_PER_DAY;
-      const samples = await this.fetchWindowedSamples(accessToken, subscriptionKey, from, now);
+      const samples = await this.fetchWindowedSamples(accessToken, subscriptionKey, from, now, job.jobId);
+      if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) return this.finishCancelled(job, 0, 0, 0, 0);
       const activity = this.records(samples.activity);
       const sleepRecords = this.records(samples.sleep);
       const recoveryRecords = this.records(samples.recovery);
@@ -90,7 +103,7 @@ export class SuuntoHealthSyncService {
 
       // Keep the existing activities domain and importer independent. This phase only writes wellness data.
       const rows = this.buildMetricRows(userId, activity, recoveryRecords);
-      const healthSamplesImported = await this.writer.replaceHealthMetricSamples({
+      healthSamplesImported = await this.writer.replaceHealthMetricSamples({
         userId,
         provider: 'suunto',
         sourceChannel: 'cloud',
@@ -98,6 +111,9 @@ export class SuuntoHealthSyncService {
         to: toIso,
         rows,
       });
+      if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) {
+        return this.finishCancelled(job, healthSamplesImported, 0, 0, 0);
+      }
 
       const provenance: CanonicalProvenance = {
         provider: 'suunto',
@@ -137,6 +153,15 @@ export class SuuntoHealthSyncService {
         dailyByDate.set(mapped.date, current);
       }
       for (const [date, daily] of dailyByDate) {
+        if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) {
+          return this.finishCancelled(
+            job,
+            healthSamplesImported,
+            healthDaysImported,
+            sleepsImported,
+            recoveriesImported,
+          );
+        }
         const mapped = mapSuuntoDailyActivityToCanonical(daily.latest);
         await this.writer.upsertDailyActivity({
           userId,
@@ -147,8 +172,18 @@ export class SuuntoHealthSyncService {
           },
           provenance: { ...provenance, sourceRecordId: `daily:${date}` },
         });
+        healthDaysImported += 1;
       }
       for (const record of sleepRecords) {
+        if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) {
+          return this.finishCancelled(
+            job,
+            healthSamplesImported,
+            healthDaysImported,
+            sleepsImported,
+            recoveriesImported,
+          );
+        }
         const sleep = mapSuuntoSleepToCanonical(record);
         const entryData = this.entryData(record);
         sleep.healthSamples = [
@@ -162,8 +197,18 @@ export class SuuntoHealthSyncService {
           sleep,
           provenance: { ...provenance, sourceRecordId: sleep.sourceSleepId },
         });
+        sleepsImported += 1;
       }
       for (const record of recoveryRecords) {
+        if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) {
+          return this.finishCancelled(
+            job,
+            healthSamplesImported,
+            healthDaysImported,
+            sleepsImported,
+            recoveriesImported,
+          );
+        }
         const recovery = mapSuuntoRecoveryToCanonical(record);
         recovery.healthSamples = [];
         await this.writer.upsertRecovery({
@@ -171,6 +216,11 @@ export class SuuntoHealthSyncService {
           recovery: { ...recovery, sourceRecordId: `recovery:${recovery.date}` },
           provenance: { ...provenance, sourceRecordId: `recovery:${recovery.date}` },
         });
+        recoveriesImported += 1;
+      }
+
+      if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) {
+        return this.finishCancelled(job, healthSamplesImported, healthDaysImported, sleepsImported, recoveriesImported);
       }
 
       const lastSyncedAt = new Date().toISOString();
@@ -190,23 +240,30 @@ export class SuuntoHealthSyncService {
           recoveries: recoveryRecords.length,
         },
       });
-      await this.lifecycle.finishSyncJob({
+      const cancelledAtFinish = await this.lifecycle.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status: 'success',
-        counters: { healthSamplesImported, healthDaysImported: dailyByDate.size, sleepsImported: sleepRecords.length },
+        counters: { healthSamplesImported, healthDaysImported, sleepsImported, recoveriesImported },
         lastError: null,
       });
       return {
-        status: 'success',
+        status: cancelledAtFinish ? 'partial' : 'success',
+        cancelled: cancelledAtFinish,
         healthSamplesImported,
-        healthDaysImported: dailyByDate.size,
-        sleepsImported: sleepRecords.length,
-        recoveriesImported: recoveryRecords.length,
-        lastSyncedAt,
+        healthDaysImported,
+        sleepsImported,
+        recoveriesImported,
+        lastSyncedAt: cancelledAtFinish ? null : lastSyncedAt,
       };
     } catch (error: unknown) {
       const errorCode = this.errorCode(error);
+      if (
+        job?.action === 'acquired' &&
+        (await this.lifecycle.isSyncCancellationRequested(job.jobId).catch(() => false))
+      ) {
+        return this.finishCancelled(job, healthSamplesImported, healthDaysImported, sleepsImported, recoveriesImported);
+      }
       await this.states
         .markFailed(
           {
@@ -231,7 +288,20 @@ export class SuuntoHealthSyncService {
           .catch(() => undefined);
       }
       return this.outcome('partial', errorCode);
+    } finally {
+      stopLeaseHeartbeat?.();
+      if (job?.action === 'acquired') this.lifecycle.releaseSyncJob?.(job.jobId);
     }
+  }
+
+  private startLeaseHeartbeat(jobId: string, leaseToken: string): () => void {
+    const timer = setInterval(() => {
+      void this.lifecycle.renewSyncJob(jobId, leaseToken).catch(error => {
+        this.logger.error('Failed to renew Suunto health sync job lease', error as Error);
+      });
+    }, 60_000);
+    timer.unref();
+    return () => clearInterval(timer);
   }
 
   private async fetchWindowedSamples(
@@ -239,20 +309,39 @@ export class SuuntoHealthSyncService {
     key: string,
     from: number,
     to: number,
+    jobId: string,
   ): Promise<{ activity: unknown[]; sleep: unknown[]; recovery: unknown[] }> {
     const result = { activity: [] as unknown[], sleep: [] as unknown[], recovery: [] as unknown[] };
     const headers = { Authorization: `Bearer ${token}`, 'Ocp-Apim-Subscription-Key': key };
     for (let start = from; start < to; start += MAX_API_WINDOW_DAYS * MS_PER_DAY) {
+      if (await this.lifecycle.isSyncCancellationRequested(jobId)) break;
       const end = Math.min(start + MAX_API_WINDOW_DAYS * MS_PER_DAY, to);
       const params = { from: start, to: end };
+      const signal = this.lifecycle.getSyncJobSignal?.(jobId);
       const [activity, sleep, recovery] = await Promise.all([
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/activity', { headers, params, timeout: 30_000 }),
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/sleep', { headers, params, timeout: 30_000 }),
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/recovery', { headers, params, timeout: 30_000 }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/activity', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/sleep', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/recovery', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
       ]);
       result.activity.push(...this.records(activity.data));
       result.sleep.push(...this.records(sleep.data));
       result.recovery.push(...this.records(recovery.data));
+      if (await this.lifecycle.isSyncCancellationRequested(jobId)) break;
     }
     return result;
   }
@@ -414,7 +503,7 @@ export class SuuntoHealthSyncService {
     return error instanceof Error && /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'SUUNTO_247_SYNC_FAILED';
   }
 
-  private outcome(status: SyncOutcome['status'], errorCode?: string): SyncOutcome {
+  private outcome(status: SyncOutcome['status'], errorCode?: string, retryAfterAt?: string | null): SyncOutcome {
     return {
       status,
       healthSamplesImported: 0,
@@ -422,6 +511,33 @@ export class SuuntoHealthSyncService {
       sleepsImported: 0,
       recoveriesImported: 0,
       errorCode,
+      lastSyncedAt: null,
+      retryAfterAt,
+    };
+  }
+
+  private async finishCancelled(
+    job: Pick<WearableSyncJobClaim, 'jobId' | 'leaseToken'>,
+    healthSamplesImported: number,
+    healthDaysImported: number,
+    sleepsImported: number,
+    recoveriesImported: number,
+  ): Promise<SyncOutcome> {
+    await this.lifecycle.finishSyncJob({
+      jobId: job.jobId,
+      leaseToken: job.leaseToken,
+      status: 'partial',
+      counters: { healthSamplesImported, healthDaysImported, sleepsImported, recoveriesImported },
+      lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+    });
+    return {
+      status: 'partial',
+      cancelled: true,
+      healthSamplesImported,
+      healthDaysImported,
+      sleepsImported,
+      recoveriesImported,
+      errorCode: WEARABLE_SYNC_CANCEL_REQUESTED,
       lastSyncedAt: null,
     };
   }
