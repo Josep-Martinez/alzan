@@ -8,7 +8,12 @@ import {
 import { DailyMealItem, AdherenceStatus, Macros } from '../types';
 import { format } from 'date-fns';
 import { DEFAULT_MACROS } from '../constants';
-import { getDailyMealMacros, getMenuImportMealState } from '../services/menuImportStatus';
+import {
+  addDailyMealMacrosToTotals,
+  getDailyMealMacros,
+  getMenuImportMealState,
+  shouldCountMealMacros,
+} from '../services/menuImportStatus';
 import { shouldShowPendingPlannedMeals } from '../services/nutritionVacation';
 import { useAuth } from '../../../context/AuthContext';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
@@ -85,7 +90,6 @@ export function useDayNutrition(date: Date) {
     // Construct Item
     if (log) {
       // It's done (or skipped)
-      const isSkipped = log.adherence_status === 'skipped';
       const importedState = getMenuImportMealState(log, currentNutritionDate);
       const isImportedPlanned = importedState === 'planned';
       const logMacros = getDailyMealMacros(log);
@@ -114,12 +118,7 @@ export function useDayNutrition(date: Date) {
         logId: log.id,
       });
 
-      if (!isSkipped && !isImportedPlanned) {
-        totals.kcal += log.kcal || 0;
-        totals.protein_g += log.protein_g || 0;
-        totals.carbs_g += log.carbs_g || 0;
-        totals.fats_g += log.fats_g || 0;
-      }
+      if (shouldCountMealMacros(log, currentNutritionDate)) addDailyMealMacrosToTotals(totals, log);
     } else if (shouldShowPendingPlannedMeals(isVacationDay)) {
       // It's pending
       dailyMeals.push({
@@ -173,12 +172,7 @@ export function useDayNutrition(date: Date) {
 
     dailyMeals.push(item);
 
-    if (!isImportedPlanned && !isSkipped) {
-      totals.kcal += log.kcal || 0;
-      totals.protein_g += log.protein_g || 0;
-      totals.carbs_g += log.carbs_g || 0;
-      totals.fats_g += log.fats_g || 0;
-    }
+    if (shouldCountMealMacros(log, currentNutritionDate)) addDailyMealMacrosToTotals(totals, log);
   });
 
   // Sort by order

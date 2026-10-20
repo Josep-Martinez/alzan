@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 
 import {
-  DailyMealMacroLog,
+  addDailyMealMacrosToTotals,
   getDailyMealMacros,
   getMealSaveProvenance,
   getMenuImportMealState,
+  shouldCountMealMacros,
   MenuImportStatusLog,
 } from './menuImportStatus';
 
@@ -21,6 +22,11 @@ function run() {
 
   assert.equal(getMenuImportMealState(createLog(), currentNutritionDate), 'planned');
   assert.equal(getMenuImportMealState(createLog({ date: '2026-07-25' }), currentNutritionDate), 'planned');
+  assert.equal(
+    getMenuImportMealState(createLog({ adherence_status: 'extra_meal' }), currentNutritionDate),
+    'not_imported',
+    'an explicitly added meal must count even if its source was an imported menu',
+  );
   assert.equal(getMenuImportMealState(createLog({ date: '2026-07-23' }), currentNutritionDate), 'assumed_eaten');
   assert.equal(
     getMenuImportMealState(createLog({ adherence_status: 'done_as_planned' }), currentNutritionDate),
@@ -39,25 +45,33 @@ function run() {
     'not_imported',
   );
 
-  const skippedMeal: DailyMealMacroLog = {
-    adherence_status: 'skipped',
+  const skippedMeal = {
+    ...createLog({ source: 'manual', origin: 'user', adherence_status: 'skipped' }),
     kcal: 640,
     protein_g: 32,
     carbs_g: 75,
     fats_g: 18,
   };
   assert.deepEqual(getDailyMealMacros(skippedMeal), {
-    kcal: 0,
-    protein_g: 0,
-    carbs_g: 0,
-    fats_g: 0,
-  });
-  assert.deepEqual(getDailyMealMacros({ ...skippedMeal, adherence_status: 'done_with_changes' }), {
     kcal: 640,
     protein_g: 32,
     carbs_g: 75,
     fats_g: 18,
   });
+
+  const totals = { kcal: 0, protein_g: 0, carbs_g: 0, fats_g: 0 };
+  if (shouldCountMealMacros(skippedMeal, currentNutritionDate)) addDailyMealMacrosToTotals(totals, skippedMeal);
+  assert.deepEqual(totals, { kcal: 0, protein_g: 0, carbs_g: 0, fats_g: 0 });
+
+  assert.equal(shouldCountMealMacros(createLog(), currentNutritionDate), false);
+  assert.equal(shouldCountMealMacros(createLog({ date: '2026-07-23' }), currentNutritionDate), true);
+  assert.equal(
+    shouldCountMealMacros(
+      { ...skippedMeal, adherence_status: 'extra_meal', source: 'meal_copy_v1', origin: 'imported' },
+      currentNutritionDate,
+    ),
+    true,
+  );
 
   const importedLog = createLog();
   assert.deepEqual(getMealSaveProvenance(importedLog), {

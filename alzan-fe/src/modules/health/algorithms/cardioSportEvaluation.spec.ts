@@ -960,6 +960,18 @@ assert.deepEqual(
 );
 assert.ok(heartRateTrendSeries[0].date < heartRateTrendSeries[1].date);
 
+process.env.TZ = 'America/Los_Angeles';
+const localDateTrend = getCardioHeartRateTrendSeries(
+  [makeActivity('local-date-session', 0, { start_time: '2026-10-10T23:30:00.000Z', avg_heart_rate: 150 })],
+  ['local-date-session'],
+  'month',
+);
+assert.equal(
+  `${localDateTrend[0].date.getFullYear()}-${String(localDateTrend[0].date.getMonth() + 1).padStart(2, '0')}-${String(localDateTrend[0].date.getDate()).padStart(2, '0')}`,
+  '2026-10-10',
+  'heart-rate trend buckets must use the user-local calendar date',
+);
+
 const firstSession = evaluateCardioSport([makeActivity('first', 1)], 'running', referenceDate, 'month');
 assert.equal(firstSession.level, 'E');
 assert.equal(firstSession.volume.previous.sessionCount, 0);

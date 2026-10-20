@@ -7,27 +7,29 @@ export type MenuImportMealState = 'planned' | 'assumed_eaten' | 'skipped' | 'not
 
 export type MealSaveProvenance = Pick<MealLog, 'adherence_status' | 'origin' | 'source'>;
 
-export type DailyMealMacroLog = Pick<MealLog, 'adherence_status' | 'kcal' | 'protein_g' | 'carbs_g' | 'fats_g'>;
+export type DailyMealMacroLog = Pick<MealLog, 'kcal' | 'protein_g' | 'carbs_g' | 'fats_g'>;
 
 const isImportedMenuLog = (log: MenuImportStatusLog): boolean =>
-  log.source === 'menu_import_v1' && log.origin === 'imported';
+  log.source === 'menu_import_v1' && log.origin === 'imported' && log.adherence_status !== 'extra_meal';
 
-export const getDailyMealMacros = (log: DailyMealMacroLog): Macros => {
-  if (log.adherence_status === 'skipped') {
-    return {
-      kcal: 0,
-      protein_g: 0,
-      carbs_g: 0,
-      fats_g: 0,
-    };
-  }
+export const getDailyMealMacros = (log: DailyMealMacroLog): Macros => ({
+  kcal: log.kcal || 0,
+  protein_g: log.protein_g || 0,
+  carbs_g: log.carbs_g || 0,
+  fats_g: log.fats_g || 0,
+});
 
-  return {
-    kcal: log.kcal || 0,
-    protein_g: log.protein_g || 0,
-    carbs_g: log.carbs_g || 0,
-    fats_g: log.fats_g || 0,
-  };
+export const addDailyMealMacrosToTotals = (totals: Macros, log: DailyMealMacroLog): void => {
+  const macros = getDailyMealMacros(log);
+  totals.kcal += macros.kcal;
+  totals.protein_g += macros.protein_g;
+  totals.carbs_g += macros.carbs_g;
+  totals.fats_g += macros.fats_g;
+};
+
+export const shouldCountMealMacros = (log: MenuImportStatusLog, currentNutritionDate: string): boolean => {
+  if (log.adherence_status === 'skipped') return false;
+  return getMenuImportMealState(log, currentNutritionDate) !== 'planned';
 };
 
 export const getMenuImportMealState = (log: MenuImportStatusLog, currentNutritionDate: string): MenuImportMealState => {

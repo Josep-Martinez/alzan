@@ -233,14 +233,14 @@ export const getCardioHeartRateTrendSeries = (
     seenIds.add(activity.id);
     const date = new Date(timestamp);
     if (period === 'all') {
-      date.setUTCDate(1);
-      date.setUTCHours(0, 0, 0, 0);
+      date.setDate(1);
+      date.setHours(0, 0, 0, 0);
     } else if (period === 'three_months' || period === 'six_months') {
-      const daysSinceMonday = (date.getUTCDay() + 6) % 7;
-      date.setUTCDate(date.getUTCDate() - daysSinceMonday);
-      date.setUTCHours(0, 0, 0, 0);
+      const daysSinceMonday = (date.getDay() + 6) % 7;
+      date.setDate(date.getDate() - daysSinceMonday);
+      date.setHours(0, 0, 0, 0);
     } else {
-      date.setUTCHours(0, 0, 0, 0);
+      date.setHours(0, 0, 0, 0);
     }
     const bucketDate = date.getTime();
     const bucket = byDate.get(bucketDate) ?? [];

@@ -33,7 +33,20 @@ const day: DailyProgress = {
       duration_s: null,
     },
   ],
-  meals: [{ id: 'meal-1', date: '2026-09-29', meal_type: 'lunch', name: 'Comida', notes: null }],
+  meals: [
+    {
+      id: 'meal-1',
+      date: '2026-09-29',
+      meal_type: 'lunch',
+      name: 'Comida',
+      notes: null,
+      kcal: 544,
+      protein_g: 35,
+      carbs_g: 58,
+      fats_g: 20,
+      adherence_status: 'done_as_planned',
+    },
+  ],
   items: [
     {
       meal_log_id: 'meal-1',
@@ -69,6 +82,10 @@ const messages: Record<string, string> = {
   'progressPdf.noTrainingRecorded': 'No training session recorded',
   'progressPdf.noFoodRecorded': 'No food log recorded',
   'progressPdf.noIngredients': 'No ingredients',
+  'nutrition.kcal': 'kcal',
+  'nutrition.proteins': 'Protein',
+  'nutrition.carbs': 'Carbs',
+  'nutrition.fats': 'Fat',
   'progressPdf.title': 'Daily progress',
   'progressPdf.daysWithFood': 'days with food',
   'progressPdf.trainingDays': 'training days',
@@ -86,6 +103,7 @@ const html = createDailyProgressHtml([day], translate, enUS);
 assert.match(html, /0 kg/);
 assert.match(html, /0 pasos|0 steps/);
 assert.match(html, /120 g/);
+assert.match(html, /544 kcal · Protein 35 g · Carbs 58 g · Fat 20 g/);
 assert.match(html, /Remo &lt;alto&gt;/);
 assert.doesNotMatch(html, /Remo <alto>/);
 assert.match(html, /min\/km/);
@@ -111,3 +129,10 @@ const emptyDay = createDailyProgressHtml(
 );
 assert.match(emptyDay, /progressPdf\.noData|Sin dato|No data/);
 assert.match(emptyDay, /progressPdf\.noTrainingRecorded|Sin entrenamiento registrado|No training session recorded/);
+
+const skippedMealHtml = createDailyProgressHtml(
+  [{ ...day, meals: day.meals.map(meal => ({ ...meal, adherence_status: 'skipped' })) }],
+  translate,
+  enUS,
+);
+assert.doesNotMatch(skippedMealHtml, /544 kcal/);

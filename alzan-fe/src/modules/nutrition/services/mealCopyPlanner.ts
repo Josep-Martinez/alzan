@@ -75,7 +75,7 @@ export const buildMealCopyDraft = (
         logged_at: new Date().toISOString(),
         origin: sourceLog.origin,
         origin_confidence: sourceLog.origin_confidence,
-        source: sourceLog.source,
+        source: 'meal_copy_v1',
         source_recipe_id: sourceLog.source_recipe_id,
         diet_template_meal_id: null,
       }

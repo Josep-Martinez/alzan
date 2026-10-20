@@ -57,17 +57,26 @@ const renderDailyCard = (day: DailyProgress, t: ProgressPdfTranslator, locale: L
       .filter(Boolean)
       .join(' — ');
   });
-  const foodLines = day.meals.flatMap(meal => {
-    const items = day.items.filter(item => item.meal_log_id === meal.id);
-    const title = [meal.meal_type, meal.name].filter(Boolean).join(' — ');
-    if (items.length === 0) return [`${title}: ${t('progressPdf.noIngredients')}`];
-    return [`${title}:`].concat(
-      items.map(item => {
-        const quality = item.data_quality === 'automatic' ? t('progressPdf.automatic') : t('progressPdf.manual');
-        return `${item.name}, ${item.quantity_g} g (${quality})`;
-      }),
-    );
-  });
+  const foodLines = day.meals
+    .filter(meal => meal.adherence_status !== 'skipped')
+    .flatMap(meal => {
+      const items = day.items.filter(item => item.meal_log_id === meal.id);
+      const title = [meal.meal_type, meal.name].filter(Boolean).join(' — ');
+      const macros = [
+        numeric(meal.kcal, t('nutrition.kcal'), t),
+        `${t('nutrition.proteins')} ${numeric(meal.protein_g, 'g', t)}`,
+        `${t('nutrition.carbs')} ${numeric(meal.carbs_g, 'g', t)}`,
+        `${t('nutrition.fats')} ${numeric(meal.fats_g, 'g', t)}`,
+      ].join(' · ');
+      const mealHeader = `${title} — ${macros}`;
+      if (items.length === 0) return [`${mealHeader}: ${t('progressPdf.noIngredients')}`];
+      return [`${mealHeader}:`].concat(
+        items.map(item => {
+          const quality = item.data_quality === 'automatic' ? t('progressPdf.automatic') : t('progressPdf.manual');
+          return `${item.name}, ${item.quantity_g} g (${quality})`;
+        }),
+      );
+    });
   const statusText =
     day.status === 'vacation'
       ? t('progressPdf.vacationLegend')

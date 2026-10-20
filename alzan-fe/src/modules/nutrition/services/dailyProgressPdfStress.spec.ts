@@ -64,6 +64,11 @@ const days: DailyProgress[] = Array.from({ length: 93 }, (_, dayIndex) => {
           meal_type: (['breakfast', 'lunch', 'snack', 'dinner'] as const)[mealIndex],
           name: `Plato ${dayIndex}-${mealIndex}`,
           notes: null,
+          kcal: 520 + mealIndex * 40,
+          protein_g: 25 + mealIndex,
+          carbs_g: 60 + mealIndex,
+          fats_g: 15 + mealIndex,
+          adherence_status: 'done_as_planned',
         })),
     items: isSparseDay
       ? []

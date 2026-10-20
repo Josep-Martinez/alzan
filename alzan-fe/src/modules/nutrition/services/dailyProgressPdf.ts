@@ -5,6 +5,7 @@ import i18n from '../../../i18n';
 import type { TranslationKey } from '../../../i18n/locales/en';
 import type { Row } from '../../../types/requests.types';
 import { createDailyProgressHtml as renderDailyProgressHtml } from './dailyProgressPdfView';
+import { isNutritionPdfRecord } from './nutritionPdfRecords';
 
 type ProgressSession = Pick<
   Row<'activity_sessions'>,
@@ -15,7 +16,10 @@ type ProgressSet = Pick<
   'session_id' | 'exercise_id' | 'set_number' | 'reps' | 'weight_kg' | 'distance_m' | 'duration_s'
 > & { exercise_name: string | null };
 type ProgressExercise = Pick<Row<'exercises'>, 'id' | 'base_name_en' | 'base_name_es'>;
-type ProgressMeal = Pick<Row<'meal_logs'>, 'id' | 'date' | 'meal_type' | 'name' | 'notes'>;
+type ProgressMeal = Pick<
+  Row<'meal_logs'>,
+  'id' | 'date' | 'meal_type' | 'name' | 'notes' | 'kcal' | 'protein_g' | 'carbs_g' | 'fats_g' | 'adherence_status'
+>;
 type ProgressItem = Pick<Row<'meal_items'>, 'meal_log_id' | 'name' | 'quantity_g' | 'data_quality' | 'origin'>;
 type ProgressWeight = Pick<Row<'weight_logs'>, 'measured_at' | 'weight_kg'>;
 type ProgressMeasurement = Pick<Row<'body_measurements'>, 'measured_at' | 'measurement_type' | 'value_cm'>;
@@ -108,7 +112,7 @@ export const loadDailyProgress = async (
         .order('start_time'),
       supabase
         .from('meal_logs')
-        .select('id,date,meal_type,name,notes')
+        .select('id,date,meal_type,name,notes,kcal,protein_g,carbs_g,fats_g,adherence_status')
         .eq('user_id', userId)
         .gte('date', startDate)
         .lte('date', endDate)
@@ -155,7 +159,7 @@ export const loadDailyProgress = async (
     ]),
   );
 
-  const meals = mealsResult.data ?? [];
+  const meals = (mealsResult.data ?? []).filter(isNutritionPdfRecord);
   const mealIds = meals.map(meal => meal.id);
   const itemsResult = mealIds.length
     ? await supabase

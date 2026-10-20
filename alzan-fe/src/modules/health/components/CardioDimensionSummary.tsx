@@ -334,7 +334,7 @@ export const CardioDimensionSummary = ({
           </View>
         ))}
       </View>
-      {heartRateTrendData.length > 1 ? (
+      {heartRateTrendData.length > 0 ? (
         <View style={styles.trendChartBlock}>
           <View style={styles.trendChartHeading}>
             <Text style={[styles.dimensionTitle, colors.title]}>{t('health.cardioHeartRateTrendTitle')}</Text>

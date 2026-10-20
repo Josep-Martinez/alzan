@@ -14,6 +14,7 @@ import { convertLengthToUi, convertWeightToUi } from '../../../utils/unitConvers
 import iconSource from '../../../../assets/icon.png';
 import { buildCompositionDeltas } from '../algorithms/compositionSnapshot';
 import { BodyCompositionLog } from './bodyCompositionService';
+import { summarizeHealthMetricPdfRows, type HealthMetricPdfSample } from './healthMetricPdf';
 
 interface PDFExportOptions {
   startDate: string;
@@ -48,6 +49,7 @@ type RestingHrLog = Row<'resting_hr_logs'>;
 type DailyHydration = Row<'daily_hydration'>;
 type SessionFeedback = Row<'session_feedback'>;
 type UserGoal = Row<'user_goals'>;
+const HEALTH_EXPORT_METRIC_TYPES = ['heart_rate', 'hrv_rmssd', 'recovery_balance', 'stress_state', 'spo2'];
 
 type SummaryCard = {
   label: string;
@@ -66,7 +68,7 @@ type DayBucket = {
   feedback: SessionFeedback[];
 };
 
-const t = (key: TranslationKey) => String(i18n.t(key));
+const t = (key: TranslationKey, options?: Record<string, string | number>) => String(i18n.t(key, options));
 const isEnglish = () => i18n.language?.startsWith('en');
 const getPdfDatePattern = () => (isEnglish() ? 'MMMM d, yyyy' : 'd MMMM yyyy');
 const getPdfDateTimePattern = () => (isEnglish() ? 'MMM d, HH:mm' : 'd MMM, HH:mm');
@@ -176,6 +178,31 @@ const average = (values: number[]): number | null => {
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
 };
 
+const loadHealthMetricSamples = async (
+  userId: string,
+  start: Date,
+  endExclusive: Date,
+): Promise<HealthMetricPdfSample[]> => {
+  const pageSize = 1000;
+  const rows: HealthMetricPdfSample[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('health_metric_samples')
+      .select('provider,source_channel,metric_type,recorded_at,local_date,unit,value')
+      .eq('user_id', userId)
+      .in('metric_type', HEALTH_EXPORT_METRIC_TYPES)
+      .gte('recorded_at', start.toISOString())
+      .lt('recorded_at', endExclusive.toISOString())
+      .order('recorded_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as HealthMetricPdfSample[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+};
+
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
@@ -262,6 +289,7 @@ export const generateHealthPDF = async ({
       hydrationResult,
       feedbackResult,
       goalsResult,
+      healthMetrics,
     ] = await Promise.all([
       loadAssetAsBase64(iconSource),
       supabase.from('users').select('*').eq('id', user.id).single(),
@@ -321,6 +349,7 @@ export const generateHealthPDF = async ({
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
+      loadHealthMetricSamples(user.id, start, endExclusive),
     ]);
 
     const queryError = [
@@ -350,6 +379,12 @@ export const generateHealthPDF = async ({
     const hydrationLogs = (hydrationResult.data ?? []) as DailyHydration[];
     const feedbackLogs = (feedbackResult.data ?? []) as SessionFeedback[];
     const goals = (goalsResult.data ?? []) as UserGoal[];
+    const wearableMetricRows = summarizeHealthMetricPdfRows(healthMetrics, t).map(row => [
+      format(parseISO(row.date), datePattern, { locale: dateLocale }),
+      row.metric,
+      row.value,
+      row.provider,
+    ]);
 
     const hasData =
       weights.length > 0 ||
@@ -357,6 +392,7 @@ export const generateHealthPDF = async ({
       measurements.length > 0 ||
       sleepSessions.length > 0 ||
       restingHrLogs.length > 0 ||
+      wearableMetricRows.length > 0 ||
       hydrationLogs.length > 0 ||
       feedbackLogs.length > 0;
     if (!hasData) throw new Error(t('health.pdfNoRecordsInRange'));
@@ -479,7 +515,7 @@ export const generateHealthPDF = async ({
       },
       {
         label: t('health.pdfDataPoints'),
-        value: `${weights.length + compositionLogs.length + measurements.length + sleepSessions.length + restingHrLogs.length + hydrationLogs.length + feedbackLogs.length}`,
+        value: `${weights.length + compositionLogs.length + measurements.length + sleepSessions.length + restingHrLogs.length + wearableMetricRows.length + hydrationLogs.length + feedbackLogs.length}`,
         meta: `${totalDays} ${t('health.days')}`,
       },
     ];
@@ -901,6 +937,9 @@ export const generateHealthPDF = async ({
 
         <div class="section-title">${escapeHtml(t('health.heartRate'))}</div>
         ${renderTable([t('health.recordDate'), t('health.unitBpm')], restingHrRows, t('health.pdfNoHeartRateData'))}
+
+        <div class="section-title">${escapeHtml(t('health.pdfWearableMetrics'))}</div>
+        ${renderTable([t('health.recordDate'), t('health.measure'), t('health.pdfValue'), t('health.pdfWearableProvider')], wearableMetricRows, t('health.pdfNoWearableMetrics'))}
 
         <div class="section-title">${escapeHtml(t('health.hydration'))}</div>
         ${renderTable([t('health.recordDate'), t('health.pdfWater')], hydrationRows, t('health.pdfNoHydrationData'))}

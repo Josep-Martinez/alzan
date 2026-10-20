@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import type { MealItem, MealLog, MealType, DietTemplateMeal } from '../../../types/requests.types';
+import { addDailyMealMacrosToTotals, getMenuImportMealState } from './menuImportStatus';
 import { buildMealCopyDraft, validateMealCopyDestination, type MealCopySource } from './mealCopyPlanner';
 
 const userId = 'user-1';
@@ -114,6 +115,48 @@ const testBuildsPlannedCopyWithoutInventingItems = () => {
   assert.deepEqual(draft.items, []);
 };
 
+const testExplicitlyCopiedImportedMealIsCountedAsUserMeal = () => {
+  const importedLog = {
+    ...loggedMeal,
+    source: 'menu_import_v1',
+    origin: 'imported' as const,
+  };
+  const copiedDraft = buildMealCopyDraft({ log: importedLog }, { date: '2026-08-10', mealType: 'breakfast' }, userId);
+
+  assert.equal(copiedDraft.log.adherence_status, 'extra_meal');
+  assert.equal(copiedDraft.log.source, 'meal_copy_v1');
+  assert.equal(copiedDraft.log.kcal, importedLog.kcal);
+  assert.equal(copiedDraft.log.protein_g, importedLog.protein_g);
+  assert.equal(copiedDraft.log.carbs_g, importedLog.carbs_g);
+  assert.equal(copiedDraft.log.fats_g, importedLog.fats_g);
+  const totals = { kcal: 0, protein_g: 0, carbs_g: 0, fats_g: 0 };
+  addDailyMealMacrosToTotals(totals, {
+    kcal: copiedDraft.log.kcal ?? 0,
+    protein_g: copiedDraft.log.protein_g ?? 0,
+    carbs_g: copiedDraft.log.carbs_g ?? 0,
+    fats_g: copiedDraft.log.fats_g ?? 0,
+  });
+  assert.deepEqual(totals, {
+    kcal: importedLog.kcal,
+    protein_g: importedLog.protein_g,
+    carbs_g: importedLog.carbs_g,
+    fats_g: importedLog.fats_g,
+  });
+  assert.equal(
+    getMenuImportMealState(
+      {
+        date: copiedDraft.log.date,
+        source: copiedDraft.log.source ?? '',
+        origin: copiedDraft.log.origin ?? 'user',
+        adherence_status: copiedDraft.log.adherence_status ?? 'extra_meal',
+      },
+      '2026-08-10',
+    ),
+    'not_imported',
+    'an explicit meal copy must not be hidden as a pending imported menu item',
+  );
+};
+
 const testValidatesDestinationAtTheServiceBoundary = () => {
   const referenceDate = new Date(2026, 7, 5, 12);
   assert.doesNotThrow(() => validateMealCopyDestination(testDestination, referenceDate));
@@ -126,6 +169,7 @@ const testValidatesDestinationAtTheServiceBoundary = () => {
 const run = async () => {
   testBuildsRegisteredCopy();
   testBuildsPlannedCopyWithoutInventingItems();
+  testExplicitlyCopiedImportedMealIsCountedAsUserMeal();
   testValidatesDestinationAtTheServiceBoundary();
   console.log('mealCopyPlanner: all tests passed');
 };

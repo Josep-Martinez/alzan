@@ -13,6 +13,7 @@ import { TranslationKey } from '../../../i18n/locales/en';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { createVacationDateSet, getNutritionExportAverageDayCount } from './nutritionVacation';
 import { generateDailyProgressHtml } from './dailyProgressPdf';
+import { hasNutritionPdfRecords } from './nutritionPdfRecords';
 
 import iconSource from '../../../../assets/icon.png';
 
@@ -193,6 +194,7 @@ export const generateDietPDF = async ({
 
     if (logsError) throw new Error(getErrorMessage(logsError));
     const safeLogs = logs ?? [];
+    if (!hasNutritionPdfRecords(safeLogs)) throw new Error(t('nutrition.pdfNoRecordsInRange'));
 
     const { data: dayStatuses, error: dayStatusesError } = await supabase
       .from('nutrition_day_statuses')

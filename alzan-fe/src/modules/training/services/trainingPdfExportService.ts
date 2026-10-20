@@ -22,6 +22,7 @@ import { TranslationKey } from '../../../i18n/locales/en';
 import { getPhaseLabel } from '../../../screens/training/helpers/phase.helper';
 import i18n from '../../../i18n';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
+import { getTrainingPdfDateRange } from './trainingPdfDateRange';
 
 const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
   try {
@@ -313,9 +314,7 @@ export const generateTrainingPDF = async ({
     const iconBase64 = await loadAssetAsBase64(iconSource);
     const iconSrc = iconBase64 ? `data:image/png;base64,${iconBase64}` : null;
 
-    const endDateInclusive = new Date(endDate);
-    endDateInclusive.setDate(endDateInclusive.getDate() + 1);
-    const endDateStr = endDateInclusive.toISOString();
+    const dateRange = getTrainingPdfDateRange(startDate, endDate);
 
     const { data: sessions, error: sessionsError } = await supabase
       .from('activity_sessions')
@@ -334,8 +333,8 @@ export const generateTrainingPDF = async ({
         `,
       )
       .eq('user_id', userId)
-      .gte('start_time', startDate)
-      .lt('start_time', endDateStr)
+      .gte('start_time', dateRange.startInclusive)
+      .lt('start_time', dateRange.endExclusive)
       .order('start_time', { ascending: true });
 
     if (sessionsError) throw new Error(getErrorMessage(sessionsError));
