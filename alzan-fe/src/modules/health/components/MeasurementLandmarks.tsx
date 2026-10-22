@@ -30,21 +30,29 @@ export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksP
   const band: Band | null = (() => {
     switch (measurement.key) {
       case 'chest':
-        return { path: 'M310 350 Q543 383 776 350', width: 16 };
+        return { path: isFemale ? 'M438 408 Q543 454 648 408' : 'M400 402 Q543 430 686 402', width: 10 };
       case 'waist':
-        return { path: 'M402 615 Q543 635 684 615', width: 16 };
+        return { path: isFemale ? 'M438 588 Q543 606 648 588' : 'M430 608 Q543 628 656 608', width: 10 };
       case 'abdomen':
-        return { path: 'M414 557 Q543 577 672 557', width: 16 };
+        return { path: isFemale ? 'M442 557 Q543 572 640 557' : 'M434 557 Q543 575 652 557', width: 10 };
       case 'hips':
-        return { path: 'M380 711 Q543 737 706 711', width: 16 };
+        return { path: isFemale ? 'M400 700 Q543 726 684 700' : 'M402 711 Q543 737 682 711', width: 10 };
       case 'thigh':
-        return { path: 'M387 850 Q460 862 533 850', width: 14 };
+        return { path: isFemale ? 'M400 790 Q466 802 534 790' : 'M402 850 Q466 862 532 850', width: 10 };
       case 'arm':
         return null;
       default:
         return null;
     }
   })();
+
+  const armPath = isFlexedArm
+    ? isFemale
+      ? 'M320 302 L320 357'
+      : 'M320 304 L320 393'
+    : isFemale
+      ? 'M656 432 L710 432'
+      : 'M678 425 L740 425';
 
   return (
     <View
@@ -65,7 +73,7 @@ export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksP
           >
             {band && (
               <>
-                <Path d={band.path} fill="none" stroke="#FFFFFF" strokeWidth={band.width + 10} strokeLinecap="round" />
+                <Path d={band.path} fill="none" stroke="#FFFFFF" strokeWidth={band.width + 6} strokeLinecap="round" />
                 <Path
                   d={band.path}
                   fill="none"
@@ -77,20 +85,8 @@ export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksP
             )}
             {measurement.key === 'arm' && (
               <>
-                <Path
-                  d={isFlexedArm ? 'M320 286 L320 379' : 'M678 425 L740 425'}
-                  fill="none"
-                  stroke="#FFFFFF"
-                  strokeWidth={14}
-                  strokeLinecap="round"
-                />
-                <Path
-                  d={isFlexedArm ? 'M320 286 L320 379' : 'M678 425 L740 425'}
-                  fill="none"
-                  stroke={measurement.color}
-                  strokeWidth={7}
-                  strokeLinecap="round"
-                />
+                <Path d={armPath} fill="none" stroke="#FFFFFF" strokeWidth={14} strokeLinecap="round" />
+                <Path d={armPath} fill="none" stroke={measurement.color} strokeWidth={7} strokeLinecap="round" />
               </>
             )}
           </Svg>

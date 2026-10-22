@@ -426,7 +426,8 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
       ['storedBodyFat'],
     );
   } else if (isPositiveFinite(heightCm) && isAdult) {
-    if (waist && hasSex) {
+    // Original DXA validation cohort: ages 20–69 (Woolcott & Bergman, 2018).
+    if (waist && hasSex && age <= 69) {
       bodyFat = describeBodyFat(
         calculateBodyFatRFM(heightCm, waist, sex),
         'rfm',
@@ -436,7 +437,7 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
         ['height', 'sex', 'waist'],
       );
     }
-    if (!bodyFat && hasCompositionData) {
+    if (!bodyFat && hasCompositionData && age <= 80) {
       const rawBmi = weightKg / (heightCm / 100) ** 2;
       bodyFat = describeBodyFat(
         calculateBodyFatCUNBAE(rawBmi, age, sex),
@@ -576,8 +577,8 @@ export const hasEnoughDataForBodyFat = (
   if (!isPositiveFinite(heightCm) || !isPositiveFinite(age) || age < 20) return false;
   const hasSex = sex === 'male' || sex === 'female';
   return !!(
-    (hasSex && validateMeasurement(waistCm, MEASUREMENT_RANGES.waist)) ||
-    (isPositiveFinite(weightKg) && isPositiveFinite(age) && hasSex) ||
+    (hasSex && age <= 69 && validateMeasurement(waistCm, MEASUREMENT_RANGES.waist)) ||
+    (isPositiveFinite(weightKg) && isPositiveFinite(age) && age <= 80 && hasSex) ||
     validateMeasurement(hipCm, MEASUREMENT_RANGES.hips)
   );
 };

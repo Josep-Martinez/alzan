@@ -113,3 +113,12 @@ const aboveSixty = calculateBodyComposition({ heightCm: 120, age: 30, sex: 'fema
 assert.equal(aboveSixty.bodyFat?.percentage, 64);
 assert.equal(aboveSixty.bodyFat?.method, 'rfm');
 assert.equal(calculateBodyComposition({ heightCm: 100, age: 30, measurements: { hips: 200 } }).bodyFat, null);
+
+// CUN-BAE's development/validation cohort spans ages 18–80; do not extrapolate it above 80.
+assert.equal(calculateBodyComposition({ ...base, age: 80 }).bodyFat?.method, 'cun_bae');
+assert.equal(calculateBodyComposition({ ...base, age: 81 }).bodyFat, null);
+assert.equal(hasEnoughDataForBodyFat(80, 180, 81, 'male'), false);
+assert.equal(calculateBodyComposition({ ...base, age: 81, measurements: { waist: 90 } }).bodyFat, null);
+assert.equal(calculateBodyComposition({ ...base, age: 69, measurements: { waist: 90 } }).bodyFat?.method, 'rfm');
+assert.equal(calculateBodyComposition({ ...base, age: 70, measurements: { waist: 90 } }).bodyFat?.method, 'cun_bae');
+assert.equal(hasEnoughDataForBodyFat(undefined, 180, 70, 'male', undefined, undefined, 90), false);
