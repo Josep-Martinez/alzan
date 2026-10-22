@@ -40,7 +40,9 @@ export const HealthHome = () => {
     ? i18n.resolvedLanguage?.startsWith('es')
       ? category.labelEs
       : category.label
-    : t('health.noData');
+    : bodyComposition.bodyFat
+      ? t('health.estimation')
+      : t('health.noData');
   const { convertWeightToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
 

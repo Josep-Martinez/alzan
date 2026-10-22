@@ -34,6 +34,7 @@ export const getLocalizedCompositionFormula = ({ metric, method, sex, t }: Local
     switch (method) {
       case 'cun_bae':
         return t('health.formulaCunBaeLocalized', { femaleFactor, sexLabel });
+      case 'rfm_adolescent':
       case 'rfm':
         return sex === 'female' ? t('health.formulaRfmFemaleLocalized') : t('health.formulaRfmMaleLocalized');
       case 'bai':
@@ -56,7 +57,7 @@ export const getLocalizedCompositionFormula = ({ metric, method, sex, t }: Local
 };
 
 export const getBodyFatPrecisionTip = (method: BodyFatMethod, t: Translate): PrecisionTip => {
-  if (method === 'rfm') {
+  if (method === 'rfm' || method === 'rfm_adolescent') {
     return {
       title: t('health.bodyFatOptimalPrecisionTitle'),
       body: t('health.bodyFatOptimalPrecisionBody'),

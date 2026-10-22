@@ -29,7 +29,7 @@ export interface ManualRecalculateResult {
     | 'user_not_found';
   errorValues?: Record<string, string | number>;
 }
-const VERSION = 3;
+const VERSION = 4;
 const historicalRepairUsers = new Set<string>();
 const localDate = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;

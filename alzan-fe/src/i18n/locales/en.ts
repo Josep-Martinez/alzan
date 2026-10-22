@@ -1496,6 +1496,9 @@ const en = {
     deurenberg: 'Deurenberg (1991)',
     cun_bae: 'CUN-BAE (2012)',
     rfm: 'RFM (Woolcott 2018)',
+    rfmAdolescent: 'RFM ages 16–19 (Woolcott 2019)',
+    adolescentFatNote:
+      'Estimate for ages 16–19. RFM uses height, sex and waist measured above the hipbones. Without a valid waist, Deurenberg uses BMI, age and sex with lower confidence, particularly in adolescent boys. Adult body fat categories do not apply.',
     bai: 'BAI (Bergman 2011)',
     lee_et_al: 'Lee et al. (2000)',
     al_gindan: 'Al-Gindan (2014)',

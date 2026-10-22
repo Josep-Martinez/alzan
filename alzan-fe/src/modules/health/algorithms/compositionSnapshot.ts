@@ -67,6 +67,7 @@ const inputKeys: CompositionInputKey[] = [
 const bodyFatMethodLabels: Record<BodyFatMethod, string> = {
   measured: 'Medición importada/externa',
   rfm: 'RFM (Woolcott & Bergman 2018)',
+  rfm_adolescent: 'RFM adolescentes (Woolcott 2019)',
   bai: 'BAI (Fallback con cadera)',
   cun_bae: 'CUN-BAE (Gómez-Ambrosi et al. 2012)',
   deurenberg: 'Deurenberg (1991)',
@@ -105,7 +106,12 @@ export const mergePersistedCompositionResult = (
 ): BodyCompositionResult => {
   if (persisted.calculation_status === 'stale') return fallback;
   const persistedBodyFatCategory =
-    persisted.bodyfat_percent === null || !sex ? null : getBodyFatCategory(persisted.bodyfat_percent, sex);
+    persisted.bodyfat_percent === null ||
+    !sex ||
+    persisted.bodyfat_method === 'rfm_adolescent' ||
+    persisted.bodyfat_method === 'deurenberg'
+      ? null
+      : getBodyFatCategory(persisted.bodyfat_percent, sex);
   const persistedMuscleCategory =
     persisted.muscle_percent === null || !sex ? null : getMuscleCategory(persisted.muscle_percent, sex);
   const bodyFatMethod = isBodyFatMethod(persisted.bodyfat_method) ? persisted.bodyfat_method : 'stored';

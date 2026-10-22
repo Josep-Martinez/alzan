@@ -1517,6 +1517,9 @@ export default {
     deurenberg: 'Deurenberg (1991)',
     cun_bae: 'CUN-BAE (2012)',
     rfm: 'RFM (Woolcott 2018)',
+    rfmAdolescent: 'RFM 16–19 años (Woolcott 2019)',
+    adolescentFatNote:
+      'Estimación para 16–19 años. RFM utiliza altura, sexo y cintura sobre los huesos de la cadera. Sin una cintura válida, Deurenberg utiliza IMC, edad y sexo con menor confianza, especialmente en chicos adolescentes. No se aplican categorías de grasa de adultos.',
     bai: 'BAI (Bergman 2011)',
     lee_et_al: 'Lee et al. (2000)',
     al_gindan: 'Al-Gindan (2014)',

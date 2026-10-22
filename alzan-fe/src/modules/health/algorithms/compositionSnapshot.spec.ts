@@ -155,3 +155,13 @@ const sexless = mergePersistedCompositionResult(
 assert.equal(sexless.bodyFat?.percentage, 24);
 assert.equal(sexless.bodyFat?.category, null);
 console.log('Composition snapshot authoritative nulls, compatible masses, and deltas passed');
+
+for (const method of ['rfm_adolescent', 'deurenberg']) {
+  const teen = mergePersistedCompositionResult(
+    { ...partialPersisted, bodyfat_percent: 24, bodyfat_method: method },
+    fallback,
+    'male',
+  );
+  assert.equal(teen.bodyFat?.method, method);
+  assert.equal(teen.bodyFat?.category, null);
+}

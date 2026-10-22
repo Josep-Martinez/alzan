@@ -13,6 +13,7 @@ export type BmiCategory = 'underweight' | 'normal' | 'overweight' | 'obese_1' | 
 export type BodyFatMethod =
   | 'measured'
   | 'rfm'
+  | 'rfm_adolescent'
   | 'bai'
   | 'cun_bae'
   | 'deurenberg'
@@ -381,6 +382,7 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
   const hasBmiData = isPositiveFinite(weightKg) && isPositiveFinite(heightCm);
   const hasSex = sex === 'male' || sex === 'female';
   const isAdult = isPositiveFinite(age) && age >= 20;
+  const isAdolescent = isPositiveFinite(age) && age >= 16 && age < 20;
   const hasCompositionData = hasBmiData && isAdult && hasSex;
   const availableData = {
     hasBasicData: hasBmiData,
@@ -402,7 +404,7 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
     inputsUsed: CompositionInputKey[],
   ): BodyFatResult | null => {
     if (!Number.isFinite(percentage) || percentage <= 0 || percentage >= 100) return null;
-    const classification = hasSex ? getBodyFatCategory(percentage, sex) : null;
+    const classification = hasSex && isAdult ? getBodyFatCategory(percentage, sex) : null;
     return {
       percentage: round1(percentage),
       category: classification?.category ?? null,
@@ -425,13 +427,13 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
       STORED_FORMULA,
       ['storedBodyFat'],
     );
-  } else if (isPositiveFinite(heightCm) && isAdult) {
+  } else if (isPositiveFinite(heightCm) && (isAdult || isAdolescent)) {
     // Original DXA validation cohort: ages 20–69 (Woolcott & Bergman, 2018).
     if (waist && hasSex && age <= 69) {
       bodyFat = describeBodyFat(
         calculateBodyFatRFM(heightCm, waist, sex),
-        'rfm',
-        'RFM (Woolcott & Bergman 2018)',
+        isAdolescent ? 'rfm_adolescent' : 'rfm',
+        isAdolescent ? 'RFM adolescentes (Woolcott 2019)' : 'RFM (Woolcott & Bergman 2018)',
         3,
         sex === 'male' ? RFM_MALE_FORMULA : RFM_FEMALE_FORMULA,
         ['height', 'sex', 'waist'],
@@ -448,7 +450,17 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
         ['weight', 'height', 'age', 'sex'],
       );
     }
-    if (!bodyFat && hips) {
+    if (!bodyFat && isAdolescent && hasBmiData && hasSex) {
+      bodyFat = describeBodyFat(
+        1.2 * (weightKg / (heightCm / 100) ** 2) + 0.23 * age - 10.8 * (sex === 'male' ? 1 : 0) - 5.4,
+        'deurenberg',
+        'Deurenberg (1991)',
+        1,
+        'BF% = 1.20 * BMI + 0.23 * age - 10.8 * male - 5.4',
+        ['weight', 'height', 'age', 'sex'],
+      );
+    }
+    if (!bodyFat && isAdult && hips) {
       bodyFat = describeBodyFat(
         calculateBodyFatBAI(heightCm, hips),
         'bai',
@@ -574,11 +586,11 @@ export const hasEnoughDataForBodyFat = (
   waistCm?: number,
 ): boolean => {
   if (isPositiveFinite(loggedBodyFat) && loggedBodyFat < 100) return true;
-  if (!isPositiveFinite(heightCm) || !isPositiveFinite(age) || age < 20) return false;
+  if (!isPositiveFinite(heightCm) || !isPositiveFinite(age) || age < 16) return false;
   const hasSex = sex === 'male' || sex === 'female';
   return !!(
     (hasSex && age <= 69 && validateMeasurement(waistCm, MEASUREMENT_RANGES.waist)) ||
     (isPositiveFinite(weightKg) && isPositiveFinite(age) && age <= 80 && hasSex) ||
-    validateMeasurement(hipCm, MEASUREMENT_RANGES.hips)
+    (age >= 20 && validateMeasurement(hipCm, MEASUREMENT_RANGES.hips))
   );
 };

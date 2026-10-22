@@ -49,7 +49,7 @@ assert.equal(calculateBodyComposition({ weightKg: 80, heightCm: 180 }).bmi?.adul
 assert.equal(calculateBodyComposition({ weightKg: 80, heightCm: 180, age: 19 }).bmi?.category, null);
 assert.equal(calculateBodyComposition({ weightKg: 80, heightCm: 180, age: 20 }).bmi?.adultCategoriesApplicable, true);
 assert.equal(
-  calculateBodyComposition({ heightCm: 180, age: 19, sex: 'male', measurements: { waist: 90 } }).bodyFat,
+  calculateBodyComposition({ heightCm: 180, age: 15, sex: 'male', measurements: { waist: 90 } }).bodyFat,
   null,
 );
 
@@ -122,3 +122,24 @@ assert.equal(calculateBodyComposition({ ...base, age: 81, measurements: { waist:
 assert.equal(calculateBodyComposition({ ...base, age: 69, measurements: { waist: 90 } }).bodyFat?.method, 'rfm');
 assert.equal(calculateBodyComposition({ ...base, age: 70, measurements: { waist: 90 } }).bodyFat?.method, 'cun_bae');
 assert.equal(hasEnoughDataForBodyFat(undefined, 180, 70, 'male', undefined, undefined, 90), false);
+
+for (const age of [16, 17, 18, 19]) {
+  for (const sex of ['male', 'female'] as const) {
+    const teen = { weightKg: 72, heightCm: 180, age, sex };
+    const basic = calculateBodyComposition(teen);
+    assert.equal(basic.bodyFat?.method, 'deurenberg');
+    assert.equal(
+      basic.bodyFat?.percentage,
+      Number((1.2 * (72 / 1.8 ** 2) + 0.23 * age - (sex === 'male' ? 10.8 : 0) - 5.4).toFixed(1)),
+    );
+    assert.equal(basic.bodyFat?.category, null);
+    assert.equal(basic.bmi?.category, null);
+    const waist = calculateBodyComposition({ ...teen, measurements: { waist: 90 } });
+    assert.equal(waist.bodyFat?.method, 'rfm_adolescent');
+    assert.equal(waist.bodyFat?.percentage, sex === 'male' ? 24 : 36);
+    assert.equal(waist.bodyFat?.category, null);
+    assert.equal(waist.muscle, null);
+    assert.equal(hasEnoughDataForBodyFat(72, 180, age, sex), true);
+  }
+}
+assert.equal(calculateBodyComposition({ heightCm: 180, age: 16, measurements: { hips: 100 } }).bodyFat, null);

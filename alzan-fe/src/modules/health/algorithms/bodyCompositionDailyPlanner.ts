@@ -204,7 +204,7 @@ export const planDailyBodyCompositionRecalculation = ({
     bodyfatShouldReplace,
     muscleShouldReplace,
     reason:
-      !result.bodyFat && (profile.age == null || !Number.isFinite(profile.age) || profile.age < 20)
+      !result.bodyFat && (profile.age == null || !Number.isFinite(profile.age) || profile.age < 16)
         ? 'missing_profile'
         : shouldUpsert
           ? undefined

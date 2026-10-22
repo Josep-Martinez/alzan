@@ -131,3 +131,16 @@ const createdFirst = plan({
 assert.equal(createdFirst.measurements.waist, 91);
 const withoutIds = [waist(now.toISOString()), { ...waist(now.toISOString()), valueCm: 92 }];
 assert.deepEqual(plan({ measurements: withoutIds }), plan({ measurements: [...withoutIds].reverse() }));
+
+const teenProfile = { ...profile, age: 16 };
+const teenWeightOnly = plan({ profile: teenProfile, weights: [weight(now.toISOString())] });
+assert.equal(teenWeightOnly.result?.bodyFat?.method, 'deurenberg');
+const teenWaistOnly = plan({ profile: teenProfile, measurements: [waist(now.toISOString())] });
+assert.equal(teenWaistOnly.result?.bodyFat?.method, 'rfm_adolescent');
+assert.equal(teenWaistOnly.result?.fatMassKg, null);
+const teenOldWaist = plan({
+  profile: teenProfile,
+  weights: [weight(now.toISOString())],
+  measurements: [waist(new Date(now.getTime() - 73 * 3600000).toISOString())],
+});
+assert.equal(teenOldWaist.result?.bodyFat?.method, 'deurenberg');

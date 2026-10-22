@@ -371,6 +371,8 @@ export const BodyCompositionDetail = () => {
             return t('health.deurenberg');
           case 'cun_bae':
             return t('health.cun_bae');
+          case 'rfm_adolescent':
+            return t('health.rfmAdolescent');
           case 'rfm':
             return t('health.rfm');
           case 'bai':
@@ -385,6 +387,9 @@ export const BodyCompositionDetail = () => {
             return t('health.storedCalculationUnknown');
           case 'measured':
             return t('health.measuredCalculationNote');
+          case 'rfm_adolescent':
+          case 'deurenberg':
+            return t('health.adolescentFatNote');
           case 'rfm':
             return t('health.rfmPrecisionNote');
           case 'bai':
@@ -1028,13 +1033,17 @@ export const BodyCompositionDetail = () => {
           >
             {bodyComposition.bodyFat && (
               <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
-                {bodyComposition.bodyFat.method === 'rfm'
-                  ? t('health.rfm')
-                  : bodyComposition.bodyFat.method === 'cun_bae'
-                    ? t('health.cun_bae')
-                    : bodyComposition.bodyFat.method === 'bai'
-                      ? t('health.bai')
-                      : t('health.estimation')}
+                {bodyComposition.bodyFat.method === 'rfm_adolescent'
+                  ? t('health.rfmAdolescent')
+                  : bodyComposition.bodyFat.method === 'deurenberg'
+                    ? t('health.deurenberg')
+                    : bodyComposition.bodyFat.method === 'rfm'
+                      ? t('health.rfm')
+                      : bodyComposition.bodyFat.method === 'cun_bae'
+                        ? t('health.cun_bae')
+                        : bodyComposition.bodyFat.method === 'bai'
+                          ? t('health.bai')
+                          : t('health.estimation')}
               </Text>
             )}
             {bodyComposition.bodyFat && hasDemographicRanges && (
