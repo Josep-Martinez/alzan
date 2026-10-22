@@ -18,10 +18,18 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useExercises } from '../../hooks/useExercises';
 import { useMuscleGroups } from '../../hooks/useMuscleGroups';
 import { useEquipment } from '../../hooks/useEquipment';
-import { Search, ArrowLeft, Dumbbell, Info, Check } from 'lucide-react-native';
+import { Search, ArrowLeft, Dumbbell, Info, Check, Sparkles } from 'lucide-react-native';
 import { ExerciseWithDetails } from '../../types/training';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTranslation } from 'react-i18next';
+import { useExerciseAlternatives } from '../../modules/training/hooks/useExerciseAlternatives';
+import {
+  rankExerciseAlternatives,
+  toAlternativeCandidate,
+  type AlternativeReason,
+} from '../../modules/training/helpers/exerciseAlternatives';
+import { normalizeExerciseCatalogName } from '../../modules/training/helpers/exerciseCatalogMatching';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
 
 export type MuscleGroupOrEquipment = {
   id: number;
@@ -38,6 +46,10 @@ export const ExerciseSearchScreen = () => {
   const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseSearch'>>();
   const isMultiSelect = route.params?.selectionMode === 'multi';
   const replacementExerciseName = route.params?.replacementExerciseName;
+  const replacementExercise = route.params?.replacementExercise;
+  const [suggestionsEnabled, setSuggestionsEnabled] = useState(false);
+  const showSuggestions = !!replacementExercise && suggestionsEnabled;
+  const { topFromScreenBottom } = useTabBarLayout();
   const excludedExerciseIds = useMemo(
     () => new Set(route.params?.excludedExerciseIds),
     [route.params?.excludedExerciseIds],
@@ -49,10 +61,11 @@ export const ExerciseSearchScreen = () => {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   // Multi-select staging (used when launched from the routine editor).
   const [selectedExercises, setSelectedExercises] = useState<ExerciseWithDetails[]>([]);
-
+  const excludedIds = useMemo(() => [...excludedExerciseIds], [excludedExerciseIds]);
+  const suggestions = useExerciseAlternatives(replacementExercise, excludedIds, showSuggestions);
   const { exercises, isLoading, isFetching, hasMore } = useExercises({
     searchQuery: debouncedSearchQuery,
-    selectedMuscleId,
+    selectedMuscleId: showSuggestions ? (selectedMuscleId ?? replacementExercise?.primary_muscle_id) : selectedMuscleId,
     selectedEquipmentId,
     limit: visibleLimit,
   });
@@ -70,7 +83,70 @@ export const ExerciseSearchScreen = () => {
   useEffect(() => {
     setVisibleLimit(EXERCISE_PAGE_SIZE);
   }, [debouncedSearchQuery, selectedMuscleId, selectedEquipmentId]);
-  const showInitialLoading = isLoading && exercises.length === 0;
+  const suggestionResults = useMemo(() => {
+    if (!showSuggestions || !replacementExercise) return { exercises, reasons: new Map<string, AlternativeReason[]>() };
+    const tokens = normalizeExerciseCatalogName(debouncedSearchQuery).split(' ').filter(Boolean);
+    const candidates = new Map(exercises.map(exercise => [exercise.id, exercise]));
+    for (const { exercise } of suggestions.alternatives) {
+      const text = normalizeExerciseCatalogName(
+        [
+          exercise.name,
+          exercise.base_name_es,
+          exercise.base_name_en,
+          exercise.muscle_name,
+          exercise.equipment_name,
+        ].join(' '),
+      );
+      if (
+        tokens.every(token => text.includes(token)) &&
+        (selectedMuscleId === null || exercise.primary_muscle_id === selectedMuscleId) &&
+        (selectedEquipmentId === null || exercise.equipment_id === selectedEquipmentId)
+      )
+        candidates.set(exercise.id, exercise);
+    }
+    const ranked = rankExerciseAlternatives(
+      toAlternativeCandidate(replacementExercise),
+      [...candidates.values()].map(toAlternativeCandidate),
+      excludedExerciseIds,
+      visibleLimit,
+    );
+    return {
+      exercises:
+        ranked.length > 0
+          ? ranked.flatMap(item => {
+              const exercise = candidates.get(item.exerciseId);
+              return exercise ? [exercise] : [];
+            })
+          : exercises.filter(exercise => !excludedExerciseIds.has(exercise.id)),
+      reasons: new Map(ranked.map(item => [item.exerciseId, item.reasons])),
+    };
+  }, [
+    showSuggestions,
+    replacementExercise,
+    exercises,
+    suggestions.alternatives,
+    debouncedSearchQuery,
+    selectedMuscleId,
+    selectedEquipmentId,
+    excludedExerciseIds,
+    visibleLimit,
+  ]);
+  const broadenToCatalog =
+    showSuggestions &&
+    !isLoading &&
+    suggestionResults.exercises.length === 0 &&
+    !debouncedSearchQuery &&
+    selectedMuscleId === null &&
+    selectedEquipmentId === null;
+  const generalFallback = useExercises({ exerciseIds: broadenToCatalog ? undefined : [], limit: visibleLimit });
+  const listedExercises = broadenToCatalog
+    ? generalFallback.exercises.filter(exercise => !excludedExerciseIds.has(exercise.id))
+    : suggestionResults.exercises;
+  const listHasMore = broadenToCatalog ? generalFallback.hasMore : hasMore;
+  const listIsFetching = broadenToCatalog ? generalFallback.isFetching : isFetching;
+  const reasonsById = suggestionResults.reasons;
+  const showInitialLoading =
+    (isLoading || (broadenToCatalog && generalFallback.isLoading)) && listedExercises.length === 0;
 
   const handleSelectExercise = (exercise: ExerciseWithDetails) => {
     if (excludedExerciseIds.has(exercise.id)) return;
@@ -155,13 +231,34 @@ export const ExerciseSearchScreen = () => {
           <View style={styles.textContainer}>
             <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.name}</Text>
             <View style={styles.metaRow}>
-              {item.muscle_name && <Text style={styles.muscleText}>{item.muscle_name}</Text>}
-              {item.muscle_name && item.equipment_name && <Text style={styles.separatorText}>•</Text>}
-              {item.equipment_name && <Text style={styles.equipmentText}>{item.equipment_name}</Text>}
+              {item.muscle_name && (
+                <Text style={[styles.muscleText, { color: themeColors.textSecondary }]}>{item.muscle_name}</Text>
+              )}
+              {item.muscle_name && item.equipment_name && (
+                <Text style={[styles.separatorText, { color: themeColors.textSecondary }]}>•</Text>
+              )}
+              {item.equipment_name && (
+                <Text style={[styles.equipmentText, { color: themeColors.textSecondary }]}>{item.equipment_name}</Text>
+              )}
             </View>
             {excluded && (
               <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
                 {t('training.exerciseAlreadyInSession')}
+              </Text>
+            )}
+            {showSuggestions && reasonsById.has(item.id) && (
+              <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
+                {[
+                  reasonsById.get(item.id)?.includes('sameMovement')
+                    ? t('training.alternativeReasonMovement')
+                    : t('training.alternativeReasonMuscle'),
+                  ...(reasonsById.get(item.id)?.includes('sameEquipment')
+                    ? [t('training.alternativeReasonSameEquipment')]
+                    : []),
+                  ...(reasonsById.get(item.id)?.includes('differentEquipment')
+                    ? [t('training.alternativeReasonEquipment')]
+                    : []),
+                ].join(' · ')}
               </Text>
             )}
           </View>
@@ -239,6 +336,32 @@ export const ExerciseSearchScreen = () => {
           <Text style={[styles.title, dynamicStyles.title]} numberOfLines={1}>
             {isMultiSelect ? t('training.selectExercises') : t('training.selectExercise')}
           </Text>
+          {replacementExercise && !isMultiSelect && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('training.alternativesToggle')}
+              accessibilityState={{ selected: showSuggestions }}
+              aria-pressed={showSuggestions}
+              onPress={() => setSuggestionsEnabled(value => !value)}
+              style={[
+                styles.suggestionsToggle,
+                {
+                  borderColor: showSuggestions ? themeColors.primary : themeColors.border,
+                  backgroundColor: showSuggestions ? themeColors.primary : 'transparent',
+                },
+              ]}
+            >
+              <Sparkles size={16} color={showSuggestions ? '#FFFFFF' : themeColors.textSecondary} />
+              <Text
+                style={[
+                  styles.suggestionsToggleLabel,
+                  { color: showSuggestions ? '#FFFFFF' : themeColors.textSecondary },
+                ]}
+              >
+                {t('training.alternativesToggle')}
+              </Text>
+            </TouchableOpacity>
+          )}
           {isMultiSelect && (
             <TouchableOpacity
               onPress={handleConfirmMultiSelect}
@@ -265,11 +388,17 @@ export const ExerciseSearchScreen = () => {
             <Text style={[styles.exerciseName, dynamicStyles.title]}>{replacementExerciseName}</Text>
           </View>
         )}
+        {showSuggestions && (
+          <Text style={[styles.suggestionsHint, { color: themeColors.textSecondary }]}>
+            {t(broadenToCatalog ? 'training.alternativesFallback' : 'training.alternativesHint')}
+          </Text>
+        )}
         <View style={styles.searchContainer}>
           <View style={[styles.searchBar, dynamicStyles.input, { height: 50, paddingVertical: 0 }]}>
             <Search size={20} color={themeColors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: themeColors.textPrimary }]}
+              accessibilityLabel={t('training.exerciseCatalogSearch')}
               placeholder={t('nutrition.search')}
               placeholderTextColor={themeColors.textSecondary}
               value={searchQuery}
@@ -281,7 +410,12 @@ export const ExerciseSearchScreen = () => {
 
         <View style={styles.filtersBlock}>
           {renderFilterChips(t('training.allEquipment'), equipment, selectedEquipmentId, setSelectedEquipmentId)}
-          {renderFilterChips(t('training.allMuscles'), muscleGroups, selectedMuscleId, setSelectedMuscleId)}
+          {renderFilterChips(
+            t('training.allMuscles'),
+            muscleGroups,
+            showSuggestions ? (selectedMuscleId ?? replacementExercise?.primary_muscle_id ?? null) : selectedMuscleId,
+            setSelectedMuscleId,
+          )}
         </View>
 
         {showInitialLoading ? (
@@ -290,20 +424,24 @@ export const ExerciseSearchScreen = () => {
           </View>
         ) : (
           <FlatList
-            data={exercises}
+            key={showSuggestions ? 'alternatives' : 'catalog'}
+            data={listedExercises}
             renderItem={renderItem}
             keyExtractor={item => item.id}
             extraData={selectedExercises}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: topFromScreenBottom + TAB_BAR_CLEARANCE + spacing.m },
+            ]}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
-              hasMore ? (
+              listHasMore ? (
                 <TouchableOpacity
                   style={[styles.loadMoreButton, dynamicStyles.secondaryButton]}
                   onPress={() => setVisibleLimit(previous => previous + EXERCISE_PAGE_SIZE)}
-                  disabled={isFetching}
+                  disabled={listIsFetching}
                 >
-                  {isFetching ? (
+                  {listIsFetching ? (
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>{t('common.loadMore')}</Text>
@@ -316,6 +454,17 @@ export const ExerciseSearchScreen = () => {
                 <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
                   {t('training.noExercisesFound')}
                 </Text>
+                {showSuggestions && !!suggestions.error && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.loadMoreButton}
+                    onPress={() => {
+                      void suggestions.retry();
+                    }}
+                  >
+                    <Text style={{ color: themeColors.primary }}>{t('nutrition.retry')}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             }
           />
@@ -326,6 +475,17 @@ export const ExerciseSearchScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  suggestionsToggle: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.s,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+  },
+  suggestionsToggleLabel: { ...typography.caption, fontWeight: '600' },
+  suggestionsHint: { ...typography.caption, paddingHorizontal: spacing.m, paddingBottom: spacing.s },
   container: {
     flex: 1,
     backgroundColor: colors.background,

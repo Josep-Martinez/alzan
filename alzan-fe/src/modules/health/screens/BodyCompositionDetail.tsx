@@ -33,7 +33,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
@@ -47,13 +47,13 @@ import {
   Lightbulb,
   Target,
   Dumbbell,
+  RotateCw,
   LucideIcon,
-  RefreshCw,
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
-import { useRecalculateBodyComp } from '../hooks/useRecalculateBodyComp';
+import { useBodyCompositionLogs } from '../hooks/useBodyCompositionLogs';
 import { useProfile } from '../../../hooks/settings/useProfile';
 import { RangeBar } from '../components/RangeBar';
 import { GlassCard } from '../../../components/GlassCard';
@@ -63,6 +63,7 @@ import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { CompositionInputKey } from '../algorithms/bodyComposition';
 import { getWaistToHeightRangeConfig, getWaistToHipRangeConfig } from '../algorithms/abdominalHealth';
+import { hasBodyCompositionChanged, hasCalculatedCompositionValues } from '../helpers/bodyCompositionRefresh';
 import {
   BMI_RANGES,
   BMI_BAR_CONFIG,
@@ -73,8 +74,10 @@ import {
   findCategory,
   toBarSegments,
 } from '../constants/bodyCompositionRanges';
-import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import { formatLocalizedDate, getLocaleTag } from '../../../i18n/dateLocale';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../../navigation/tabBarLayout';
+import type { BodyChangeKey } from '../algorithms/bodyChanges';
 import {
   getBodyFatPrecisionTip,
   getLocalizedCompositionFormula,
@@ -88,6 +91,7 @@ import {
 
 /** Type for info modal state - which metric is being explained */
 type InfoType = 'bmi' | 'bodyFat' | 'muscle' | 'remainder' | 'waistToHeight' | 'waistToHip' | 'recomposition' | null;
+type RecalculateNotice = 'current' | 'insufficient' | 'success' | 'error' | null;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -112,69 +116,39 @@ export const BodyCompositionDetail = () => {
 
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { bodyComposition, latestWeight, age } = useHealthInsights();
+  const compositionQuery = useBodyCompositionLogs();
+  const { topFromScreenBottom } = useTabBarLayout();
   const { profile } = useProfile();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
-  const recalculateMutation = useRecalculateBodyComp();
-  const { convertWeightToUi } = useUnitConversion();
+  const { convertWeightToUi, units } = useUnitConversion();
 
   /** Currently open info modal (null = closed) */
   const [infoModal, setInfoModal] = useState<InfoType>(null);
+  const [recalculateNotice, setRecalculateNotice] = useState<RecalculateNotice>(null);
 
-  /** Track if recalculation is in progress */
-  const [isRecalculating, setIsRecalculating] = useState(false);
   const isSpanish = i18n.resolvedLanguage?.startsWith('es') ?? false;
 
-  const getRecalculateErrorMessage = (
-    errorCode:
-      | 'limit_reached'
-      | 'weight_missing'
-      | 'height_missing'
-      | 'insufficient_data'
-      | 'unexpected_error'
-      | 'user_not_found',
-    errorValues?: Record<string, string | number>,
-  ) => {
-    switch (errorCode) {
-      case 'limit_reached':
-        return t('health.recalculateLimitError', errorValues);
-      case 'weight_missing':
-        return t('health.recalculateNeedWeight');
-      case 'height_missing':
-        return t('health.recalculateNeedHeight');
-      case 'insufficient_data':
-        return t('health.recalculateInsufficientData');
-      case 'user_not_found':
-        return t('health.userNotFound');
-      default:
-        return t('health.recalculateUnexpectedError');
-    }
-  };
-
-  /** Handler for global recalculate button */
-  const handleRecalculate = async () => {
-    setIsRecalculating(true);
-    try {
-      const result = await recalculateMutation.mutateAsync();
-      if (result.success) {
-        if (result.unchanged) {
-          Alert.alert(t('health.noChangesTitle'), t('health.noChangesMessage'));
-        } else {
-          Alert.alert(t('health.recalculateSuccessTitle'), t('health.recalculateSuccessMessage'));
-        }
-      } else if (result.errorCode) {
-        Alert.alert(
-          t('health.cannotRecalculateTitle'),
-          getRecalculateErrorMessage(result.errorCode, result.errorValues),
-        );
-      }
-    } finally {
-      setIsRecalculating(false);
-    }
-  };
-
-  const hasDemographicRanges = age !== null && (profile?.sex === 'male' || profile?.sex === 'female');
+  const hasDemographicRanges = age !== null && age >= 20 && (profile?.sex === 'male' || profile?.sex === 'female');
   const isFemale = profile?.sex === 'female';
   const deltas = bodyComposition.deltas;
+  const handleRecalculate = async () => {
+    if (compositionQuery.isFetching) return;
+    const previousSnapshots = compositionQuery.data;
+    const result = await compositionQuery.refetch();
+    if (result.isError) {
+      setRecalculateNotice('error');
+      return;
+    }
+    if (!hasCalculatedCompositionValues(result.data)) {
+      setRecalculateNotice('insufficient');
+      return;
+    }
+    if (!hasBodyCompositionChanged(previousSnapshots, result.data)) {
+      setRecalculateNotice('current');
+      return;
+    }
+    setRecalculateNotice('success');
+  };
 
   // =========================================================================
   // DYNAMIC RANGES (Age & Sex Specific)
@@ -214,11 +188,23 @@ export const BodyCompositionDetail = () => {
 
   /** Current BMI category based on official WHO ranges */
   const currentBmiCategory = useMemo(() => {
-    if (!bodyComposition.bmi?.value) return null;
-    return findCategory(bodyComposition.bmi.value, BMI_RANGES);
-  }, [bodyComposition.bmi?.value]);
+    if (!bodyComposition.bmi?.value || !bodyComposition.bmi.adultCategoriesApplicable) return null;
+    const category = bodyComposition.bmi.category;
+    return BMI_RANGES[category === 'underweight' ? 0 : category === 'normal' ? 1 : category === 'overweight' ? 2 : 3];
+  }, [bodyComposition.bmi]);
   const abdominalHealth = bodyComposition.abdominalHealth;
-  const recompositionTrend = bodyComposition.recompositionTrend;
+  const bodyChanges = bodyComposition.bodyChanges;
+  const formatDate = (date: string) => formatLocalizedDate(new Date(date), { en: 'MMM d, yyyy', es: 'd MMM yyyy' });
+  const changeLabels: Record<BodyChangeKey, string> = {
+    weight: t('health.compositionWeightLabel'),
+    waist: t('health.waist'),
+    abdomen: t('health.abdomen'),
+    hips: t('health.hips'),
+    chest: t('health.chest'),
+    arm: t('health.armRelaxed'),
+    armFlexed: t('health.armFlexed'),
+    thigh: t('health.thigh'),
+  };
 
   const getInputLabel = (input: CompositionInputKey): string => {
     switch (input) {
@@ -230,6 +216,8 @@ export const BodyCompositionDetail = () => {
         return t('health.calcInputAge');
       case 'sex':
         return t('health.calcInputSex');
+      case 'waist':
+        return t('health.waist');
       case 'abdomen':
         return t('health.abdomen');
       case 'hips':
@@ -712,40 +700,17 @@ export const BodyCompositionDetail = () => {
         </View>,
       );
     } else if (infoModal === 'recomposition') {
-      title = t('health.recomposition');
-      themeColor = '#8B5CF6';
+      title = t('health.bodyChanges');
+      themeColor = themeColors.primary;
       IconComponent = TrendingUp;
-      description = t('health.recompositionDescription');
-      formulaTitle = t('health.methodOfCalculation');
-
+      description = t('health.bodyChangesExplanation');
+      formulaTitle = t('health.dataCompared');
       calculationDetails = (
-        <View style={styles.calculationContainer}>
-          <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
-            {t('health.recompositionFormula')}
-          </Text>
-          <View style={styles.calcDivider} />
-          <Text style={styles.calcExplanation}>{t('health.recompositionNoMedicalFormula')}</Text>
-          <View style={styles.calcDivider} />
-          <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
-            {t('health.currentTrend')} {translateDynamicKey(recompositionTrend.labelKey)}
-          </Text>
-          <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.dataCompared')} </Text>
-            {formatInputsUsed(recompositionTrend.usedMeasurements)}
-          </Text>
-        </View>
-      );
-
-      tips.push(
-        <View key="tip1" style={styles.tipBox}>
-          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
-            <Lightbulb size={16} color={themeColor} />
-          </View>
-          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-            {translateDynamicKey(recompositionTrend.recommendationKey)}
-          </Text>
-        </View>,
+        <Text style={styles.calcExplanation}>
+          {bodyChanges
+            ? `${formatDate(bodyChanges.previousDate)} → ${formatDate(bodyChanges.currentDate)}`
+            : t('health.bodyChangesMissing')}
+        </Text>
       );
     }
 
@@ -791,22 +756,82 @@ export const BodyCompositionDetail = () => {
               </View>
 
               {/* Tips */}
-              <View style={styles.sheetSection}>
-                <Text style={[styles.sheetSectionTitle, { color: themeColors.textPrimary }]}>
-                  {t('health.tipsAndRecs')}
-                </Text>
-                {tips.length > 0 && (
-                  <View
-                    style={[
-                      styles.tipsContainer,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
-                    ]}
-                  >
-                    {tips}
-                  </View>
-                )}
-              </View>
+              {tips.length > 0 && (
+                <View style={styles.sheetSection}>
+                  <Text style={[styles.sheetSectionTitle, { color: themeColors.textPrimary }]}>
+                    {t('health.tipsAndRecs')}
+                  </Text>
+                  {tips.length > 0 && (
+                    <View
+                      style={[
+                        styles.tipsContainer,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
+                      ]}
+                    >
+                      {tips}
+                    </View>
+                  )}
+                </View>
+              )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const RecalculateNoticeModal = () => {
+    if (!recalculateNotice) return null;
+
+    const notice = recalculateNotice;
+    const noticeColor = notice === 'error' ? colors.danger : themeColors.primary;
+    const title =
+      notice === 'current'
+        ? t('health.compositionAlreadyCurrentTitle')
+        : notice === 'insufficient'
+          ? t('health.cannotRecalculateTitle')
+          : notice === 'success'
+            ? t('health.recalculateSuccessTitle')
+            : t('common.error');
+    const message =
+      notice === 'current'
+        ? t('health.compositionAlreadyCurrentMessage')
+        : notice === 'insufficient'
+          ? t('health.recalculateInsufficientData')
+          : notice === 'success'
+            ? t('health.recalculateSuccessMessage')
+            : t('health.recalculateUnexpectedError');
+    const NoticeIcon = notice === 'success' ? TrendingUp : notice === 'error' ? X : Info;
+
+    return (
+      <Modal
+        visible
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRecalculateNotice(null)}
+        statusBarTranslucent
+      >
+        <View style={styles.noticeModalOverlay}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setRecalculateNotice(null)}
+          />
+          <View style={[styles.noticeModalCard, dynamicStyles.modalContent]}>
+            <View style={[styles.noticeIcon, { backgroundColor: noticeColor + '20' }]}>
+              <NoticeIcon size={25} color={noticeColor} />
+            </View>
+            <Text style={[styles.noticeTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+            <Text style={[styles.noticeMessage, { color: themeColors.textSecondary }]}>{message}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setRecalculateNotice(null)}
+              style={[styles.noticeButton, { backgroundColor: themeColors.primary }]}
+            >
+              <Text style={[styles.noticeButtonText, { color: themeColors.white }]}>{t('common.gotIt')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -893,6 +918,7 @@ export const BodyCompositionDetail = () => {
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.safeArea}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <InfoModal />
+        <RecalculateNoticeModal />
 
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -902,7 +928,36 @@ export const BodyCompositionDetail = () => {
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: topFromScreenBottom + TAB_BAR_CLEARANCE + spacing.l },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+            {t('health.compositionAutomatic')}
+            {bodyComposition.sourceDate ? ` · ${formatDate(bodyComposition.sourceDate)}` : ''}
+          </Text>
+          {bodyComposition.historicalDate && (
+            <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+              {t('health.compositionHistorical', { date: formatDate(bodyComposition.historicalDate) })}
+            </Text>
+          )}
+          {bodyComposition.measuredBodyFat != null && (
+            <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+              {t('health.compositionMeasuredFat', {
+                value: bodyComposition.measuredBodyFat.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }),
+              })}
+            </Text>
+          )}
+          {bodyComposition.measuredMuscleMass != null && (
+            <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+              {t('health.compositionMeasuredMuscle', {
+                value: bodyComposition.measuredMuscleMass.toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 }),
+              })}
+            </Text>
+          )}
           {/* 1. IMC */}
           <MetricCard
             icon={Activity}
@@ -914,7 +969,7 @@ export const BodyCompositionDetail = () => {
             delta={deltas.bmi ?? undefined}
             onInfoPress={() => setInfoModal('bmi')}
           >
-            {bodyComposition.bmi && (
+            {bodyComposition.bmi?.adultCategoriesApplicable && (
               <>
                 <View style={styles.rangeWrapper}>
                   <RangeBar
@@ -971,6 +1026,17 @@ export const BodyCompositionDetail = () => {
             comparisonNote={deltas.bodyFatMethodChanged ? t('health.methodUpdated') : undefined}
             onInfoPress={() => setInfoModal('bodyFat')}
           >
+            {bodyComposition.bodyFat && (
+              <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+                {bodyComposition.bodyFat.method === 'rfm'
+                  ? t('health.rfm')
+                  : bodyComposition.bodyFat.method === 'cun_bae'
+                    ? t('health.cun_bae')
+                    : bodyComposition.bodyFat.method === 'bai'
+                      ? t('health.bai')
+                      : t('health.estimation')}
+              </Text>
+            )}
             {bodyComposition.bodyFat && hasDemographicRanges && (
               <>
                 <View style={styles.rangeWrapper}>
@@ -1135,51 +1201,55 @@ export const BodyCompositionDetail = () => {
             </View>
           </MetricCard>
 
-          {/* 5. RECOMPOSITION */}
-          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>{t('health.recomposition')}</Text>
-          <MetricCard
-            icon={TrendingUp}
-            iconColor="#8B5CF6"
-            title={t('health.recomposition')}
-            value={translateDynamicKey(recompositionTrend.labelKey)}
-            badge={
-              recompositionTrend.usedMeasurements.length > 0
-                ? `${recompositionTrend.usedMeasurements.length}`
-                : undefined
-            }
-            badgeColor="#8B5CF6"
-            onInfoPress={() => setInfoModal('recomposition')}
-          >
-            <View
-              style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
-            >
-              <View style={[styles.inlineTipIcon, { backgroundColor: '#8B5CF620' }]}>
-                <Lightbulb size={14} color="#8B5CF6" />
+          <View style={[styles.metricCard, dynamicStyles.glassCard]}>
+            <View style={styles.metricHeader}>
+              <View style={[styles.iconBadge, { backgroundColor: `${themeColors.primary}15` }]}>
+                <TrendingUp size={20} color={themeColors.primary} />
               </View>
-              <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                {translateDynamicKey(recompositionTrend.recommendationKey)}
-              </Text>
+              <Text style={[styles.metricTitle, { color: themeColors.textPrimary }]}>{t('health.bodyChanges')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('health.bodyChanges')}
+                style={styles.infoBtn}
+                onPress={() => setInfoModal('recomposition')}
+              >
+                <Info size={20} color={themeColors.textSecondary} />
+              </TouchableOpacity>
             </View>
-          </MetricCard>
-
-          {/* Global Recalculate Button */}
-          <View style={styles.recalculateContainer}>
-            <View style={[styles.recalculateSeparator, { backgroundColor: themeColors.border }]} />
-            <TouchableOpacity
-              style={[styles.recalculateButton, isRecalculating && styles.recalculateButtonDisabled]}
-              onPress={handleRecalculate}
-              disabled={isRecalculating}
-            >
-              {isRecalculating ? (
-                <ActivityIndicator size="small" color={themeColors.primary} />
-              ) : (
-                <RefreshCw size={15} color={themeColors.primary} />
-              )}
-              <Text style={[styles.recalculateButtonText, { color: themeColors.primary }]}>
-                {t('health.recalculateComposition')}
+            {bodyChanges ? (
+              <>
+                <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+                  {formatDate(bodyChanges.previousDate)} → {formatDate(bodyChanges.currentDate)}
+                </Text>
+                {bodyChanges.changes.map(change => (
+                  <View key={change.key} style={[styles.changeRow, { borderBottomColor: themeColors.border }]}>
+                    <Text style={[styles.changeLabel, { color: themeColors.textPrimary }]}>
+                      {changeLabels[change.key]}
+                    </Text>
+                    <Text style={[styles.changeValue, { color: themeColors.textPrimary }]}>
+                      {change.difference > 0 ? '+' : ''}
+                      {(change.unit === 'kg'
+                        ? convertWeightToUi(change.difference).value
+                        : change.difference
+                      ).toLocaleString(getLocaleTag(), { maximumFractionDigits: 1 })}{' '}
+                      {change.unit === 'kg' ? units.weight : t('health.cm')}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <Text style={[styles.changesPeriod, { color: themeColors.textSecondary }]}>
+                {t('health.bodyChangesMissing')}
               </Text>
-            </TouchableOpacity>
-            <View style={[styles.recalculateSeparator, { backgroundColor: themeColors.border }]} />
+            )}
+            <Text style={[styles.changesNote, { color: themeColors.textSecondary }]}>
+              {t('health.bodyChangesExplanation')}
+            </Text>
+            {(deltas.bodyFatMethodChanged || deltas.muscleMethodChanged) && (
+              <Text style={[styles.changesNote, { color: themeColors.textSecondary }]}>
+                {t('health.bodyChangesMethod')}
+              </Text>
+            )}
           </View>
 
           {/* 4. MASS BREAKDOWN (Combined Lean/Fat/Muscle kg) */}
@@ -1226,6 +1296,27 @@ export const BodyCompositionDetail = () => {
           <Text style={[styles.disclaimer, { color: themeColors.textSecondary }]}>
             {t('health.compositionEstimatesDisclaimer')}
           </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled: compositionQuery.isFetching,
+              busy: compositionQuery.isFetching,
+            }}
+            disabled={compositionQuery.isFetching}
+            onPress={() => void handleRecalculate()}
+            style={[
+              styles.recalculateButton,
+              {
+                borderColor: themeColors.primary,
+                opacity: compositionQuery.isFetching ? 0.45 : 1,
+              },
+            ]}
+          >
+            <RotateCw size={19} color={themeColors.primary} />
+            <Text style={[styles.recalculateText, { color: themeColors.primary }]}>
+              {t('health.recalculateComposition')}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -1276,6 +1367,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.s,
   },
   metricTitle: {
+    flexShrink: 1,
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
@@ -1294,6 +1386,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.m,
   },
   valueContainer: {
+    flex: 1,
+    flexWrap: 'wrap',
     flexDirection: 'row',
     alignItems: 'baseline',
   },
@@ -1315,32 +1409,18 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: 4,
   },
-  recalculateContainer: {
-    marginTop: 0,
-    marginBottom: spacing.l,
-    alignItems: 'center',
-  },
-  recalculateSeparator: {
-    width: '100%',
-    height: 1,
-    opacity: 0.1,
-  },
-  recalculateButton: {
+  changesPeriod: { fontSize: 13, lineHeight: 20, marginBottom: spacing.s },
+  changeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingVertical: spacing.m,
-    paddingHorizontal: spacing.l,
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: spacing.m,
+    paddingVertical: spacing.s,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  recalculateButtonDisabled: {
-    opacity: 0.4,
-  },
-  recalculateButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  changeLabel: { fontSize: 15, flex: 1 },
+  changeValue: { fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  changesNote: { fontSize: 13, lineHeight: 20, marginTop: spacing.m },
   deltaContainer: {
     marginLeft: 12,
   },
@@ -1419,8 +1499,72 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     paddingHorizontal: spacing.l,
   },
+  recalculateButton: {
+    alignSelf: 'center',
+    minHeight: 48,
+    marginTop: spacing.m,
+    paddingHorizontal: spacing.l,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+  },
+  recalculateText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   // Modal
 
+  noticeModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.l,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+  },
+  noticeModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+    padding: spacing.xl,
+    borderRadius: borderRadius.l,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    elevation: 20,
+  },
+  noticeIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.m,
+  },
+  noticeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  noticeMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: spacing.s,
+  },
+  noticeButton: {
+    width: '100%',
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.m,
+    marginTop: spacing.l,
+  },
+  noticeButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',

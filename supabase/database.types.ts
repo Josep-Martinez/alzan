@@ -1002,6 +1002,29 @@ export type Database = {
           },
         ]
       }
+      body_composition_input_revisions: {
+        Row: {
+          revision: number
+          user_id: string
+        }
+        Insert: {
+          revision?: number
+          user_id: string
+        }
+        Update: {
+          revision?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_composition_input_revisions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       body_composition_logs: {
         Row: {
           bmi: number | null
@@ -1016,6 +1039,7 @@ export type Database = {
           composition_calculated_at: string
           created_at: string
           id: string
+          input_revision: number
           input_snapshot: Json
           muscle_formula: string | null
           muscle_inputs: Json
@@ -1049,6 +1073,7 @@ export type Database = {
           composition_calculated_at?: string
           created_at?: string
           id?: string
+          input_revision?: number
           input_snapshot?: Json
           muscle_formula?: string | null
           muscle_inputs?: Json
@@ -1082,6 +1107,7 @@ export type Database = {
           composition_calculated_at?: string
           created_at?: string
           id?: string
+          input_revision?: number
           input_snapshot?: Json
           muscle_formula?: string | null
           muscle_inputs?: Json
@@ -1123,6 +1149,7 @@ export type Database = {
         Row: {
           id: string
           measured_at: string
+          measurement_protocol: string | null
           measurement_type: Database["public"]["Enums"]["measurement_type_enum"]
           notes: string | null
           user_id: string
@@ -1131,6 +1158,7 @@ export type Database = {
         Insert: {
           id?: string
           measured_at?: string
+          measurement_protocol?: string | null
           measurement_type: Database["public"]["Enums"]["measurement_type_enum"]
           notes?: string | null
           user_id: string
@@ -1139,6 +1167,7 @@ export type Database = {
         Update: {
           id?: string
           measured_at?: string
+          measurement_protocol?: string | null
           measurement_type?: Database["public"]["Enums"]["measurement_type_enum"]
           notes?: string | null
           user_id?: string
@@ -2037,6 +2066,39 @@ export type Database = {
           },
         ]
       }
+      exercise_favorites: {
+        Row: {
+          created_at: string
+          exercise_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exercise_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exercise_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_favorites_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_media: {
         Row: {
           exercise_id: string
@@ -2118,6 +2180,7 @@ export type Database = {
       }
       exercises: {
         Row: {
+          archived_at: string | null
           base_name_en: string | null
           base_name_es: string
           created_at: string
@@ -2134,6 +2197,7 @@ export type Database = {
           secondary_muscle_id: number | null
         }
         Insert: {
+          archived_at?: string | null
           base_name_en?: string | null
           base_name_es: string
           created_at?: string
@@ -2150,6 +2214,7 @@ export type Database = {
           secondary_muscle_id?: number | null
         }
         Update: {
+          archived_at?: string | null
           base_name_en?: string | null
           base_name_es?: string
           created_at?: string
@@ -4419,6 +4484,87 @@ export type Database = {
           },
         ]
       }
+      user_exercise_overrides: {
+        Row: {
+          base_name_en: string
+          base_name_es: string
+          created_at: string
+          description_en: string | null
+          description_es: string | null
+          equipment_id: number | null
+          exercise_id: string
+          load_type: Database["public"]["Enums"]["exercise_load_type"] | null
+          primary_muscle_id: number
+          secondary_muscle_id: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_name_en: string
+          base_name_es: string
+          created_at?: string
+          description_en?: string | null
+          description_es?: string | null
+          equipment_id?: number | null
+          exercise_id: string
+          load_type?: Database["public"]["Enums"]["exercise_load_type"] | null
+          primary_muscle_id: number
+          secondary_muscle_id?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_name_en?: string
+          base_name_es?: string
+          created_at?: string
+          description_en?: string | null
+          description_es?: string | null
+          equipment_id?: number | null
+          exercise_id?: string
+          load_type?: Database["public"]["Enums"]["exercise_load_type"] | null
+          primary_muscle_id?: number
+          secondary_muscle_id?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_exercise_overrides_equipment_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_exercise_overrides_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_exercise_overrides_primary_muscle_fkey"
+            columns: ["primary_muscle_id"]
+            isOneToOne: false
+            referencedRelation: "muscle_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_exercise_overrides_secondary_muscle_fkey"
+            columns: ["secondary_muscle_id"]
+            isOneToOne: false
+            referencedRelation: "muscle_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_exercise_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_goals: {
         Row: {
           created_at: string
@@ -5378,6 +5524,49 @@ export type Database = {
         }
         Returns: Json
       }
+      commit_body_composition_snapshot: {
+        Args: { p_expected_revision: number; p_snapshot: Json }
+        Returns: {
+          bmi: number | null
+          bodyfat_formula: string | null
+          bodyfat_inputs: Json
+          bodyfat_method: string | null
+          bodyfat_percent: number | null
+          bodyfat_precision_level: number | null
+          calculated_for_date: string
+          calculation_status: string
+          calculation_version: number
+          composition_calculated_at: string
+          created_at: string
+          id: string
+          input_revision: number
+          input_snapshot: Json
+          muscle_formula: string | null
+          muscle_inputs: Json
+          muscle_mass_kg: number | null
+          muscle_method: string | null
+          muscle_percent: number | null
+          muscle_precision_level: number | null
+          source_weight_log_id: string | null
+          updated_at: string
+          user_id: string
+          waist_to_height_category: string | null
+          waist_to_height_formula: string | null
+          waist_to_height_inputs: Json
+          waist_to_height_ratio: number | null
+          waist_to_hip_category: string | null
+          waist_to_hip_formula: string | null
+          waist_to_hip_inputs: Json
+          waist_to_hip_ratio: number | null
+          weight_kg_used: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "body_composition_logs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       complete_wearable_activity_import: {
         Args: {
           p_canonical_version: number
@@ -5450,6 +5639,14 @@ export type Database = {
         Args: { p_recipe_id: string }
         Returns: string
       }
+      exercise_catalog_query_matches_candidates: {
+        Args: { p_candidates: string[]; p_query: string }
+        Returns: boolean
+      }
+      exercise_catalog_search_token_variants: {
+        Args: { p_token: string }
+        Returns: string[]
+      }
       expire_training_templates: {
         Args: { p_local_date: string }
         Returns: number
@@ -5461,6 +5658,10 @@ export type Database = {
           p_retryable: boolean
         }
         Returns: undefined
+      }
+      find_exact_exercise_catalog_match: {
+        Args: { p_exclude_exercise_id?: string; p_name: string }
+        Returns: string
       }
       finish_wearable_activity_reconciliation: {
         Args: { p_error_code?: string; p_import_id: string }
@@ -5575,6 +5776,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_body_composition_context: {
+        Args: never
+        Returns: {
+          revision: number
+          server_now: string
+          user_id: string
+        }[]
+      }
+      get_exercise_catalog_usage_summaries: {
+        Args: { p_exercise_ids: string[] }
+        Returns: {
+          best_weight_kg: number
+          exercise_id: string
+          latest_at: string
+          latest_reps: number
+          latest_weight_kg: number
+          set_count: number
+        }[]
+      }
       get_home_summary: {
         Args: {
           p_timezone?: string
@@ -5613,6 +5833,26 @@ export type Database = {
           planned_count: number
         }[]
       }
+      get_used_exercise_catalog_page: {
+        Args: {
+          p_equipment_id?: number
+          p_favorites_only?: boolean
+          p_muscle_id?: number
+          p_page?: number
+          p_page_size?: number
+          p_query?: string
+        }
+        Returns: {
+          best_weight_kg: number
+          current_page: number
+          exercise_id: string
+          latest_at: string
+          latest_reps: number
+          latest_weight_kg: number
+          set_count: number
+          total_items: number
+        }[]
+      }
       import_ingredients_batch: { Args: { payload: Json }; Returns: number }
       import_nutrition_menu: {
         Args: {
@@ -5631,6 +5871,10 @@ export type Database = {
           p_recipe_id: string
         }
         Returns: undefined
+      }
+      normalize_exercise_catalog_name: {
+        Args: { p_name: string }
+        Returns: string
       }
       nutrition_menu_snapshot_token: {
         Args: { p_dates: string[]; p_user_id: string }
@@ -5690,6 +5934,20 @@ export type Database = {
           p_limit?: number
           p_locale?: string
           p_muscle_id?: number
+          p_query: string
+        }
+        Returns: {
+          id: string
+          search_rank: number
+        }[]
+      }
+      search_exercises_ranked_page: {
+        Args: {
+          p_equipment_id?: number
+          p_limit?: number
+          p_locale?: string
+          p_muscle_id?: number
+          p_offset?: number
           p_query: string
         }
         Returns: {

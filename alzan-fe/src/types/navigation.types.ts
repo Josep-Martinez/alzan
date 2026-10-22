@@ -94,8 +94,11 @@ export type TrainingStackParamList = {
     routineId?: string;
     selectionMode?: 'single' | 'multi';
     replacementExerciseName?: string;
+    replacementExercise?: ExerciseWithDetails;
     excludedExerciseIds?: string[];
   };
+  ExerciseCatalog: undefined;
+  ExerciseCatalogCreate: { exerciseId?: string } | undefined;
   StartWorkout: { templateId: string; date?: string; planId?: string };
   ActiveWorkout: { sessionId: string };
   FinishWorkout: { sessionId: string };
@@ -173,12 +176,15 @@ export type HealthStackParamList = {
   BodyCompositionDetail: undefined;
   MeasurementsList: undefined;
   MeasurementDetail: {
+    protocol?: string | null;
     measurementType?: MeasurementType;
     type?: MeasurementType;
     label?: string;
     defaultType?: MeasurementType;
   };
-  MeasurementAdd: { measurementType?: string; date?: string; defaultType?: MeasurementType } | undefined;
+  MeasurementAdd:
+    | { measurementType?: string; date?: string; defaultType?: MeasurementType; defaultProtocol?: string | null }
+    | undefined;
   SleepList: undefined;
   SleepAdd: undefined;
   RestingHRList: undefined;

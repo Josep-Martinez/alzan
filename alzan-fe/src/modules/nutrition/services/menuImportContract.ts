@@ -118,6 +118,57 @@ const getWeekdayForDate = (date: string): string =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/**
+ * Some external AI clients copy JSON through a LaTeX/Markdown renderer. Undo
+ * only the renderer escapes that are unambiguous in this contract: escaped
+ * array/object delimiters outside strings and escaped underscores in keys.
+ */
+const normalizeAiRenderedJson = (text: string): string => {
+  const chunks: string[] = [];
+  let escaped = false;
+  let stringStart = -1;
+  let chunkStart = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (stringStart >= 0) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"') {
+        let nextIndex = index + 1;
+        while (nextIndex < text.length && /\s/u.test(text[nextIndex] ?? '')) nextIndex += 1;
+        if (text[nextIndex] === ':') {
+          chunks.push(text.slice(chunkStart, stringStart + 1));
+          chunks.push(text.slice(stringStart + 1, index).replace(/(^|[^\\])\\_/gu, '$1_'));
+          chunkStart = index;
+        }
+        stringStart = -1;
+      }
+      continue;
+    }
+    if (character === '"') {
+      stringStart = index;
+      continue;
+    }
+    const nextCharacter = text[index + 1];
+    if (character === '\\' && ['[', ']', '{', '}'].includes(nextCharacter ?? '')) {
+      chunks.push(text.slice(chunkStart, index));
+      chunkStart = index + 1;
+      index += 1;
+    }
+  }
+  chunks.push(text.slice(chunkStart));
+  return chunks.join('');
+};
+
+const addMissingMenuRootBrace = (text: string): string => {
+  const trimmed = text.trim();
+  if (/^"format"\s*:/u.test(trimmed) && trimmed.endsWith('}')) return `{${trimmed}`;
+  return trimmed;
+};
+
 const addError = (context: ValidationContext, code: MenuImportValidationErrorCode, path: string, message: string) => {
   context.errors.push({ code, path, message });
 };
@@ -427,13 +478,19 @@ export function parseMenuImportJson(rawText: string): MenuImportParseResult {
   try {
     value = JSON.parse(rawText);
   } catch {
+    const normalizedText = normalizeImportJsonText(rawText);
     try {
-      value = JSON.parse(normalizeImportJsonText(rawText));
+      value = JSON.parse(normalizedText);
     } catch {
-      return {
-        ok: false,
-        errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
-      };
+      const renderedJson = normalizeAiRenderedJson(normalizedText);
+      try {
+        value = JSON.parse(addMissingMenuRootBrace(renderedJson));
+      } catch {
+        return {
+          ok: false,
+          errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
+        };
+      }
     }
   }
 

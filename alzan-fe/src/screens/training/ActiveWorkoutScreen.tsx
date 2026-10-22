@@ -379,7 +379,8 @@ export const ActiveWorkoutScreen = () => {
     navigation.navigate('ExerciseSearch', {
       onSelect: () => {},
       replacementExerciseName: getLocalizedExerciseName(source.exercise),
-      excludedExerciseIds: items.map(item => item.exercise_id),
+      replacementExercise: { ...source.exercise, name: getLocalizedExerciseName(source.exercise) },
+      excludedExerciseIds: sourceDraft.exerciseOrder.filter(id => !sourceDraft.hiddenExercises.includes(id)),
       onExerciseSelected: replacement => setReplacementPreview({ id, replacement, organizing }),
     });
   };
