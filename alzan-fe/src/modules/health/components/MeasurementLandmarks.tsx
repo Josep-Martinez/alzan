@@ -30,7 +30,7 @@ export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksP
   const band: Band | null = (() => {
     switch (measurement.key) {
       case 'chest':
-        return { path: 'M340 383 Q543 408 746 383', width: 16 };
+        return { path: 'M310 350 Q543 383 776 350', width: 16 };
       case 'waist':
         return { path: 'M402 615 Q543 635 684 615', width: 16 };
       case 'abdomen':

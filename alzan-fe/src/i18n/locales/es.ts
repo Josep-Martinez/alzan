@@ -1700,7 +1700,8 @@ export default {
     thigh: 'Muslo',
     measureTipAbdomen: 'Mide a la altura del ombligo, relajando el abdomen sin meter tripa.',
     measureTipHips: 'Mide en la parte más ancha de los glúteos, con los pies juntos.',
-    measureTipChest: 'Mide a la altura de los pezones, con el pecho relajado (no inflado). Por debajo de las axilas.',
+    measureTipChest:
+      'Pasa la cinta por debajo de las axilas y a la altura de los pezones, con el pecho relajado (sin inflarlo).',
     measureTipArm: 'Mide en la parte más gruesa del bíceps, con el brazo relajado.',
     measureTipThigh: 'Mide en la parte más gruesa del muslo, cerca de la ingle.',
     progress30Days: 'Progreso (30 días)',

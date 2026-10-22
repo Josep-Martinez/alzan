@@ -1676,7 +1676,7 @@ const en = {
     thigh: 'Thigh',
     measureTipAbdomen: 'Measure at navel height, relax your abdomen without pulling it in.',
     measureTipHips: 'Measure at the widest part of your glutes, with feet together.',
-    measureTipChest: 'Measure at nipple level, with chest relaxed (not inflated).',
+    measureTipChest: 'Pass the tape just below the armpits and across nipple level, with your chest relaxed.',
     measureTipArm: 'Measure at the widest part of your biceps, with arm relaxed.',
     measureTipThigh: 'Measure at the widest part of your thigh, near the groin.',
     progress30Days: 'Progress (30 days)',
