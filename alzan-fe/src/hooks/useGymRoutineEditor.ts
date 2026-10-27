@@ -23,6 +23,8 @@ import {
   type StrengthProgressionTargets,
 } from '../modules/training/helpers/strengthExerciseReconciliation.helper';
 import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
+import type { Json } from '../types/database.types';
+import { parseTargetRirBySet } from '../modules/training/helpers/targetRirBySet.helper';
 
 export type PopulatedRoutineData = NonNullable<ReturnType<typeof useGymRoutineEditor>['routineData']>;
 export type RoutineDataExercise = PopulatedRoutineData['exercises'][number];
@@ -52,7 +54,8 @@ interface RoutineExerciseLookupRow extends Exercise {
   } | null;
 }
 
-type WorkoutTemplateExerciseLookupRow = WorkoutTemplateExercise & {
+type WorkoutTemplateExerciseLookupRow = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
   exercise: RoutineExerciseLookupRow | null;
 };
 
@@ -60,6 +63,10 @@ type ExistingRoutineExerciseRow = {
   id: string;
   order_index: number;
 } & StrengthProgressionTargets;
+
+type ExistingRoutineExerciseDatabaseRow = Omit<ExistingRoutineExerciseRow, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
+};
 
 export const useGymRoutineEditor = (routineId?: string) => {
   const { user } = useAuth();
@@ -112,6 +119,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
 
         return {
           ...te,
+          target_rir_by_set: parseTargetRirBySet(te.target_rir_by_set, te.target_sets),
           target_reps_min: repsMin,
           target_reps_max: repsMax,
           is_warmup: te.is_warmup ?? false,
@@ -213,15 +221,19 @@ export const useGymRoutineEditor = (routineId?: string) => {
               target_reps_max,
               target_weight_kg,
               target_rpe,
+              target_rir_by_set,
               rest_seconds
             `,
           )
           .eq('workout_template_id', data.id)
           .order('order_index')
-          .returns<ExistingRoutineExerciseRow[]>();
+          .returns<ExistingRoutineExerciseDatabaseRow[]>();
 
         if (existingError) throw existingError;
-        existingExercises = existingRows ?? [];
+        existingExercises = (existingRows ?? []).map(row => ({
+          ...row,
+          target_rir_by_set: parseTargetRirBySet(row.target_rir_by_set, row.target_sets),
+        }));
       }
 
       const reconciliation = buildStrengthExerciseReconciliationPlan({
@@ -255,16 +267,22 @@ export const useGymRoutineEditor = (routineId?: string) => {
         const exercise = data.exercises[index];
         const repsMin = normalizePositiveInteger(exercise.target_reps_min ?? exercise.target_reps_max, 8);
         const repsMax = normalizePositiveInteger(exercise.target_reps_max ?? exercise.target_reps_min, repsMin);
+        const targetSets = normalizePositiveInteger(exercise.target_sets, 3);
+        const resizeRirTargets = (values: Array<number | null>) =>
+          Array.from({ length: targetSets }, (_, setIndex) => values[setIndex] ?? null);
         return {
           exercise_id: exercise.exercise_id,
           order_index: index,
           is_warmup: !!exercise.is_warmup,
           drop_set_mode: exercise.is_warmup ? 'none' : exercise.drop_set_mode || 'none',
-          target_sets: normalizePositiveInteger(exercise.target_sets, 3),
+          target_sets: targetSets,
           target_reps_min: repsMin,
           target_reps_max: repsMax,
           target_weight_kg: exercise.target_weight_kg,
           target_rpe: exercise.target_rpe,
+          target_rir_by_set: Array.isArray(exercise.target_rir_by_set)
+            ? resizeRirTargets(exercise.target_rir_by_set)
+            : null,
           notes: exercise.notes,
           rest_seconds: exercise.rest_seconds,
           superset_next_exercise_id: null,
@@ -283,14 +301,39 @@ export const useGymRoutineEditor = (routineId?: string) => {
           return Object.keys(patch).length > 0 ? [{ exerciseId: item.existingId, patch }] : [];
         });
         if (targetUpdates.length > 0) {
+          const { data: progressionRows, error: progressionRowsError } = await supabase
+            .from('workout_template_exercise_progressions')
+            .select('id, workout_template_exercise_id, target_sets, target_rir_by_set')
+            .eq('workout_template_id', template.id)
+            .returns<
+              Array<{
+                id: string;
+                workout_template_exercise_id: string;
+                target_sets: number | null;
+                target_rir_by_set: Json | null;
+              }>
+            >();
+          if (progressionRowsError) throw progressionRowsError;
+
           const progressionUpdates = await Promise.all(
-            targetUpdates.map(update =>
-              supabase
-                .from('workout_template_exercise_progressions')
-                .update(update.patch)
-                .eq('workout_template_id', template.id)
-                .eq('workout_template_exercise_id', update.exerciseId),
-            ),
+            targetUpdates.flatMap(update => {
+              const progressionPatch = { ...update.patch };
+              const setCountChanged = progressionPatch.target_sets !== undefined;
+              if (setCountChanged) delete progressionPatch.target_rir_by_set;
+              return (progressionRows ?? [])
+                .filter(row => row.workout_template_exercise_id === update.exerciseId)
+                .map(row => {
+                  const rowPatch = { ...progressionPatch };
+                  const previousRirTargets = parseTargetRirBySet(row.target_rir_by_set, row.target_sets);
+                  if (setCountChanged && previousRirTargets) {
+                    rowPatch.target_rir_by_set = Array.from(
+                      { length: progressionPatch.target_sets ?? previousRirTargets.length },
+                      (_, index) => previousRirTargets[index] ?? null,
+                    );
+                  }
+                  return supabase.from('workout_template_exercise_progressions').update(rowPatch).eq('id', row.id);
+                });
+            }),
           );
           const progressionUpdateError = progressionUpdates.find(result => result.error);
           if (progressionUpdateError?.error) throw progressionUpdateError.error;

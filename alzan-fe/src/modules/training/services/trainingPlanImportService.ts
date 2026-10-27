@@ -13,6 +13,7 @@ import {
 import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPlanImportLogger';
 import { buildImportedWorkoutPlans } from './trainingPlanImportCalendar.helper';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
+import { toImportedRirBySet } from './trainingPlanImportRir.helper';
 import {
   areTrainingPlanExerciseResolutionsReady,
   getTrainingExerciseResolutionKey,
@@ -513,6 +514,7 @@ const createStrengthTemplate = async (
         target_reps_max: exercise.reps_max ?? exercise.reps ?? 8,
         target_weight_kg: exercise.weight_kg ?? null,
         target_rpe: exercise.rpe ?? null,
+        target_rir_by_set: toImportedRirBySet(exercise.rir_by_set),
         rest_seconds: exercise.rest_seconds ?? null,
         notes: exercise.notes ?? null,
       };
@@ -544,6 +546,7 @@ const createStrengthTemplate = async (
         target_reps_max: number | null;
         target_weight_kg: number | null;
         target_rpe: number | null;
+        target_rir_by_set: Array<number | null> | null;
         rest_seconds: number | null;
       }
     >();
@@ -561,6 +564,7 @@ const createStrengthTemplate = async (
           target_reps_max: exercise.reps_max ?? exercise.reps ?? null,
           target_weight_kg: exercise.weight_kg ?? null,
           target_rpe: exercise.rpe ?? null,
+          target_rir_by_set: toImportedRirBySet(exercise.rir_by_set),
           rest_seconds: exercise.rest_seconds ?? null,
         };
         const progressionKey = `${inserted.id}:${weekIndex}`;
@@ -581,7 +585,7 @@ const createStrengthTemplate = async (
       });
       const { error: progressionError } = await supabase
         .from('workout_template_exercise_progressions')
-        .insert(progressionRows as never);
+        .insert(progressionRows);
       if (progressionError) {
         logTrainingPlanImportError('strength-progressions:create-failed', progressionError, {
           familyKey: family.familyKey,

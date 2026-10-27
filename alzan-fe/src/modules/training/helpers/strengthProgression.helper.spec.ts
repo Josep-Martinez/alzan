@@ -7,6 +7,7 @@ import {
   type StrengthExerciseProgression,
 } from './strengthProgression.helper';
 import { getProgressionWeekIndex } from './enduranceProgression.helper';
+import { parseTargetRirBySet } from './targetRirBySet.helper';
 
 const baseExercises = [
   {
@@ -16,6 +17,7 @@ const baseExercises = [
     target_reps_max: 10,
     target_weight_kg: 70,
     target_rpe: 7,
+    target_rir_by_set: [3, 2, 2],
     rest_seconds: 90,
     nested: { preserved: true },
   },
@@ -26,6 +28,7 @@ const baseExercises = [
     target_reps_max: 8,
     target_weight_kg: 40,
     target_rpe: 8,
+    target_rir_by_set: [3, 2, 2, 1],
     rest_seconds: 120,
     nested: { preserved: true },
   },
@@ -50,6 +53,7 @@ const progressions: StrengthExerciseProgression[] = [
     target_reps_max: null,
     target_weight_kg: null,
     target_rpe: null,
+    target_rir_by_set: null,
     rest_seconds: null,
   },
   {
@@ -60,6 +64,7 @@ const progressions: StrengthExerciseProgression[] = [
     target_reps_max: 5,
     target_weight_kg: 85,
     target_rpe: 9,
+    target_rir_by_set: [2, 1, 1, 0, 0],
     rest_seconds: 180,
   },
 ];
@@ -84,8 +89,16 @@ assert.deepEqual(
   },
 );
 assert.deepEqual(weekTwo[0].nested, { preserved: true });
+assert.deepEqual(weekTwo[0].target_rir_by_set, baseExercises[0].target_rir_by_set);
 assert.deepEqual(weekTwo[1], baseExercises[1], 'null progression values must preserve the base targets');
 assert.deepEqual(baseExercises[0].target_sets, 3, 'the base exercise must not be mutated');
+
+const weekThree = applyStrengthExerciseProgressions(baseExercises, progressions, 3);
+assert.deepEqual(
+  weekThree[0].target_rir_by_set,
+  [2, 1, 1, 0, 0],
+  'a progression RIR vector must override the base targets',
+);
 
 const weekOne = applyStrengthExerciseProgressions(baseExercises, progressions, 1);
 assert.deepEqual(weekOne, baseExercises, 'weeks without overrides must keep the base targets');
@@ -135,6 +148,16 @@ assert.deepEqual(
   baseExercises,
   'dates after the recurrence must use the base targets',
 );
+
+assert.deepEqual(parseTargetRirBySet(null, 3), null);
+assert.deepEqual(parseTargetRirBySet([3, null, 1], 3), [3, null, 1]);
+assert.deepEqual(parseTargetRirBySet([0, 10], 2), [0, 10]);
+assert.equal(parseTargetRirBySet([3, 2], 3), null, 'vectors with a different number of sets are rejected');
+assert.equal(parseTargetRirBySet([3, -1], 2), null, 'RIR cannot be negative');
+assert.equal(parseTargetRirBySet([3, 11], 2), null, 'RIR cannot be above ten');
+assert.equal(parseTargetRirBySet([3, 2.5], 2), null, 'RIR targets must be integers');
+assert.equal(parseTargetRirBySet([3, '2'], 2), null, 'string values are rejected');
+assert.equal(parseTargetRirBySet({ values: [3, 2] }, 2), null, 'non-array JSON is rejected');
 
 const verifySafeFallback = async () => {
   let capturedError: unknown;
