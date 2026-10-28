@@ -870,7 +870,7 @@ const en = {
     bodyChangesMissing: 'Add comparable measurements on another date, between 7 and 90 days apart.',
     bodyChangesPeriod: 'Compared dates',
     bodyChangesMethod: 'The estimation method changed. Percentage differences are not interpreted as physical change.',
-    compositionAutomatic: 'Updates automatically with compatible inputs from the last 72 hours.',
+    compositionAutomatic: 'Updates automatically using the latest valid data available.',
     compositionMeasuredFat: 'Recorded body fat · {{value}}%',
     compositionMeasuredMuscle: 'Recorded muscle · {{value}} kg',
     compositionHistorical: 'Historical estimate · {{date}}',
@@ -2984,6 +2984,11 @@ const en = {
     trainingPlanImportSuccess: '{{templates}} templates and {{plans}} workouts added.',
     trainingPlanImportReused: '{{templates}} existing templates were reused without replacing their changes.',
     trainingPlanImportError: 'Could not import the training plan.',
+    trainingPlanTimedCatalogTypeRequired:
+      'Could not verify the type of “{{exercise}}”. Select a time-based exercise from the catalog to import duration_s.',
+    trainingPlanTimedNeedsDuration:
+      '“{{exercise}}” is time-based. Provide duration_s in seconds instead of repetitions.',
+    trainingPlanRepsNeedRepetitions: '“{{exercise}}” is repetition-based. Provide reps instead of duration_s.',
     trainingPlanValidationError: '{{path}}: {{message}}',
     trainingPlanPreviewMeta: '{{weeks}} {{weekLabel}} · {{sessions}} {{workoutLabel}}',
     trainingPlanWeek: 'week',

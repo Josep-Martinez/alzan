@@ -880,7 +880,7 @@ export default {
     bodyChangesPeriod: 'Fechas comparadas',
     bodyChangesMethod:
       'Cambió el método de estimación. La diferencia entre porcentajes no se interpreta como un cambio físico.',
-    compositionAutomatic: 'Se actualiza automáticamente con datos compatibles de las últimas 72 horas.',
+    compositionAutomatic: 'Se actualiza automáticamente con los datos válidos más recientes disponibles.',
     compositionMeasuredFat: 'Grasa registrada · {{value}}%',
     compositionMeasuredMuscle: 'Músculo registrado · {{value}} kg',
     compositionHistorical: 'Estimación histórica · {{date}}',
@@ -3027,6 +3027,11 @@ export default {
     trainingPlanImportSuccess: 'Se han añadido {{templates}} plantillas y {{plans}} entrenamientos.',
     trainingPlanImportReused: 'Se han reutilizado {{templates}} plantillas existentes sin reemplazar sus cambios.',
     trainingPlanImportError: 'No se ha podido importar el plan de entrenamiento.',
+    trainingPlanTimedCatalogTypeRequired:
+      'No se ha podido verificar el tipo de «{{exercise}}». Elige un ejercicio de tipo tiempo del catálogo para importar duration_s.',
+    trainingPlanTimedNeedsDuration:
+      '«{{exercise}}» se mide por tiempo. Indica duration_s en segundos en lugar de repeticiones.',
+    trainingPlanRepsNeedRepetitions: '«{{exercise}}» se mide por repeticiones. Indica reps en lugar de duration_s.',
     trainingPlanValidationError: '{{path}}: {{message}}',
     trainingPlanPreviewMeta: '{{weeks}} {{weekLabel}} · {{sessions}} {{workoutLabel}}',
     trainingPlanWeek: 'semana',
